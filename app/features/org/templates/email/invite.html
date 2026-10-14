@@ -1,0 +1,21 @@
+{#- Member invitation. Context: inviter, company_name, role_label, link, days. -#}
+{% block subject %}{% autoescape false %}{{ _("{inviter} mời bạn tham gia {company} trên {product}", inviter=inviter, company=company_name, product=product_name) }}{% endautoescape %}{% endblock %}
+
+{% block text %}{% autoescape false %}
+{{ _("{inviter} mời bạn tham gia sổ sách kế toán của {company} với vai trò {role}.", inviter=inviter, company=company_name, role=_(role_label)) }}
+
+{{ _("Nhấn đường link dưới đây để chấp nhận lời mời:") }}
+
+{{ link }}
+
+{{ _("Lời mời hết hạn sau {days} ngày. Nếu bạn không biết người mời, hãy bỏ qua email này.", days=days) }}
+{% endautoescape %}{% endblock %}
+
+{% block html %}
+{% import "email/macros.html" as mail with context %}
+{% call mail.layout(_("Lời mời tham gia {company}", company=company_name)) %}
+<p style="margin:0">{{ _("{inviter} mời bạn tham gia sổ sách kế toán của {company} với vai trò {role}.", inviter=inviter, company=company_name, role=_(role_label)) }}</p>
+{{ mail.button(_("Chấp nhận lời mời"), link) }}
+<p style="margin:0;font-size:13px;color:#52606d">{{ _("Lời mời hết hạn sau {days} ngày. Nếu bạn không biết người mời, hãy bỏ qua email này.", days=days) }}</p>
+{% endcall %}
+{% endblock %}

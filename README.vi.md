@@ -92,7 +92,7 @@ Dọn dẹp: `docker rm -f vfas && docker volume rm vfas-data`.
 | Máy chủ | VPS 1 GB hoặc máy trong LAN | VPS 2–4 GB trở lên |
 | CSDL | SQLite | PostgreSQL |
 | Truy cập | HTTPS qua reverse proxy hoặc VPN | HTTPS qua Traefik, rate limit tại proxy |
-| Đăng ký | Quản trị mời thành viên | Tự đăng ký (cần SMTP – đang làm) |
+| Đăng ký | Quản trị mời thành viên | Tự đăng ký, xác minh email (SMTP) |
 
 Hướng dẫn đầy đủ: [docs/DEPLOY.md](docs/DEPLOY.md). Trước khi đưa lên Internet, làm theo checklist trong
 [docs/SECURITY-GUIDE.md](docs/SECURITY-GUIDE.md).
@@ -134,7 +134,7 @@ Tài liệu chi tiết viết bằng tiếng Anh.
 
 ## Lộ trình
 
-- [ ] Gửi email (SMTP): xác minh email, quên mật khẩu, gửi lời mời – cần có trước khi mở đăng ký công khai
+- [x] Gửi email (SMTP): xác minh email, quên mật khẩu, gửi lời mời – cần có trước khi mở đăng ký công khai
 - [ ] Xuất hóa đơn điện tử qua nhà cung cấp (Viettel S-Invoice, MISA meInvoice, VNPT, BKAV) – thiết kế ở [docs/EINVOICE.md](docs/EINVOICE.md)
 - [ ] XML BCTC, 03/TNDN, 05/QTT-TNCN để nộp qua HTKK
 - [ ] Chế độ kế toán TT99/2025 và TT58/2026 (điểm mở rộng `app/core/regimes.py`)

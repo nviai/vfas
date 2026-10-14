@@ -1,0 +1,22 @@
+{#- Password reset link. Context: name, link, minutes. -#}
+{% block subject %}{% autoescape false %}{{ _("Đặt lại mật khẩu – {product}", product=product_name) }}{% endautoescape %}{% endblock %}
+
+{% block text %}{% autoescape false %}
+{{ _("Chào {name},", name=name) }}
+
+{{ _("Có yêu cầu đặt lại mật khẩu cho tài khoản {email}. Nhấn đường link dưới đây để đặt mật khẩu mới:", email=email) }}
+
+{{ link }}
+
+{{ _("Link có hiệu lực trong {minutes} phút và chỉ dùng được một lần. Nếu bạn không yêu cầu, hãy bỏ qua email này – mật khẩu hiện tại vẫn giữ nguyên.", minutes=minutes) }}
+{% endautoescape %}{% endblock %}
+
+{% block html %}
+{% import "email/macros.html" as mail with context %}
+{% call mail.layout(_("Đặt lại mật khẩu")) %}
+<p style="margin:0 0 12px">{{ _("Chào {name},", name=name) }}</p>
+<p style="margin:0">{{ _("Có yêu cầu đặt lại mật khẩu cho tài khoản {email}. Nhấn đường link dưới đây để đặt mật khẩu mới:", email=email) }}</p>
+{{ mail.button(_("Đặt mật khẩu mới"), link) }}
+<p style="margin:0;font-size:13px;color:#52606d">{{ _("Link có hiệu lực trong {minutes} phút và chỉ dùng được một lần. Nếu bạn không yêu cầu, hãy bỏ qua email này – mật khẩu hiện tại vẫn giữ nguyên.", minutes=minutes) }}</p>
+{% endcall %}
+{% endblock %}

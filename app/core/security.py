@@ -44,6 +44,9 @@ class CurrentUser:
     # Scopes (read, write_draft) when authenticated with an API token.
     # None = web session.
     api_scopes: frozenset[str] | None = None
+    # False only for self sign-up accounts that have not confirmed
+    # their email address yet.
+    email_verified: bool = True
     extra: dict = field(default_factory=dict)
 
     def can(self, perm: str) -> bool:
@@ -417,6 +420,7 @@ def build_current_user(
         ip=ip,
         session_id=session_id,
         api_scopes=api_scopes,
+        email_verified=getattr(user, "email_verified_at", True) is not None,
     )
 
 
@@ -471,9 +475,25 @@ class CompanyRequiredError(Exception):
     """Logged in but no company selected or available yet."""
 
 
+class EmailUnverifiedError(Exception):
+    """Logged in, but the email address still has to be verified."""
+
+
+def require_verified_email(user: CurrentUser) -> None:
+    from app.core.mail import verification_required
+
+    if (
+        not user.email_verified
+        and user.api_scopes is None
+        and verification_required()
+    ):
+        raise EmailUnverifiedError()
+
+
 def get_member(request: Request) -> CurrentUser:
     """Logged-in user who is working on a company."""
     user = get_current_user(request)
+    require_verified_email(user)
     if user.company_id is None or user.role is None:
         raise CompanyRequiredError()
     return user

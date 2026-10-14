@@ -6,10 +6,11 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core import mail
 from app.core.config import get_settings
 from app.core.dates import parse_date
 from app.core.db import get_db
@@ -22,6 +23,7 @@ from app.core.security import (
     record_event,
     require,
     require_superadmin,
+    require_verified_email,
 )
 from app.core.web import (
     client_ip,
@@ -29,8 +31,10 @@ from app.core.web import (
     form_data,
     get_ctx,
     get_tenant_db,
+    public_base_url,
     redirect,
     render,
+    resolve_lang,
 )
 from app.features.auth import service as auth
 from app.features.auth.models import User, UserSession
@@ -41,16 +45,11 @@ from app.features.org.models import Company, Membership
 router = APIRouter()
 
 
-def _public_url(request: Request) -> str:
-    return get_settings().public_url.rstrip("/") or str(
-        request.base_url
-    ).rstrip("/")
-
-
 # ----------------------------------------------------- company creation
 
 
 def _can_create_company(user: CurrentUser) -> bool:
+    require_verified_email(user)
     return user.is_superadmin or get_settings().allow_signup
 
 
@@ -265,6 +264,62 @@ def members_page(
     return resp
 
 
+def _send_invitation(request: Request, inv, link: str) -> Response:
+    """Email the invitation link (when SMTP is configured).
+
+    The link is also shown once on the members page as a fallback.
+    """
+    sent, error = False, None
+    if mail.mail_enabled():
+        user = request.state.user
+        try:
+            mail.send(
+                mail.render_mail(
+                    "org/email/invite.html",
+                    inv.email,
+                    resolve_lang(request),
+                    inviter=user.display_name,
+                    company_name=inv.company.name,
+                    role_label=ROLE_LABELS.get(inv.role, inv.role),
+                    link=link,
+                    days=org.INVITE_DAYS,
+                )
+            )
+            sent = True
+        except mail.MailError as e:
+            error = str(e)
+    if sent:
+        message, level = (
+            f"Đã gửi email mời tới {inv.email}. "
+            "Đường link bên dưới dùng khi họ không nhận được email.",
+            "success",
+        )
+    elif error:
+        message, level = (
+            f"Không gửi được email mời ({error}). "
+            f"Gửi đường link bên dưới cho {inv.email}.",
+            "warning",
+        )
+    else:
+        message, level = (
+            f"Đã tạo lời mời cho {inv.email}. Gửi đường link bên dưới cho họ.",
+            "success",
+        )
+    # Keep the link (it contains the token) out of URLs/logs: store
+    # it in a signed cookie that the members page reads once.
+    resp = redirect("/members", message, level, request=request)
+    resp.set_cookie(
+        INVITE_COOKIE,
+        _invite_serializer().dumps(link),
+        max_age=600,
+        httponly=True,
+        samesite="strict",
+        secure=cookie_secure(request),
+        path="/members",
+    )
+    return resp
+
+
 @router.post("/members/invite")
 def members_invite(
     request: Request,
@@ -276,24 +331,22 @@ def members_invite(
     inv, token = org.invite(
         db, ctx, form.get("email") or "", form.get("role") or ""
     )
-    link = f"{_public_url(request)}/invite/{token}"
-    # Keep the link (it contains the token) out of URLs/logs: store
-    # it in a signed cookie that the members page reads once.
-    resp = redirect(
-        "/members",
-        f"Đã tạo lời mời cho {inv.email}. Gửi đường link bên dưới cho họ.",
-        request=request,
+    return _send_invitation(
+        request, inv, f"{public_base_url(request)}/invite/{token}"
     )
-    resp.set_cookie(
-        INVITE_COOKIE,
-        _invite_serializer().dumps(link),
-        max_age=600,
-        httponly=True,
-        samesite="strict",
-        secure=cookie_secure(request),
-        path="/members",
+
+
+@router.post("/invitations/{invitation_id}/resend")
+def invitation_resend(
+    request: Request,
+    invitation_id: int,
+    _u: CurrentUser = Depends(require("members.manage")),
+    db: Session = Depends(get_tenant_db),
+):
+    inv, token = org.renew_invitation(db, get_ctx(request), invitation_id)
+    return _send_invitation(
+        request, inv, f"{public_base_url(request)}/invite/{token}"
     )
-    return resp
 
 
 @router.post("/members/{membership_id}/role")

@@ -21,11 +21,14 @@ from app.core.web import RequestContextMiddleware, install_error_handlers
 API_FEATURES = {"api"}
 log = logging.getLogger("app")
 
-_SECRET_IN_URL = re.compile(r"(/invite/|[?&](?:token|link)=)[^\s\"&]+")
+_SECRET_IN_URL = re.compile(
+    r"(/invite/|/reset-password/|/verify-email/(?!resend)"
+    r"|[?&](?:token|link)=)[^\s\"&]+"
+)
 
 
 class _RedactSecrets(logging.Filter):
-    """Hide invite tokens and setup codes from the access log."""
+    """Hide secret tokens (invites, resets, setup codes) in the log."""
 
     def filter(self, record: logging.LogRecord) -> bool:
         if record.args:
@@ -96,6 +99,19 @@ def create_app(
     problem = check_secret(settings)
     if problem:
         raise RuntimeError(problem)
+    from app.core.mail import mail_enabled, verification_required
+
+    if settings.allow_signup and not mail_enabled():
+        log.warning(
+            "ALLOW_SIGNUP=true without SMTP: email addresses are not "
+            "verified and password reset is unavailable. Configure "
+            "SMTP_HOST before opening public sign-up."
+        )
+    elif verification_required() and not mail_enabled():
+        log.warning(
+            "EMAIL_VERIFICATION=required but SMTP is not configured: "
+            "new accounts cannot be verified."
+        )
     if settings.secret_key and len(settings.secret_key) < 32:
         log.warning(
             "SECRET_KEY is shorter than 32 characters; use a longer key."

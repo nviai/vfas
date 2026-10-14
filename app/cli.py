@@ -237,6 +237,21 @@ def cmd_reset_password(args) -> int:
     return 0
 
 
+def cmd_send_test_email(args) -> int:
+    from app.core import mail
+
+    if not mail.mail_enabled():
+        print("Chưa cấu hình SMTP_HOST", file=sys.stderr)
+        return 1
+    try:
+        mail.send(mail.render_mail("email/test.html", args.to, "vi"))
+    except mail.MailError as e:
+        print(f"Gửi email thất bại: {e}", file=sys.stderr)
+        return 1
+    print(f"Đã gửi email thử tới {args.to}.")
+    return 0
+
+
 # --------------------------------------------------------------- backup
 
 
@@ -671,6 +686,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--email", required=True)
     p.add_argument("--password", help="Bỏ trống để nhập ẩn")
     p.set_defaults(func=cmd_reset_password)
+
+    p = sub.add_parser(
+        "send-test-email", help="Gửi email thử để kiểm tra cấu hình SMTP"
+    )
+    p.add_argument("--to", required=True)
+    p.set_defaults(func=cmd_send_test_email)
 
     p = sub.add_parser("demo", help="Tạo công ty mẫu có dữ liệu ~1 năm")
     p.add_argument("--email", default="demo@example.com")

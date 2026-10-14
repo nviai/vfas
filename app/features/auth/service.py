@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import hashlib
 from datetime import datetime, timedelta, timezone
 
+from itsdangerous import BadSignature, URLSafeTimedSerializer
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core import mail
 from app.core.audit import write_audit
+from app.core.config import get_settings
 from app.core.errors import BusinessError, NotFoundError
 from app.core.security import (
     API_SCOPES,
@@ -49,10 +53,16 @@ def create_user(
     full_name: str = "",
     *,
     is_superadmin: bool = False,
+    email_verified: bool = True,
     commit: bool = True,
 ) -> User:
+    """Create an account.
+
+    `email_verified=False` for self sign-up: the address is confirmed
+    later through the verification email.
+    """
     email = normalize_email(email)
-    if "@" not in email or len(email) > 200 or " " in email:
+    if not mail.valid_email(email):
         raise BusinessError("Email không hợp lệ")
     err = validate_password_strength(password, email)
     if err:
@@ -66,6 +76,7 @@ def create_user(
         is_active=True,
         is_superadmin=is_superadmin,
         created_at=_now(),
+        email_verified_at=_now() if email_verified else None,
     )
     db.add(u)
     db.flush()
@@ -189,6 +200,128 @@ def update_profile(
         user.theme = theme
     db.commit()
     return user
+
+
+# ------------------------------------------- email verification, reset
+
+VERIFY_DAYS = 3
+RESET_MINUTES = 60
+
+
+def _serializer(salt: str) -> URLSafeTimedSerializer:
+    return URLSafeTimedSerializer(get_settings().resolved_secret(), salt=salt)
+
+
+def _password_fingerprint(user: User) -> str:
+    # Part of the reset token: changing the password (including through
+    # the link itself) invalidates every reset link issued before.
+    return hashlib.sha256(user.password_hash.encode()).hexdigest()[:16]
+
+
+def email_verification_token(user: User) -> str:
+    return _serializer("verify-email").dumps({"u": user.id, "e": user.email})
+
+
+def verify_email_token(db: Session, token: str) -> User:
+    """Mark the account in a verification token as verified."""
+    data: dict = {}
+    try:
+        data = _serializer("verify-email").loads(
+            token or "", max_age=VERIFY_DAYS * 86400
+        )
+        user = db.get(User, int(data["u"]))
+    except (BadSignature, KeyError, TypeError, ValueError):
+        user = None
+    if user is None or user.email != data.get("e"):
+        raise NotFoundError("Link xác minh không hợp lệ hoặc đã hết hạn")
+    mark_email_verified(db, user)
+    return user
+
+
+def mark_email_verified(
+    db: Session, user: User, *, commit: bool = True
+) -> None:
+    if user.email_verified_at is not None:
+        return
+    user.email_verified_at = _now()
+    write_audit(
+        db,
+        None,
+        action="user.verify_email",
+        entity_type="user",
+        entity_id=user.id,
+        user=user,
+        summary=f"Xác minh email {user.email}",
+    )
+    if commit:
+        db.commit()
+
+
+def password_reset_token(user: User) -> str:
+    return _serializer("password-reset").dumps(
+        {"u": user.id, "p": _password_fingerprint(user)}
+    )
+
+
+def user_from_reset_token(db: Session, token: str) -> User:
+    data: dict = {}
+    try:
+        data = _serializer("password-reset").loads(
+            token or "", max_age=RESET_MINUTES * 60
+        )
+        user = db.get(User, int(data["u"]))
+    except (BadSignature, KeyError, TypeError, ValueError):
+        user = None
+    if (
+        user is None
+        or not user.is_active
+        or data.get("p") != _password_fingerprint(user)
+    ):
+        raise NotFoundError(
+            "Link đặt lại mật khẩu không hợp lệ, đã dùng hoặc đã hết hạn"
+        )
+    return user
+
+
+def reset_password(db: Session, user: User, new: str) -> None:
+    """Set a new password from a reset link.
+
+    The link proves control of the mailbox, so the address also counts
+    as verified. Every session of the user is signed out.
+    """
+    mark_email_verified(db, user, commit=False)
+    set_password(db, user, new)
+
+
+def send_verification_email(user: User, base_url: str, lang: str) -> None:
+    link = f"{base_url}/verify-email/{email_verification_token(user)}"
+    mail.send(
+        mail.render_mail(
+            "auth/email/verify.html",
+            user.email,
+            lang,
+            name=user.full_name or user.email,
+            link=link,
+            days=VERIFY_DAYS,
+        ),
+        background=True,
+    )
+
+
+def send_password_reset(user: User, base_url: str, lang: str) -> None:
+    link = f"{base_url}/reset-password/{password_reset_token(user)}"
+    mail.send(
+        mail.render_mail(
+            "auth/email/reset.html",
+            user.email,
+            lang,
+            name=user.full_name or user.email,
+            email=user.email,
+            link=link,
+            minutes=RESET_MINUTES,
+        ),
+        background=True,
+    )
 
 
 # ------------------------------------------------------------ API token

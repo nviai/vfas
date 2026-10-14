@@ -80,17 +80,23 @@
         <p class="truncate font-medium text-fg">{{ inv.email }}</p>
         <p class="text-xs text-fg-3">{{ _(roles|selectattr(0, "equalto", inv.role)|map(attribute=1)|first or inv.role) }} · {{ _("hết hạn") }} {{ inv.expires_at|datetime }}</p>
       </div>
-      <form method="post" action="/invitations/{{ inv.id }}/revoke">
-        {{ ui.csrf_field() }}
-        {{ ui.button(_("Thu hồi"), "ghost", size="sm", icon_name="x") }}
-      </form>
+      <div class="flex shrink-0 items-center gap-1">
+        <form method="post" action="/invitations/{{ inv.id }}/resend">
+          {{ ui.csrf_field() }}
+          {{ ui.button(_("Gửi lại") if mail_enabled else _("Tạo link mới"), "ghost", size="sm", icon_name="send") }}
+        </form>
+        <form method="post" action="/invitations/{{ inv.id }}/revoke">
+          {{ ui.csrf_field() }}
+          {{ ui.button(_("Thu hồi"), "ghost", size="sm", icon_name="x") }}
+        </form>
+      </div>
     </li>
     {% endfor %}
   </ul>
 {% endcall %}
 {% endif %}
 
-{% call ui.modal("invite", _("Mời thành viên"), description=_("Tạo đường link mời; người được mời đặt mật khẩu (nếu chưa có tài khoản) rồi vào thẳng công ty.")) %}
+{% call ui.modal("invite", _("Mời thành viên"), description=(_("Gửi email mời kèm đường link; người được mời đặt mật khẩu (nếu chưa có tài khoản) rồi vào thẳng công ty.") if mail_enabled else _("Tạo đường link mời; người được mời đặt mật khẩu (nếu chưa có tài khoản) rồi vào thẳng công ty."))) %}
 <form method="post" action="/members/invite" class="space-y-4 px-5 pb-5">
   {{ ui.csrf_field() }}
   {{ ui.input("email", _("Email"), "", type="email", required=True) }}
@@ -105,7 +111,7 @@
   </div>
   <div class="modal-footer -mx-5 -mb-5">
     {{ ui.button(_("Hủy"), "secondary", type="button", attrs="@click=\"$dispatch('modal-close')\"") }}
-    {{ ui.button(_("Tạo lời mời"), "primary", icon_name="send") }}
+    {{ ui.button(_("Gửi lời mời") if mail_enabled else _("Tạo lời mời"), "primary", icon_name="send") }}
   </div>
 </form>
 {% endcall %}

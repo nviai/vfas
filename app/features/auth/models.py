@@ -28,6 +28,11 @@ class User(Base):
     last_login_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True)
     )
+    # None = the address was never confirmed (self sign-up waiting for
+    # the verification email).
+    email_verified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
 
 
 class UserSession(Base):

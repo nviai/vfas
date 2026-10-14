@@ -10,6 +10,7 @@ This document is for people who install and run the server. Before exposing it t
 - [5. Upgrading](#5-upgrading)
 - [6. Backup, restore, data export](#6-backup-restore-data-export)
 - [7. Admin commands](#7-admin-commands)
+- [8. Email (SMTP)](#8-email-smtp)
 
 ## 1. Choosing a deployment type
 
@@ -17,7 +18,7 @@ This document is for people who install and run the server. Before exposing it t
 |---|---|---|
 | Server | 1 GB VPS or a machine on the LAN | 2–4 GB VPS or larger |
 | Database | SQLite (default, 1 process) | PostgreSQL, 2–4 web processes |
-| Sign-up | `ALLOW_SIGNUP=false`, the admin invites members | `ALLOW_SIGNUP=true` (needs SMTP – not available yet, see roadmap) |
+| Sign-up | `ALLOW_SIGNUP=false`, the admin invites members | `ALLOW_SIGNUP=true` + SMTP (email verification, password reset) |
 | Access | HTTPS via a reverse proxy, or a VPN (WireGuard/Tailscale) | HTTPS via Traefik, rate limiting at the proxy |
 | AI assistant | Prefer self-hosted AI (Ollama) so data never leaves the server | Each company enters its own API key; a platform-wide key is optional |
 | Backup | Daily, encrypted, copied to another machine | Daily, encrypted, pushed to separate storage, restore drills |
@@ -65,7 +66,7 @@ The container runs as an unprivileged user with a read-only file system, `cap_dr
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `SECRET_KEY` | auto-generated in `DATA_DIR/.secret_key` | Key for signing cookies and encrypting AI API keys, ≥ 32 characters (required for SaaS); the app refuses to start with the sample value |
+| `SECRET_KEY` | auto-generated in `DATA_DIR/.secret_key` | Key for signing cookies, email links and encrypting AI API keys, ≥ 32 characters (required for SaaS); the app refuses to start with the sample value |
 | `SECRET_KEY_OLD` | empty | Previous key when rotating `SECRET_KEY` (stored AI API keys can still be decrypted) |
 | `SETUP_TOKEN` | auto-generated, printed to the log | Code required by the first-run `/setup` page |
 | `FORWARDED_ALLOW_IPS` | `127.0.0.1` (compose: `172.16.0.0/12`) | Proxies whose `X-Forwarded-*` headers are trusted (real client IP for brute-force protection and the audit log) |
@@ -78,7 +79,12 @@ The container runs as an unprivileged user with a read-only file system, `cap_dr
 | `DATA_DIR` | `/data` (Docker) | SQLite DB, attachments, temporary import files |
 | `DATABASE_URL` | empty = SQLite | PostgreSQL: `postgresql+psycopg://user:pass@host:5432/db` |
 | `WEB_CONCURRENCY` | `1` | Number of web processes when using PostgreSQL (always 1 for SQLite) |
-| `PUBLIC_URL` | empty | Public address, used in invitation links |
+| `PUBLIC_URL` | empty | Public address, used in invitation, verification and password-reset links (set it when emails are enabled) |
+| `SMTP_HOST`, `SMTP_PORT` | empty, `587` | Outgoing mail server; empty = email disabled (see [Email](#8-email-smtp)) |
+| `SMTP_USERNAME`, `SMTP_PASSWORD` | empty | SMTP login (skipped when the username is empty) |
+| `SMTP_SECURITY` | `starttls` | `starttls` (port 587), `ssl` (port 465) or `none` (local relay only) |
+| `MAIL_FROM` | `SMTP_USERNAME` | Sender, e.g. `VFAS <no-reply@example.com>` |
+| `EMAIL_VERIFICATION` | `auto` | `auto`: required when `ALLOW_SIGNUP=true` and SMTP is configured; `required`; `off` |
 | `COOKIE_SECURE` | `false` | `true` when running behind HTTPS (cookies also switch to Secure automatically when the request arrives over https) |
 | `MAX_UPLOAD_MB` | `10` | Maximum upload size |
 | `TIMEZONE` | `Asia/Ho_Chi_Minh` | Time zone |
@@ -138,6 +144,37 @@ Run inside the container (`docker compose exec vfas …`) or in the venv when ru
 | `python -m app.cli create-admin --email … [--company … --tax-code … --start-date dd/mm/yyyy]` | Create an admin (+ company) |
 | `python -m app.cli create-company --owner-email … --name …` | Create a company for a user |
 | `python -m app.cli reset-password --email …` | Reset a password |
+| `python -m app.cli send-test-email --to …` | Send a test email to check the SMTP settings |
 | `python -m app.cli backup [-o FILE]` / `restore FILE --yes [--json]` | Back up / restore |
 | `python -m app.cli export-company ID [-o FILE]` | Export one company's data |
 | `python -m app.cli demo` | Create a sample company with one year of transactions (sign in with `demo@example.com` / `Demo@2026`) |
+
+## 8. Email (SMTP)
+
+Email is optional for a self-hosted single-company install and **required before opening public sign-up**. With
+`SMTP_HOST` set:
+
+- **Invitations** are emailed to the invitee; the link is still shown once on the "Thành viên" (Members) page in case
+  the email does not arrive. "Gửi lại" (Resend) issues a new link and the old one stops working.
+- **Password reset**: a "Quên mật khẩu?" (Forgot password?) link appears on the sign-in page. The emailed link is valid
+  for 60 minutes and works once; all sessions are signed out after the reset.
+- **Email verification** (`EMAIL_VERIFICATION=auto`): with `ALLOW_SIGNUP=true`, people who sign up must click the
+  link sent to their address before they can open their company. Accounts created by an administrator, through
+  `/setup`, the CLI or an invitation count as verified.
+
+Example with a transactional mail provider (any SMTP server works):
+
+```dotenv
+PUBLIC_URL=https://vfas.example.com
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_SECURITY=starttls
+SMTP_USERNAME=no-reply@example.com
+SMTP_PASSWORD=...
+MAIL_FROM=VFAS <no-reply@example.com>
+```
+
+Check the settings with `docker compose exec vfas python -m app.cli send-test-email --to you@example.com`. Publish SPF,
+DKIM and DMARC records for the sender domain, otherwise verification and reset emails often land in spam. Sending
+failures of reset/verification emails are written to the log (`app.mail`); the response to the user stays the same so it
+never reveals whether an account exists.

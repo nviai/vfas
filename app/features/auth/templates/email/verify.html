@@ -1,0 +1,22 @@
+{#- Email address verification after self sign-up. Context: name, link, days. -#}
+{% block subject %}{% autoescape false %}{{ _("Xác minh địa chỉ email – {product}", product=product_name) }}{% endautoescape %}{% endblock %}
+
+{% block text %}{% autoescape false %}
+{{ _("Chào {name},", name=name) }}
+
+{{ _("Nhấn đường link dưới đây để xác minh địa chỉ email của bạn trên {product}:", product=product_name) }}
+
+{{ link }}
+
+{{ _("Link có hiệu lực trong {days} ngày. Nếu bạn không đăng ký tài khoản, hãy bỏ qua email này.", days=days) }}
+{% endautoescape %}{% endblock %}
+
+{% block html %}
+{% import "email/macros.html" as mail with context %}
+{% call mail.layout(_("Xác minh địa chỉ email")) %}
+<p style="margin:0 0 12px">{{ _("Chào {name},", name=name) }}</p>
+<p style="margin:0">{{ _("Nhấn đường link dưới đây để xác minh địa chỉ email của bạn trên {product}:", product=product_name) }}</p>
+{{ mail.button(_("Xác minh email"), link) }}
+<p style="margin:0;font-size:13px;color:#52606d">{{ _("Link có hiệu lực trong {days} ngày. Nếu bạn không đăng ký tài khoản, hãy bỏ qua email này.", days=days) }}</p>
+{% endcall %}
+{% endblock %}

@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.core.audit import write_audit
 from app.core.errors import BusinessError, NotFoundError, PermissionDeniedError
+from app.core.mail import valid_email
 from app.core.regimes import get_regime
 from app.core.registry import OWNER, ROLE_LABELS, ROLES
 from app.core.security import hash_token
@@ -271,7 +272,7 @@ def invite(db: Session, ctx, email: str, role: str) -> tuple[Invitation, str]:
     Returns (invitation, raw token used to build the invite link).
     """
     email = (email or "").strip().lower()
-    if "@" not in email or len(email) > 200:
+    if not valid_email(email):
         raise BusinessError("Email không hợp lệ")
     if role not in ROLES:
         raise BusinessError("Vai trò không hợp lệ")
@@ -341,6 +342,37 @@ def revoke_invitation(db: Session, ctx, invitation_id: int) -> None:
         summary=f"Thu hồi lời mời {inv.email}",
     )
     db.commit()
+
+
+def renew_invitation(
+    db: Session, ctx, invitation_id: int
+) -> tuple[Invitation, str]:
+    """Issue a new link for a pending invitation.
+
+    Only the hash of a token is stored, so "resend" means a new token
+    (the old link stops working) and a fresh expiry date.
+    """
+    inv = db.get(Invitation, invitation_id)
+    if (
+        inv is None
+        or inv.company_id != ctx.company_id
+        or inv.accepted_at is not None
+        or inv.revoked_at is not None
+    ):
+        raise NotFoundError()
+    token = secrets.token_urlsafe(32)
+    inv.token_hash = hash_token(token)
+    inv.expires_at = _now() + timedelta(days=INVITE_DAYS)
+    write_audit(
+        db,
+        ctx,
+        action="member.invite_renew",
+        entity_type="invitation",
+        entity_id=inv.id,
+        summary=f"Gửi lại lời mời {inv.email}",
+    )
+    db.commit()
+    return inv, token
 
 
 def find_invitation(db: Session, token: str) -> Invitation:

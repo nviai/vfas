@@ -3,6 +3,16 @@
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- Email over SMTP (`SMTP_*`, `MAIL_FROM`): invitation emails with a "Resend" action, password reset ("Quên mật khẩu?")
+  and email verification for self sign-up (`EMAIL_VERIFICATION=auto`); `python -m app.cli send-test-email`.
+
+### Upgrade notes
+- Migration `0004` adds `users.email_verified_at`; existing accounts are marked as verified.
+- `ALLOW_SIGNUP=true` without SMTP now logs a warning at startup: configure SMTP before opening public sign-up.
+
 ## [2.0.0] – Unreleased
 
 First full accounting release, published as open source under the name **VFAS – Vietnam Free Accounting Software**.

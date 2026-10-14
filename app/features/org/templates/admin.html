@@ -42,7 +42,7 @@
     <tbody>
       {% for u in all_users %}
       <tr class="{{ 'is-muted' if not u.is_active }}">
-        <td><p class="font-medium text-fg">{{ u.full_name }}</p><p class="text-xs text-fg-3">{{ u.email }}</p></td>
+        <td><p class="font-medium text-fg">{{ u.full_name }}</p><p class="text-xs text-fg-3">{{ u.email }}{% if not u.email_verified_at %} {{ ui.badge(_("Chưa xác minh email"), "amber") }}{% endif %}</p></td>
         <td class="max-md:hidden tabular-nums text-fg-3">{{ u.last_login_at|datetime if u.last_login_at else "–" }}</td>
         <td>{% if u.is_superadmin %}{{ ui.badge(_("Quản trị"), "violet", icon_name="shield") }}{% else %}<span class="text-fg-3">–</span>{% endif %}</td>
         <td>{{ ui.status_badge("active" if u.is_active else "inactive") }}</td>

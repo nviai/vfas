@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
+from app.core import mail
 from app.core.config import get_settings
 from app.core.dates import parse_date
 from app.core.db import get_db
@@ -25,6 +26,7 @@ from app.core.security import (
     get_current_user,
     rate_limited,
     record_event,
+    require_verified_email,
 )
 from app.core.web import (
     LANG_COOKIE,
@@ -33,8 +35,10 @@ from app.core.web import (
     client_ip,
     cookie_secure,
     form_data,
+    public_base_url,
     redirect,
     render,
+    resolve_lang,
     safe_next,
 )
 from app.features.auth import service as auth
@@ -169,6 +173,7 @@ def _signup(
             form.get("password") or "",
             form.get("full_name") or "",
             is_superadmin=superadmin,
+            email_verified=superadmin or not mail.verification_required(),
             commit=False,
         )
         db.flush()
@@ -246,6 +251,9 @@ def signup(
             },
             status_code=400,
         )
+    if user.email_verified_at is None:
+        _send_verification(request, user)
+        record_event(db, "verify", email=user.email, ip=ip, commit=False)
     return _login_response(request, db, user)
 
 
@@ -312,6 +320,189 @@ def setup(
         return _login_response(request, db, user)
 
 
+# ------------------------------------------------- email verification
+
+VERIFY_PER_HOUR = 3
+
+
+def _send_verification(request: Request, user: User) -> None:
+    try:
+        auth.send_verification_email(
+            user, public_base_url(request), resolve_lang(request)
+        )
+    except mail.MailError:
+        # Logged by the mail module; the user can resend from the
+        # verification page.
+        pass
+
+
+@router.get("/verify-email")
+def verify_email_page(
+    request: Request,
+    user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if user.email_verified or not mail.verification_required():
+        return RedirectResponse("/", status_code=303)
+    return render(request, "auth/verify_email.html", {"email": user.email})
+
+
+@router.post("/verify-email/resend")
+def verify_email_resend(
+    request: Request,
+    user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if user.email_verified:
+        return redirect("/", request=request)
+    if rate_limited(
+        db, "verify", VERIFY_PER_HOUR, timedelta(hours=1), email=user.email
+    ):
+        return redirect(
+            "/verify-email",
+            "Đã gửi quá nhiều email xác minh. Vui lòng thử lại sau.",
+            "error",
+        )
+    record_event(db, "verify", email=user.email, ip=client_ip(request))
+    _send_verification(request, db.get(User, user.id))
+    return redirect(
+        "/verify-email", f"Đã gửi lại email xác minh tới {user.email}"
+    )
+
+
+@router.get("/verify-email/{token}")
+def verify_email(request: Request, token: str, db: Session = Depends(get_db)):
+    verified = auth.verify_email_token(db, token)
+    current: CurrentUser | None = getattr(request.state, "user", None)
+    if current is not None and current.id == verified.id:
+        return redirect("/", "Đã xác minh email. Chào mừng bạn!")
+    return redirect("/login", "Đã xác minh email. Hãy đăng nhập.")
+
+
+# ------------------------------------------------------ password reset
+
+RESET_PER_EMAIL_HOUR = 3
+RESET_PER_IP_HOUR = 10
+
+
+def _require_mail() -> None:
+    if not mail.mail_enabled():
+        raise NotFoundError(
+            "Chưa cấu hình gửi email nên không đặt lại mật khẩu qua email "
+            "được. Liên hệ quản trị hệ thống để được đặt lại mật khẩu."
+        )
+
+
+@router.get("/forgot-password")
+def forgot_password_page(request: Request):
+    _require_mail()
+    return render(
+        request, "auth/forgot_password.html", {"form": {}, "sent": False}
+    )
+
+
+@router.post("/forgot-password")
+def forgot_password(
+    request: Request,
+    form: dict = Depends(form_data),
+    db: Session = Depends(get_db),
+):
+    """Send a reset link.
+
+    The response is the same whether or not the email has an account.
+    """
+    _require_mail()
+    email = auth.normalize_email(form.get("email"))
+    ip = client_ip(request)
+    if not mail.valid_email(email):
+        return render(
+            request,
+            "auth/forgot_password.html",
+            {
+                "form": {"email": email},
+                "sent": False,
+                "errors": {"email": "Email không hợp lệ"},
+            },
+            status_code=400,
+        )
+    if rate_limited(
+        db, "reset", RESET_PER_IP_HOUR, timedelta(hours=1), ip=ip
+    ) or rate_limited(
+        db, "reset", RESET_PER_EMAIL_HOUR, timedelta(hours=1), email=email
+    ):
+        return render(
+            request,
+            "auth/forgot_password.html",
+            {
+                "form": {"email": email},
+                "sent": False,
+                "errors": {
+                    "email": "Yêu cầu quá nhiều lần. Vui lòng thử lại sau."
+                },
+            },
+            status_code=429,
+        )
+    record_event(db, "reset", email=email, ip=ip)
+    user = auth.get_user_by_email(db, email)
+    if user is not None and user.is_active:
+        try:
+            auth.send_password_reset(
+                user, public_base_url(request), resolve_lang(request)
+            )
+        except mail.MailError:
+            pass  # logged; the answer must not reveal the account
+    return render(
+        request,
+        "auth/forgot_password.html",
+        {"form": {"email": email}, "sent": True},
+    )
+
+
+@router.get("/reset-password/{token}")
+def reset_password_page(
+    request: Request, token: str, db: Session = Depends(get_db)
+):
+    user = auth.user_from_reset_token(db, token)
+    return render(
+        request,
+        "auth/reset_password.html",
+        {"email": user.email, "token": token, "errors": {}},
+    )
+
+
+@router.post("/reset-password/{token}")
+def reset_password(
+    request: Request,
+    token: str,
+    form: dict = Depends(form_data),
+    db: Session = Depends(get_db),
+):
+    user = auth.user_from_reset_token(db, token)
+    password = form.get("password") or ""
+    errors = {}
+    if password != (form.get("password2") or ""):
+        errors["password2"] = "Mật khẩu nhập lại không khớp"
+    else:
+        try:
+            auth.reset_password(db, user, password)
+        except BusinessError as e:
+            db.rollback()
+            errors["password"] = e.message
+    if errors:
+        return render(
+            request,
+            "auth/reset_password.html",
+            {"email": user.email, "token": token, "errors": errors},
+            status_code=400,
+        )
+    resp = redirect(
+        "/login", "Đã đặt lại mật khẩu. Đăng nhập bằng mật khẩu mới."
+    )
+    # Any session open in this browser belonged to the old password.
+    resp.delete_cookie(get_settings().session_cookie)
+    return resp
+
+
 # ------------------------------------------------------------ companies
 
 
@@ -321,6 +512,7 @@ def select_company(
     user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    require_verified_email(user)
     rows = org.user_companies(db, user.id)
     companies = [
         {
@@ -425,6 +617,8 @@ def invite_accept(
             "Đăng nhập bằng email được mời để nhận lời mời",
             "info",
         )
+    # The invitation link went to this address, which confirms it.
+    auth.mark_email_verified(db, user, commit=False)
     org.accept_invitation(db, inv, user)
     if current is not None and current.id == user.id:
         sess = (

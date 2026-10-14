@@ -15,7 +15,8 @@ deployment). Each finding was reproduced with TestClient/Chrome where possible a
 | Sessions | 256-bit tokens, the DB stores only the sha256; HttpOnly + SameSite=Lax cookies, Secure switched on automatically under HTTPS; absolute expiry after 12 hours + idle expiry after 120 minutes; changing the password/locking the user revokes sessions; other sessions can be viewed and signed out under "Tài khoản của tôi" (My account) |
 | CSRF | Per-session token for every POST (forms, HTMX, multipart); the token changes when switching companies (a form opened under the old company cannot write into the new one) |
 | First-run setup | `/setup` requires a setup code (auto-generated, printed to the log, stored in `DATA_DIR/.setup_token`) – strangers cannot take over a fresh server |
-| Sign-up (SaaS) | Limits on sign-ups per IP per hour, maximum companies per user, company creations per hour |
+| Sign-up (SaaS) | Limits on sign-ups per IP per hour, maximum companies per user, company creations per hour; with SMTP configured, new accounts must verify their email (signed link, valid 3 days) before they can open a company |
+| Password reset | Only with SMTP; signed link valid 60 minutes that embeds a fingerprint of the current password hash (single use, invalidated by any password change); the same answer whether or not the email has an account; 3 requests/email/hour and 10/IP/hour; every session is signed out after the reset |
 | Multi-company | Every query filters on `company_id` + the session's automatic filtering layer; a test scans every route with an id for leaks of other companies' data (with positive controls); IDs referenced in forms are checked to belong to the company |
 | Authorization | 5 per-company roles, per-module permissions; payroll data (per-employee detailed ledgers, salary change log, employees' personal data, Ctrl+K) is shown only to users with payroll permission |
 | Data immutability | DB triggers block editing/deleting posted vouchers and the audit log (append-only) |
@@ -23,7 +24,7 @@ deployment). Each finding was reproduced with TestClient/Chrome where possible a
 | AI assistant | Tools filtered by the asking user's permissions, write tools only create drafts, audit log entries `via=ai`; API keys encrypted (Fernet, key rotation via `SECRET_KEY_OLD`); the platform's default key is only sent to the exact `AI_DEFAULT_BASE_URL` within the platform's quota; SaaS blocks non-public addresses (including CGNAT, metadata) and re-checks before every call; limits of 180 seconds/2 MB per request, 3 concurrent requests per company, quota reserved before the call; no DB connection held while waiting for the AI; payroll data not sent to the AI by default |
 | Files, XML | defusedxml (blocks XXE, billion laughs); ZIP limits on file count/size, never extracted to disk; attachments identified by magic bytes; random per-company storage names; exported Excel files contain no formulas from user data; limits on import row counts; PDFs only load internal resources |
 | Browser | CSP `script-src 'self' 'unsafe-eval'` (Alpine), no inline scripts; `frame-ancestors 'self'`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`, COOP; HSTS under HTTPS |
-| Secrets | Refuses to start with the sample `SECRET_KEY`; SaaS requires ≥ 32 characters; the auto-generated key file is created atomically with permissions 600; invitation tokens and setup codes are masked in the access log |
+| Secrets | Refuses to start with the sample `SECRET_KEY`; SaaS requires ≥ 32 characters; the auto-generated key file is created atomically with permissions 600; invitation, password-reset and verification tokens and setup codes are masked in the access log |
 | Backup | Files with permissions 600; scrypt + Fernet encryption when `BACKUP_PASSPHRASE` is set; single-company exports contain no passwords, API tokens or AI API keys |
 | Container | Non-root user, read-only file system, `cap_drop: ALL`, `no-new-privileges`, `umask 077` (DB, attachments and keys readable only by the app); base image pinned by digest; Tailwind CLI verified by sha256 |
 
@@ -38,9 +39,9 @@ Severity: H = High, M = Medium, L = Low, I = Info. Status: ✅ fixed (with test)
 | C-1 | H | Stored XSS bypassing the CSP on the inventory catalog page | ✅ |
 | D-1 | H | The platform's AI API key sent to a URL set by a tenant | ✅ |
 | A3 | M | Read-only API tokens can write via web routes | ✅ Bearer only for `/api/` |
-| A4/D-6 | M | Mass sign-up, no email verification | ✅ rate limits; ⏳ email verification/password reset need SMTP |
+| A4/D-6 | M | Mass sign-up, no email verification | ✅ rate limits + email verification and password reset over SMTP |
 | A5 | M | argon2 at 64 MiB per hash can exhaust RAM | ✅ |
-| A6/D-14 | M | Invitation link in the URL/log | ✅ signed cookie + log filtering; ⏳ sending by email needs SMTP |
+| A6/D-14 | M | Invitation link in the URL/log | ✅ signed cookie + log filtering; invitations sent by email when SMTP is configured |
 | A7 | M | Email enumeration via response timing | ✅ |
 | A8 | M | Cookies not Secure by default | ✅ switched on automatically under HTTPS |
 | B-01/D-5 | M | Payroll leaked via the 334 detailed ledger, receivables/payables, AI, audit log | ✅ |
@@ -80,8 +81,9 @@ Severity: H = High, M = Medium, L = Low, I = Info. Status: ✅ fixed (with test)
 cash (the cashier needs them to pay out). If the "Chỉ xem" (Viewer) role should not see them, pay salaries with a single combined voucher or do not
 give this role to outsiders.
 
-**Outstanding (⏳):** email verification, password reset and sending invitations by email require SMTP integration – mandatory before opening
-public sign-up (cloud). A self-hosted single-company install does not need it (the admin resets passwords via the CLI and sends invitation links directly).
+**Email (SMTP):** email verification, password reset and invitation emails work once `SMTP_HOST` is set – mandatory before
+opening public sign-up (cloud); the app logs a warning at startup when `ALLOW_SIGNUP=true` runs without SMTP. A self-hosted
+single-company install does not need it (the admin resets passwords via the CLI and sends invitation links directly).
 
 ## 3. Cloud / SaaS deployment (many companies, exposed to the Internet)
 
@@ -92,7 +94,9 @@ encrypted backups pushed to separate storage; secrets from a secret manager; cen
 1. PostgreSQL `DATABASE_URL`, strong password, SSL if the DB is on another machine; `WEB_CONCURRENCY=2..4`.
 2. `SECRET_KEY` ≥ 32 characters, fixed, stored separately (lose the key = lose the stored AI API keys); rotate with `SECRET_KEY_OLD`.
 3. HTTPS at Traefik; `COOKIE_SECURE=true`; `FORWARDED_ALLOW_IPS` = Traefik's Docker network range (default 172.16.0.0/12).
-4. `ALLOW_SIGNUP=true` only once SMTP + email verification exist (⏳); set `SIGNUP_PER_IP_HOUR`, `MAX_COMPANIES_PER_USER`.
+4. Configure SMTP (`SMTP_HOST`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `MAIL_FROM`; check with `python -m app.cli send-test-email --to …`)
+   **before** `ALLOW_SIGNUP=true` – email verification then turns on automatically; set `SIGNUP_PER_IP_HOUR`, `MAX_COMPANIES_PER_USER`.
+   Publish SPF/DKIM/DMARC for the sender domain so verification and reset emails are not marked as spam.
 5. Traefik rate-limit + in-flight middleware (labels already in `docker-compose.yml`), body size limit ≥ `MAX_UPLOAD_MB`.
 6. AI: do not set `AI_DEFAULT_API_KEY` unless you accept the cost; set `AI_DEFAULT_DAILY_LIMIT`; keep `AI_ALLOW_PRIVATE_URLS=0`;
    preferably add an egress proxy that only allows the AI providers' domains (fully prevents DNS rebinding).

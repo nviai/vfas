@@ -97,7 +97,7 @@ year of transactions. Clean up with `docker rm -f vfas && docker volume rm vfas-
 | Server | 1 GB VPS or a LAN machine | 2–4 GB VPS or larger |
 | Database | SQLite | PostgreSQL |
 | Access | HTTPS via a reverse proxy, or a VPN | HTTPS via Traefik, rate limiting at the proxy |
-| Sign-up | Admin invites members | Self sign-up (needs SMTP – on the roadmap) |
+| Sign-up | Admin invites members | Self sign-up with email verification (SMTP) |
 
 Full guide: [docs/DEPLOY.md](docs/DEPLOY.md). Before exposing it to the Internet, follow the checklist in
 [docs/SECURITY-GUIDE.md](docs/SECURITY-GUIDE.md).
@@ -138,7 +138,7 @@ openpyxl · SQLite/PostgreSQL.
 
 ## Roadmap
 
-- [ ] Email (SMTP): address verification, password reset, invitation emails – required before opening public sign-up
+- [x] Email (SMTP): address verification, password reset, invitation emails – required before opening public sign-up
 - [ ] Issue e-invoices through providers (Viettel S-Invoice, MISA meInvoice, VNPT, BKAV) – design in [docs/EINVOICE.md](docs/EINVOICE.md)
 - [ ] XML export of financial statements, 03/TNDN and 05/QTT-TNCN for HTKK
 - [ ] Accounting regimes under Circular 99/2025 and Circular 58/2026 (extension point `app/core/regimes.py`)

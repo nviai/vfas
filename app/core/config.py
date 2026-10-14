@@ -47,6 +47,21 @@ class Settings(BaseSettings):
     # Public URL (used in member invitation links). Empty = taken from
     # the request.
     public_url: str = ""
+    # Outgoing email (SMTP). Empty SMTP_HOST = email disabled:
+    # invitation links are shown on screen only and password reset
+    # is unavailable.
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    # starttls (port 587) | ssl (port 465) | none (local relay only)
+    smtp_security: str = "starttls"
+    smtp_timeout: int = 15
+    # Sender, e.g. "VFAS <no-reply@example.com>". Empty = SMTP_USERNAME.
+    mail_from: str = ""
+    # auto: required when ALLOW_SIGNUP=true and SMTP is configured;
+    # required | off.
+    email_verification: str = "auto"
     # Show the /ui-kit page to every logged-in user (default:
     # superadmin only).
     debug_ui: bool = False

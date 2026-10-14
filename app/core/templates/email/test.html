@@ -1,0 +1,13 @@
+{#- Test email sent by: python -m app.cli send-test-email --to … -#}
+{% block subject %}{% autoescape false %}{{ _("Email thử từ {product}", product=product_name) }}{% endautoescape %}{% endblock %}
+
+{% block text %}{% autoescape false %}
+{{ _("Cấu hình gửi email (SMTP) của {product} hoạt động.", product=product_name) }}
+{% endautoescape %}{% endblock %}
+
+{% block html %}
+{% import "email/macros.html" as mail with context %}
+{% call mail.layout(_("Email thử từ {product}", product=product_name)) %}
+<p style="margin:0">{{ _("Cấu hình gửi email (SMTP) của {product} hoạt động.", product=product_name) }}</p>
+{% endcall %}
+{% endblock %}

@@ -13,6 +13,9 @@
   {{ ui.input("email", _("Email"), (form.email if form is defined and form else ""), "email", required=True,
               attrs='autocomplete="username" autocapitalize="off" spellcheck="false"', autofocus=True, placeholder="ten@congty.vn") }}
   {{ ui.password_input("password", _("Mật khẩu")) }}
+  {% if mail_enabled is defined and mail_enabled %}
+  <p class="-mt-2 text-right text-[13px]"><a href="/forgot-password" class="font-medium text-primary hover:underline dark:text-brand-400">{{ _("Quên mật khẩu?") }}</a></p>
+  {% endif %}
   {{ ui.button(_("Đăng nhập"), size="lg", cls="btn-block mt-2", icon_right="arrow-right") }}
 </form>
 {% if allow_signup is defined and allow_signup %}

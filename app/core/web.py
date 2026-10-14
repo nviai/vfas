@@ -44,11 +44,13 @@ from app.core.errors import (
     PermissionDeniedError,
 )
 from app.core.i18n import DEFAULT_LANGUAGE, LANGUAGES, get_translator
+from app.core.mail import mail_enabled
 from app.core.registry import SECTIONS, load_features, registry
 from app.core.security import (
     CSRF_COOKIE,
     CompanyRequiredError,
     CurrentUser,
+    EmailUnverifiedError,
     build_current_user,
     load_api_token,
     load_session,
@@ -278,6 +280,7 @@ def base_context(request: Request) -> dict:
         "today": today(),
         "now": datetime.now(timezone.utc),
         "allow_signup": settings.allow_signup,
+        "mail_enabled": mail_enabled(),
         "asset_version": asset_version(),
     }
 
@@ -369,6 +372,16 @@ def get_tenant_db(request: Request):
         yield db
     finally:
         db.close()
+
+
+def public_base_url(request: Request) -> str:
+    """Base URL for links sent outside the app (emails, invitations).
+
+    PUBLIC_URL wins; otherwise it is taken from the request.
+    """
+    return get_settings().public_url.rstrip("/") or str(
+        request.base_url
+    ).rstrip("/")
 
 
 def safe_next(url: str | None, default: str = "/") -> str:
@@ -662,6 +675,15 @@ def install_error_handlers(app: FastAPI) -> None:
         if _wants_json(request):
             return _json_error(403, "No company selected", "forbidden")
         url = "/select-company"
+        if is_htmx(request):
+            return Response(status_code=204, headers={"HX-Redirect": url})
+        return RedirectResponse(url, status_code=303)
+
+    @app.exception_handler(EmailUnverifiedError)
+    async def _email_unverified(request: Request, _exc: EmailUnverifiedError):
+        if _wants_json(request):
+            return _json_error(403, "Email address not verified", "forbidden")
+        url = "/verify-email"
         if is_htmx(request):
             return Response(status_code=204, headers={"HX-Redirect": url})
         return RedirectResponse(url, status_code=303)
