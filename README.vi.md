@@ -138,8 +138,8 @@ Tài liệu chi tiết viết bằng tiếng Anh.
 - [ ] Xuất hóa đơn điện tử qua nhà cung cấp (Viettel S-Invoice, MISA meInvoice, VNPT, BKAV) – thiết kế ở [docs/EINVOICE.md](docs/EINVOICE.md)
 - [ ] XML BCTC, 03/TNDN, 05/QTT-TNCN để nộp qua HTKK
 - [ ] Chế độ kế toán TT99/2025 và TT58/2026 (điểm mở rộng `app/core/regimes.py`)
-- [ ] Ngoại tệ, kết nối API ngân hàng, giá thành sản xuất
 - [ ] Image Docker dựng sẵn
+- [ ] Ngoại tệ, kết nối API ngân hàng, giá thành sản xuất
 
 Muốn nhận một mục? Mở issue để thảo luận trước khi làm.
 

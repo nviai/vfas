@@ -142,8 +142,8 @@ openpyxl · SQLite/PostgreSQL.
 - [ ] Issue e-invoices through providers (Viettel S-Invoice, MISA meInvoice, VNPT, BKAV) – design in [docs/EINVOICE.md](docs/EINVOICE.md)
 - [ ] XML export of financial statements, 03/TNDN and 05/QTT-TNCN for HTKK
 - [ ] Accounting regimes under Circular 99/2025 and Circular 58/2026 (extension point `app/core/regimes.py`)
-- [ ] Foreign currencies, bank API connections, production costing
 - [ ] Prebuilt Docker image
+- [ ] Foreign currencies, bank API connections, production costing
 
 Want to take one? Open an issue to discuss it first.
 
