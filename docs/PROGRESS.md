@@ -2,9 +2,11 @@
 
 Progress of v1 (cash book): `docs/v1/PROGRESS.md`.
 
-**Final test results (14/10/2026, after the security review and the VFAS rename):**
-- 280 tests (unit, business, HTTP, integration, security) pass on SQLite and on PostgreSQL 16.
-- 22 end-to-end tests in real Chrome (Playwright) pass in about 90 seconds (`make e2e`).
+**Test results (14/10/2026, after the roadmap items email, prebuilt image, HTKK XML, TT99/TT58 regimes and
+e-invoice issuing):**
+- 335 tests (unit, business, HTTP, integration, security) pass on SQLite and on PostgreSQL 16.
+- 23 end-to-end tests in real Chrome (Playwright) pass (`make e2e`), including issuing an e-invoice with the simulator.
+- The four XML returns validate against the HTKK 5.6.4 schemas when `HTKK_XSD_DIR` is set (`tests/htkk_schema.py`).
 - The Docker image runs in hardened mode (read-only, `cap_drop: ALL`, unprivileged user): migrations, `/healthz`, demo
   data, sign-in, PDF printing; about 140 MB RAM with the demo data.
 - GitHub Actions CI (`.github/workflows/ci.yml`): ruff, pytest on SQLite + PostgreSQL, E2E, image build and smoke run.
@@ -23,6 +25,7 @@ every High/Medium finding has been fixed with tests (`tests/core/test_security.p
 | Integration | `tests/integration` | One year of transactions through the real services → every cross-check; scan of every route with an id for cross-company data leaks (with positive controls); 6 concurrent posting flows never drive cash negative |
 | End-to-end | `tests/e2e` (enabled with `E2E=1`) | Real browser: JavaScript (entry grid, invoice grid, combobox, Ctrl+K, shortcuts), XML/CSV upload, PDF/Excel download, AI assistant via a fake LLM (SSE + tools), API token + OpenAI endpoint, inviting members, roles, 390px phone, dark mode, English; FAILS automatically on any JS error or HTTP ≥ 500 |
 | Static | `tests/core/test_ui_assets.py`, `test_i18n.py`, `test_migrations.py` | Icons exist, templates parse, no missing translations, migrations match the models |
+| Providers | `tests/einvoice` | Each e-invoice adapter against a fake provider server (request shape, auth, idempotency, lookups, errors, files; BKAV AES round trip); the outbox rules with the simulator |
 
 | Step | Content | Status |
 |---|---|---|
@@ -73,5 +76,6 @@ every High/Medium finding has been fixed with tests (`tests/core/test_security.p
 ## Still open
 - HTKK XML (01/GTGT, BCTC TT133, 03/TNDN, 05/QTT-TNCN) validates against the HTKK 5.6.4 schemas, but the period encoding of the BCTC file and the Circular 89/2026 versions are still to be confirmed with a real HTKK export.
 - Codes of some book templates (inventory, fixed assets, payroll) follow advisory sources and need checking against the original TT133 text; the TT99 codes of the inventory and fixed-asset books (S10–S12, S21, S23-DN) follow the TT200 numbering kept by TT99 and the TT99 B01–B03 computation rules come from one transcription of Appendix IV.
-- Issuing e-invoices, bank API connections, foreign currency, product costing, manual receivable/payable matching.
+- E-invoice adapters were written without provider test accounts: issue test invoices before production (docs/EINVOICE.md).
+- Bank API connections, foreign currency, product costing, manual receivable/payable matching.
 - The general journal voucher grid uses a partial of its own in the gl module (the shared `line_grid` macro has no debit/credit partner columns yet).

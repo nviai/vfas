@@ -4,8 +4,9 @@
 - [2. AI assistant](#2-ai-assistant)
 - [3. API and OpenAI-style integration](#3-api-and-openai-style-integration)
 - [4. Keyboard shortcuts](#4-keyboard-shortcuts)
-- [5. Tax returns for HTKK](#5-tax-returns-for-htkk)
-- [6. Accounting regimes](#6-accounting-regimes)
+- [5. E-invoices](#5-e-invoices)
+- [6. Tax returns for HTKK](#6-tax-returns-for-htkk)
+- [7. Accounting regimes](#7-accounting-regimes)
 
 ## 1. Roles and permissions
 
@@ -16,6 +17,8 @@
 | Payroll, employees' personal data | ✓ | ✓ | ✓ | | |
 | Opening balances, period locks | ✓ | ✓ | | | |
 | Members, settings, AI, API tokens | ✓ | ✓ | | | |
+| Issue e-invoices | ✓ | ✓ | ✓ | | |
+| E-invoice provider account | ✓ | ✓ | | | |
 
 Role names in the Vietnamese UI: "Chủ DN / Giám đốc", "Kế toán trưởng", "Kế toán viên", "Thủ quỹ", "Chỉ xem".
 
@@ -87,7 +90,26 @@ Limit: 60 requests/minute/token.
 
 Amount fields accept shorthand: `2tr` = 2.000.000, `500k` = 500.000, `1,5tr` = 1.500.000 (Vietnamese number format: `.` thousands separator, `,` decimal; "tr" = triệu, million).
 
-## 5. Tax returns for HTKK
+## 5. E-invoices
+
+1. **Bán hàng → Hóa đơn điện tử → Cài đặt**: choose the provider (Viettel S-Invoice, MISA meInvoice, VNPT Invoice, BKAV
+   eHoadon), the environment (start with **Thử nghiệm** / test), the API account the provider gave the company, the
+   template number and the series registered with the tax authority (e.g. `C26TAA`). **Lưu và kiểm tra kết nối** checks
+   the account.
+2. Create the sales voucher as a **draft** (do not post it), open it and click **Phát hành HĐĐT** in the "Hóa đơn điện
+   tử" card. The invoice is dated today; its number goes into the voucher and the VAT listing, then the voucher is
+   posted (unless that option is off).
+3. The card then shows the number, the tax authority code (when assigned), the lookup code and PDF/XML downloads.
+   "Đã ký, chờ mã CQT" means the provider signed it and the tax authority code is still pending: it is fetched by
+   **Kiểm tra trạng thái** or by the administrator's scheduled `einvoice-poll`.
+4. "Chưa rõ kết quả" means the provider did not answer in time. **Do not re-enter the sale**: click **Kiểm tra trạng
+   thái**; VFAS looks the invoice up with the same key and only offers to issue again when the provider confirms it never
+   received it.
+5. Invoices with a tax authority code cannot be cancelled. To correct an amount, create a **sales return/allowance**
+   from the original voucher and issue it: it becomes a decrease adjustment invoice (Viettel and BKAV). An issued
+   voucher can no longer be edited, deleted or cancelled.
+
+## 6. Tax returns for HTKK
 
 | Return | Where | File |
 |---|---|---|
@@ -101,7 +123,7 @@ figures and the lines VFAS cannot know (dependants in 05-3, real-estate transfer
 adjustments…), then file from HTKK or the e-tax portal. The notes to the financial statements (B09) are attached as a
 separate file.
 
-## 6. Accounting regimes
+## 7. Accounting regimes
 
 | Regime | For | Chart of accounts | Financial statements |
 |---|---|---|---|

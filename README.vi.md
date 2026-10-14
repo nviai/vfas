@@ -34,8 +34,8 @@ Phần mềm kế toán **miễn phí, mã nguồn mở** cho doanh nghiệp Vi�
 - **Dữ liệu là của bạn** – tự cài trên máy chủ của mình hoặc chạy dạng SaaS; xuất toàn bộ dữ liệu một công ty bất cứ lúc nào.
 - **Sổ sách sạch** – chứng từ đã ghi sổ không sửa được số liệu, không xóa được (chặn cả ở tầng cơ sở dữ liệu); sửa sai
   bằng hủy có lý do hoặc chứng từ điều chỉnh; nhật ký thao tác không xóa được.
-- **Đúng chế độ** – mẫu sổ, BCTC theo TT133, TT99 hoặc TT58, tờ khai 01/GTGT, XML nộp qua HTKK, thuế TNCN, bảo hiểm với
-  tham số có ngày hiệu lực.
+- **Đúng chế độ** – mẫu sổ, BCTC theo TT133, TT99 hoặc TT58, tờ khai 01/GTGT, XML nộp qua HTKK, phát hành hóa đơn điện
+  tử, thuế TNCN, bảo hiểm với tham số có ngày hiệu lực.
 - **AI agent theo chuẩn OpenAI** – hỏi số liệu bằng tiếng Việt, lập chứng từ nháp; dùng Claude, OpenAI, OpenRouter hoặc
   Ollama tự host. AI chỉ lập nháp, người có quyền mới ghi sổ.
 - **Nhẹ** – chạy trên VPS 1 GB với SQLite, hoặc PostgreSQL nhiều tiến trình cho SaaS; một lệnh Docker.
@@ -58,7 +58,7 @@ Phần mềm kế toán **miễn phí, mã nguồn mở** cho doanh nghiệp Vi�
 | **Sổ cái, báo cáo** | Bút toán kép, phiếu kế toán, số dư đầu kỳ (nhập Excel), Sổ Nhật ký chung, Sổ Cái, sổ chi tiết tài khoản, bảng cân đối tài khoản, BCTC theo chế độ của công ty; kết chuyển cuối kỳ; khóa sổ tháng/năm |
 | **Tiền mặt** | Phiếu thu 01-TT, phiếu chi 02-TT (form nhanh cho thủ quỹ trên điện thoại), sổ quỹ S04a/S04b-DNN, kiểm kê quỹ 08a-TT, nhập sổ quỹ cũ từ Excel |
 | **Ngân hàng** | Thu/chi tiền gửi, chuyển tiền nội bộ, sổ tiền gửi S05-DNN, ủy nhiệm chi, nhập sao kê CSV/XLSX, tự đối chiếu |
-| **Mua bán** | Hàng hóa/dịch vụ, chứng từ bán hàng, mua hàng, trả lại/giảm giá, **nhập hóa đơn điện tử XML** (file lẻ hoặc ZIP) |
+| **Mua bán** | Hàng hóa/dịch vụ, chứng từ bán hàng, mua hàng, trả lại/giảm giá, **nhập hóa đơn điện tử XML** (file lẻ hoặc ZIP), **phát hành hóa đơn điện tử** qua Viettel S-Invoice, MISA meInvoice, VNPT hoặc BKAV (kèm hóa đơn điều chỉnh) |
 | **Thuế** | Bảng kê mua vào/bán ra, tờ khai **01/GTGT** (PDF, Excel, XML theo cấu trúc HTKK), phụ lục giảm thuế 8%, bảng tính TNDN kèm XML **03/TNDN**, XML **05/QTT-TNCN**, lịch nộp thuế |
 | **Công nợ** | Phải thu/phải trả theo đối tượng, sổ chi tiết thanh toán, tuổi nợ, biên bản đối chiếu công nợ |
 | **Kho** | Nhiều kho, nhập/xuất/chuyển kho, giá xuất bình quân gia quyền cả kỳ, thẻ kho, tổng hợp nhập–xuất–tồn |
@@ -129,7 +129,7 @@ Tài liệu chi tiết viết bằng tiếng Anh.
 | [docs/DEPLOY.md](docs/DEPLOY.md) | Cài đặt, biến môi trường, PostgreSQL, cập nhật, sao lưu, lệnh quản trị |
 | [docs/USAGE.md](docs/USAGE.md) | Vai trò và quyền, trợ lý AI, API kiểu OpenAI, phím tắt |
 | [docs/SECURITY-GUIDE.md](docs/SECURITY-GUIDE.md) | Mô hình bảo mật, kết quả review, checklist cloud và self-host |
-| [docs/EINVOICE.md](docs/EINVOICE.md) | Nghiên cứu và thiết kế xuất hóa đơn điện tử qua nhà cung cấp |
+| [docs/EINVOICE.md](docs/EINVOICE.md) | Xuất hóa đơn điện tử qua nhà cung cấp: cách hoạt động, cơ sở pháp lý, API nhà cung cấp |
 | [docs/PLAN.md](docs/PLAN.md) | Kế hoạch sản phẩm, kiến trúc |
 | [docs/MODULES.md](docs/MODULES.md) · [docs/CONTRACTS.md](docs/CONTRACTS.md) · [docs/UI.md](docs/UI.md) | Đặc tả module, giao kèo lõi–module, design system |
 | [docs/DECISIONS.md](docs/DECISIONS.md) | Quyết định thiết kế và nguồn pháp lý đã đối chiếu |
@@ -139,7 +139,7 @@ Tài liệu chi tiết viết bằng tiếng Anh.
 ## Lộ trình
 
 - [x] Gửi email (SMTP): xác minh email, quên mật khẩu, gửi lời mời – cần có trước khi mở đăng ký công khai
-- [ ] Xuất hóa đơn điện tử qua nhà cung cấp (Viettel S-Invoice, MISA meInvoice, VNPT, BKAV) – thiết kế ở [docs/EINVOICE.md](docs/EINVOICE.md)
+- [x] Xuất hóa đơn điện tử qua nhà cung cấp (Viettel S-Invoice, MISA meInvoice, VNPT, BKAV) – xem [docs/EINVOICE.md](docs/EINVOICE.md)
 - [x] XML BCTC, 03/TNDN, 05/QTT-TNCN để nộp qua HTKK
 - [x] Chế độ kế toán TT99/2025 và TT58/2026 (`app/core/regimes.py`)
 - [x] Image Docker dựng sẵn (`ghcr.io/nviai/vfas`, amd64/arm64, có ký số)
@@ -164,6 +164,9 @@ Phát hiện lỗ hổng? **Đừng mở issue công khai** – báo riêng theo
   trước khi nộp.
 - **Các tờ khai XML** (01/GTGT, BCTC, 03/TNDN, 05/QTT-TNCN) dựng theo bộ XSD đi kèm HTKK 5.6.4 và hợp lệ theo XSD đó,
   nhưng chưa ký số và HTKK cập nhật mẫu thường xuyên: **mở bằng HTKK ("Nhập tờ khai từ XML") để kiểm tra trước khi nộp**.
+- **Hóa đơn điện tử** phát hành bằng tài khoản của chính công ty tại nhà cung cấp; công ty chịu trách nhiệm về nội dung
+  hóa đơn. Phần kết nối viết theo tài liệu và client thực tế của nhà cung cấp nhưng chưa chạy thử trên tài khoản test:
+  **phát hành thử ở môi trường Thử nghiệm trước** (xem [docs/EINVOICE.md](docs/EINVOICE.md)).
 - Với **TT99**, B01-DN cần tách số dư ngắn hạn/dài hạn; sổ sách không lưu kỳ hạn nên hãy kiểm tra thiết lập "Trình bày
   ngắn hạn / dài hạn" trước khi nộp.
 - Một số mã mẫu sổ (S06/S07/S08/S09/S11-DNN, 02-LĐTL, 06-TSCĐ…) lấy theo nguồn tư vấn, cần đối chiếu văn bản gốc TT133.

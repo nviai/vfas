@@ -50,6 +50,7 @@ Product principles:
 - Sales vouchers (BH), purchases of goods/services (MH), discounts/returns (decrease adjustments); paid immediately (cash/bank) or on credit.
 - Input/output VAT invoice listings; every VAT line goes through the `vat_records` table (including cash payment vouchers with VAT).
 - **E-invoice XML import** (Decree 123/2020/ND-CP, Circular 78/2021/TT-BTC standard – `HDon` file), single file or ZIP → draft purchase/sales vouchers, duplicate prevention.
+- **E-invoice issuing** from draft sales vouchers through Viettel S-Invoice, MISA meInvoice, VNPT Invoice or BKAV eHoadon (`app/features/einvoice`, docs/EINVOICE.md).
 - VAT return 01/GTGT (credit method, monthly/quarterly, Circular 80/2021/TT-BTC), auto-filled, carrying [43] of the previous period to [22]; export to PDF, Excel and XML in the HTKK structure (validated against the HTKK schema; open it in HTKK before filing – see D-v2-12).
 - XML for HTKK of the annual financial statements (TT133 set: B01a, B02, B03, F01), the CIT return 03/TNDN (with 03-1A) and the PIT finalization 05/QTT-TNCN (with 05-1 and 05-2).
 - VAT reduction to 8% (Decree 174/2025/ND-CP, until 2026-12-31): rate "8" is declared together with the 10% group and has a tax-reduction appendix.
@@ -68,7 +69,6 @@ Product principles:
 - **New UI** (section 9): own design system, light/dark, mobile, keyboard shortcut sheet, Ctrl+K.
 
 ### Out of scope for this release (extension points exist)
-- Issuing e-invoices (requires a provider accepted by the tax authority): an `EInvoiceProvider` interface exists, no provider implemented yet.
 - Direct bank API connections: replaced by statement import.
 - Foreign currencies, production costing, construction, contracts, budgets, subscription billing.
 

@@ -171,6 +171,12 @@ new functions in service – keep the `Item` model and the existing function sig
   statements: the last day of the 3rd month after year-end) – the dashboard will call this function.
 - **XML returns for HTKK**: shared envelope `app/core/htkk.py`; `gl/htkk.py` (financial statements, form 683, TT133 only),
   `vat/htkk_cit.py` (03/TNDN, form 892, with 03-1A), `payroll/htkk.py` (05/QTT-TNCN, form 953, with 05-1/05-2).
+- **E-invoice issuing** (`einvoice`, see docs/EINVOICE.md): `EInvoiceConfig` (provider, environment, encrypted secrets,
+  template/series), outbox `EInvoiceIssue` (idempotency key, status pending/unknown/signed/issued/failed, number, tax
+  authority code, stored XML + SHA-256); adapters in `einvoice/providers/` (viettel, misa, vnpt, bkav, simulator); a card
+  on the sales voucher (loaded with HTMX), `/einvoice` list and settings; `python -m app.cli einvoice-poll`. Permissions
+  `einvoice.view|export` READERS, `einvoice.issue` ACCOUNTANTS, `einvoice.manage` MANAGERS. Hooks lock issued vouchers
+  (no edit/delete/cancel) through `posting_validator`, `entry.deleted` and the `sales.before_update` event.
 - **Receivables/payables** (`debts`): receivables (131) / payables (331): summary by partner (opening, turnover, closing), detailed
   payment ledger per partner, FIFO aging (due date = voucher date + `payment_terms_days`, or `due_date`), balance confirmation
   letter (PDF).

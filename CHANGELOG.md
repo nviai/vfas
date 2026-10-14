@@ -11,6 +11,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - Prebuilt Docker image `ghcr.io/nviai/vfas` (linux/amd64 + linux/arm64) published by the "Docker image" workflow on
   release tags (`X.Y.Z`, `X.Y`, `X`, `latest`) and on `main` (`edge`), with SBOM/provenance and a cosign signature;
   `docker-compose.yml` pulls it by default (`VFAS_VERSION`).
+- E-invoice issuing (module `einvoice`): Viettel S-Invoice, MISA meInvoice, VNPT Invoice and BKAV eHoadon adapters
+  (HSM signing), decrease adjustment invoices from sales returns (Viettel, BKAV), idempotent outbox with lookup after
+  timeouts, polling of the tax authority code (`python -m app.cli einvoice-poll`), signed XML kept with its SHA-256,
+  issued vouchers locked against edit/delete/cancel; a simulator for demos (`EINVOICE_SIMULATOR=true`).
 - Accounting regimes per company (`app/core/regimes.py`): **Circular 99/2025** (full chart, B01-DN with
   short/long-term presentation settings, B02-DN, B03-DN, B09-DN, trial balance S06-DN, ledgers coded -DN) and
   **Circular 58/2026** for micro enterprises (B01-DNSN, B02-DNSN); chosen when creating a company and changeable in
@@ -25,7 +29,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   elements, and no empty signature element.
 
 ### Upgrade notes
-- Migration `0004` adds `users.email_verified_at`; existing accounts are marked as verified.
+- Migration `0004` adds `users.email_verified_at`; existing accounts are marked as verified. Migration `0005` adds the
+  e-invoice tables.
 - `ALLOW_SIGNUP=true` without SMTP now logs a warning at startup: configure SMTP before opening public sign-up.
 - `docker-compose.yml` now uses the image `ghcr.io/nviai/vfas:${VFAS_VERSION:-latest}` instead of a local `vfas:latest`
   build; add `--build` to keep building from the source.

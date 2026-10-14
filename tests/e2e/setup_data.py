@@ -1,8 +1,9 @@
 """Prepare E2E data after `python -m app.cli demo`.
 
 Runs in a subprocess (DATA_DIR already set): adds members for every
-role, another company (isolation checks) and configures the AI
-assistant to use the fake LLM. Prints the info as JSON to stdout.
+role, another company (isolation checks), configures the AI assistant
+to use the fake LLM and creates a draft sale for the e-invoice test.
+Prints the info as JSON to stdout.
 Usage::
 
     python tests/e2e/setup_data.py <llm_base_url>
@@ -91,6 +92,60 @@ def main(llm_url: str) -> None:
                 "daily_limit": 1000,
             },
         )
+        # Draft sale dated today, to be issued as an e-invoice
+        from decimal import Decimal
+
+        from app.core.dates import today
+        from app.features.partners.models import Partner
+        from app.features.sales import service as sales
+        from app.features.sales.common import TradeHeader, TradeLine
+
+        customer = db.scalars(
+            select(Partner).where(
+                Partner.company_id == company.id,
+                Partner.is_customer.is_(True),
+                Partner.tax_code != "",
+            )
+        ).first()
+        d = today()
+        doc = sales.create(
+            db,
+            ctx,
+            sales.SalesInput(
+                kind="sale",
+                header=TradeHeader(
+                    date=d,
+                    doc_date=d,
+                    partner_id=customer.id,
+                    partner_name="",
+                    address="",
+                    tax_code="",
+                    contact_name="",
+                    invoice_template="",
+                    invoice_series="",
+                    invoice_no="",
+                    invoice_date=None,
+                    payment_method="credit",
+                    bank_account_id=None,
+                    due_date=None,
+                    description="Bán hàng E2E – hóa đơn điện tử",
+                    note="",
+                    original_entry_id=None,
+                ),
+                lines=[
+                    TradeLine(
+                        description="Dịch vụ tư vấn E2E",
+                        amount=5_000_000,
+                        vat_rate="10",
+                        vat_amount=500_000,
+                        quantity=Decimal("1"),
+                        unit_price=Decimal("5000000"),
+                        account="5113",
+                    )
+                ],
+            ),
+        )
+        out["einvoice_entry_id"] = doc.entry_id
     print(json.dumps(out))
 
 

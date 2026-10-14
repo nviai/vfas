@@ -16,6 +16,7 @@ deployment). Each finding was reproduced with TestClient/Chrome where possible a
 | CSRF | Per-session token for every POST (forms, HTMX, multipart); the token changes when switching companies (a form opened under the old company cannot write into the new one) |
 | First-run setup | `/setup` requires a setup code (auto-generated, printed to the log, stored in `DATA_DIR/.setup_token`) – strangers cannot take over a fresh server |
 | Sign-up (SaaS) | Limits on sign-ups per IP per hour, maximum companies per user, company creations per hour; with SMTP configured, new accounts must verify their email (signed link, valid 3 days) before they can open a company |
+| E-invoice providers | Account passwords/tokens encrypted with `SECRET_KEY` (Fernet), never shown again or exported; a custom API address must be https and, on SaaS installs, resolve to public Internet addresses (checked when saved and before each call – SSRF); provider answers parsed with `defusedxml`; ZIP downloads limited in depth and size; issuing needs the `einvoice.issue` permission (API tokens cannot issue); every attempt is in the audit log |
 | Password reset | Only with SMTP; signed link valid 60 minutes that embeds a fingerprint of the current password hash (single use, invalidated by any password change); the same answer whether or not the email has an account; 3 requests/email/hour and 10/IP/hour; every session is signed out after the reset |
 | Multi-company | Every query filters on `company_id` + the session's automatic filtering layer; a test scans every route with an id for leaks of other companies' data (with positive controls); IDs referenced in forms are checked to belong to the company |
 | Authorization | 5 per-company roles, per-module permissions; payroll data (per-employee detailed ledgers, salary change log, employees' personal data, Ctrl+K) is shown only to users with payroll permission |
@@ -25,7 +26,7 @@ deployment). Each finding was reproduced with TestClient/Chrome where possible a
 | Files, XML | defusedxml (blocks XXE, billion laughs); ZIP limits on file count/size, never extracted to disk; attachments identified by magic bytes; random per-company storage names; exported Excel files contain no formulas from user data; limits on import row counts; PDFs only load internal resources |
 | Browser | CSP `script-src 'self' 'unsafe-eval'` (Alpine), no inline scripts; `frame-ancestors 'self'`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`, COOP; HSTS under HTTPS |
 | Secrets | Refuses to start with the sample `SECRET_KEY`; SaaS requires ≥ 32 characters; the auto-generated key file is created atomically with permissions 600; invitation, password-reset and verification tokens and setup codes are masked in the access log |
-| Backup | Files with permissions 600; scrypt + Fernet encryption when `BACKUP_PASSPHRASE` is set; single-company exports contain no passwords, API tokens or AI API keys |
+| Backup | Files with permissions 600; scrypt + Fernet encryption when `BACKUP_PASSPHRASE` is set; single-company exports contain no passwords, API tokens, AI API keys or e-invoice provider passwords |
 | Container | Non-root user, read-only file system, `cap_drop: ALL`, `no-new-privileges`, `umask 077` (DB, attachments and keys readable only by the app); base image pinned by digest; Tailwind CLI verified by sha256 |
 
 ## 2. Review results
@@ -92,7 +93,7 @@ encrypted backups pushed to separate storage; secrets from a secret manager; cen
 
 **Mandatory before opening sign-up**
 1. PostgreSQL `DATABASE_URL`, strong password, SSL if the DB is on another machine; `WEB_CONCURRENCY=2..4`.
-2. `SECRET_KEY` ≥ 32 characters, fixed, stored separately (lose the key = lose the stored AI API keys); rotate with `SECRET_KEY_OLD`.
+2. `SECRET_KEY` ≥ 32 characters, fixed, stored separately (lose the key = lose the stored AI API keys and e-invoice provider passwords); rotate with `SECRET_KEY_OLD`.
 3. HTTPS at Traefik; `COOKIE_SECURE=true`; `FORWARDED_ALLOW_IPS` = Traefik's Docker network range (default 172.16.0.0/12).
 4. Configure SMTP (`SMTP_HOST`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `MAIL_FROM`; check with `python -m app.cli send-test-email --to …`)
    **before** `ALLOW_SIGNUP=true` – email verification then turns on automatically; set `SIGNUP_PER_IP_HOUR`, `MAX_COMPANIES_PER_USER`.
@@ -129,6 +130,6 @@ encrypted backups pushed to separate storage; secrets from a secret manager; cen
 |---|---|
 | Suspected password leak | Admin locks the account (`/admin` or lock the member) → sessions and API tokens are revoked immediately; `python -m app.cli reset-password` |
 | Leaked API token | Revoke it under "Hệ thống → API & tích hợp" (System → API & integrations) |
-| Leaked `SECRET_KEY` | Set a new key, put the old one in `SECRET_KEY_OLD`, restart, re-enter AI API keys, remove `SECRET_KEY_OLD` |
+| Leaked `SECRET_KEY` | Set a new key, put the old one in `SECRET_KEY_OLD`, restart, re-enter AI API keys and e-invoice provider passwords, remove `SECRET_KEY_OLD` |
 | Suspected tampering with figures | Check the audit log ("Nhật ký thao tác", cannot be deleted); DB triggers block editing/deleting posted vouchers |
 | Data corruption | `python -m app.cli restore <file> --yes` (requires `BACKUP_PASSPHRASE` if the backup is encrypted) |

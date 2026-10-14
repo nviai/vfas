@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Cài đặt hóa đơn điện tử") }}{% endblock %}
+{% block content %}
+{% set badge %}{% if cfg and cfg.is_active %}{{ ui.badge(_("Đang bật"), "green", dot=True) }}{% else %}{{ ui.badge(_("Đang tắt"), "gray") }}{% endif %}{% endset %}
+{{ ui.page_header(_("Hóa đơn điện tử"), _("Phát hành hóa đơn có mã của cơ quan thuế qua tài khoản của công ty tại nhà cung cấp dịch vụ hóa đơn."), breadcrumbs=breadcrumbs, icon_name="receipt-text", badge=badge) }}
+
+<div class="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
+<form method="post" action="/einvoice/settings" class="card" x-data='{ provider: {{ (cfg.provider if cfg and cfg.provider else (providers[0].code if providers else ""))|tojson }} }'>
+  {{ ui.csrf_field() }}
+  <div class="card-body divide-y divide-line">
+    {% call ui.form_section(_("Trạng thái")) %}
+      {{ ui.switch("is_active", _("Bật phát hành hóa đơn điện tử"), cfg.is_active if cfg else False, hint=_("Nút “Phát hành HĐĐT” xuất hiện trên chứng từ bán hàng nháp.")) }}
+      {{ ui.switch("auto_post", _("Ghi sổ chứng từ ngay sau khi phát hành"), cfg.auto_post if cfg else True, hint=_("Số hóa đơn được ghi vào chứng từ và bảng kê thuế trước khi ghi sổ.")) }}
+    {% endcall %}
+
+    {% call ui.form_section(_("Nhà cung cấp"), _("Dùng tài khoản tích hợp (API) do nhà cung cấp cấp cho công ty. Thông tin bí mật được mã hóa khi lưu.")) %}
+      <div>
+        <label class="label" for="f-provider">{{ _("Nhà cung cấp") }}</label>
+        <select id="f-provider" name="provider" class="input" x-model="provider">
+          {% for p in providers %}<option value="{{ p.code }}" {{ "selected" if cfg and cfg.provider == p.code }}>{{ _(p.name) }}</option>{% endfor %}
+        </select>
+      </div>
+      {{ ui.select("environment", _("Môi trường"), [("test", _("Thử nghiệm")), ("production", _("Chính thức"))], cfg.environment if cfg else "test", hint=_("Thử nghiệm: hóa đơn không gửi cơ quan thuế. Chuyển sang Chính thức khi đã kiểm tra xong.")) }}
+      {{ ui.input("base_url", _("Địa chỉ API (base URL)"), cfg.base_url if cfg else "", input_cls="font-mono text-[13px]", hint=_("Để trống dùng địa chỉ mặc định. VNPT: địa chỉ riêng của công ty do VNPT cấp.")) }}
+      {% for p in providers %}
+      <div class="space-y-4" x-show="provider === {{ p.code|tojson|forceescape }}" x-cloak>
+        {% for f in p.fields %}
+          {% set fname = p.code ~ "__" ~ f.name %}
+          {% if f.secret %}
+            {{ ui.password_input(fname, _(f.label), required=False, autocomplete="off",
+                                 hint=((_("Đã lưu") ~ " (" ~ masked[f.name] ~ "). " ~ _("Để trống để giữ nguyên.")) if cfg and cfg.provider == p.code and masked.get(f.name) else _(f.hint) if f.hint else None)) }}
+          {% else %}
+            {{ ui.input(fname, _(f.label), values.get(f.name, "") if cfg and cfg.provider == p.code else "", hint=_(f.hint) if f.hint else None, placeholder=f.placeholder or None) }}
+          {% endif %}
+        {% endfor %}
+      </div>
+      {% endfor %}
+    {% endcall %}
+
+    {% call ui.form_section(_("Mẫu số, ký hiệu"), _("Đã đăng ký với cơ quan thuế qua nhà cung cấp. Ký hiệu đổi theo năm (C26… cho năm 2026).")) %}
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {{ ui.select("template", _("Mẫu số"), [("1", _("1 – Hóa đơn GTGT")), ("2", _("2 – Hóa đơn bán hàng"))], cfg.template if cfg else default_template) }}
+        {{ ui.input("series", _("Ký hiệu"), cfg.series if cfg else "", required=True, input_cls="font-mono uppercase", placeholder="C26TAA", attrs='maxlength="6"') }}
+      </div>
+    {% endcall %}
+  </div>
+  <div class="card-footer flex flex-wrap items-center justify-between gap-2">
+    {#- The primary button comes first so that Enter saves without a test call. -#}
+    {{ ui.button(_("Lưu cấu hình"), "primary", icon_name="check", cls="order-2") }}
+    {{ ui.button(_("Lưu và kiểm tra kết nối"), "secondary", icon_name="plug", name="action", value="test", cls="order-1") }}
+  </div>
+</form>
+
+<div class="space-y-5">
+  {% call ui.card(_("Trước khi phát hành"), icon_name="shield") %}
+    <ul class="space-y-2.5 text-[13px] text-fg-2">
+      <li class="flex gap-2">{{ ui.icon("check", "mt-0.5 size-3.5 shrink-0 text-primary") }}<span>{{ _("Công ty ký hợp đồng với nhà cung cấp và đăng ký sử dụng hóa đơn (mẫu 01/ĐKTĐ-HĐĐT); chữ ký số HSM/ký từ xa được khai báo trên tờ khai đăng ký.") }}</span></li>
+      <li class="flex gap-2">{{ ui.icon("check", "mt-0.5 size-3.5 shrink-0 text-primary") }}<span>{{ _("Phát hành thử ở môi trường Thử nghiệm và đối chiếu hóa đơn trên trang của nhà cung cấp.") }}</span></li>
+      <li class="flex gap-2">{{ ui.icon("check", "mt-0.5 size-3.5 shrink-0 text-primary") }}<span>{{ _("Hóa đơn đã có mã không hủy được: sai sót xử lý bằng hóa đơn điều chỉnh (chứng từ giảm giá/trả lại).") }}</span></li>
+      <li class="flex gap-2">{{ ui.icon("check", "mt-0.5 size-3.5 shrink-0 text-primary") }}<span>{{ _("Công ty (người bán) chịu trách nhiệm về nội dung hóa đơn.") }}</span></li>
+    </ul>
+  {% endcall %}
+</div>
+</div>
+{% endblock %}

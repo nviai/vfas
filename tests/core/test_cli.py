@@ -180,6 +180,17 @@ def test_export_company_excludes_secrets(tmp_path, db, ctx, company):
         {"enabled": True, "api_key_enc": crypto.encrypt("sk-secret-key")},
     )
     create_api_token(db, ctx, "n8n", ["read"])
+    from app.features.einvoice.models import EInvoiceConfig
+
+    db.add(
+        EInvoiceConfig(
+            company_id=company.id,
+            provider="viettel",
+            settings={"username": "0000000001"},
+            secrets=crypto.encrypt('{"password": "sinvoice-secret"}'),
+        )
+    )
+    db.commit()
     out = tmp_path / "c.tar.gz"
     assert cli.main(["export-company", str(company.id), "-o", str(out)]) == 0
     with tarfile.open(out) as tar:
@@ -189,6 +200,7 @@ def test_export_company_excludes_secrets(tmp_path, db, ctx, company):
     assert len(tables["journal_entries"]) == 1
     assert "api_tokens" not in tables
     assert "api_key_enc" not in json.dumps(tables["companies"])
+    assert tables["einvoice_configs"][0]["secrets"] is None
     assert all("password_hash" not in m for m in tables["members"])
     assert {m["email"] for m in tables["members"]} >= {"giamdoc@nviai.vn"}
 
