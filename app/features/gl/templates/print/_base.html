@@ -1,6 +1,8 @@
 {#- Print layout for gl books/reports (WeasyPrint). Always Vietnamese; does not use the translation function. -#}
 {%- macro paren(v) -%}{%- if v is none or v == 0 -%}{%- elif v < 0 -%}({{ (-v)|money }}){%- else -%}{{ v|money }}{%- endif -%}{%- endmacro -%}
-{%- macro head(company, form_code, issued) -%}
+{#- form_code: TT133 code, translated to the company's regime (TT58 internal books have none). -#}
+{%- macro head(company, form_code, issued=None) -%}
+{%- set code = regime_form(company, form_code) -%}
 <table class="doc-head"><tr>
   <td class="left">
     <p><b>Đơn vị:</b> {{ company.name }}</p>
@@ -8,8 +10,8 @@
     {% if company.tax_code %}<p><b>Mã số thuế:</b> {{ company.tax_code }}</p>{% endif %}
   </td>
   <td class="right">
-    {% if form_code %}<p class="form-code">Mẫu số {{ form_code }}</p>{% endif %}
-    <p class="issued">{{ issued }}</p>
+    {% if code %}<p class="form-code">Mẫu số {{ code }}</p>
+    <p class="issued">{{ regime_issued(company) }}</p>{% endif %}
   </td>
 </tr></table>
 {%- endmacro -%}

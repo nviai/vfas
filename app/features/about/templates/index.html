@@ -4,17 +4,18 @@
 {% block content %}
 {{ ui.page_header(_("Giới thiệu"), product ~ " · " ~ _("phiên bản {v}", v=version), icon_name="info") }}
 
-{% call ui.alert(_("Phần mềm hỗ trợ lập chứng từ, sổ kế toán, báo cáo tài chính và tờ khai thuế theo chế độ kế toán doanh nghiệp nhỏ và vừa (Thông tư 133/2016/TT-BTC). Người quản lý, kế toán trưởng/người phụ trách kế toán chịu trách nhiệm về tính chính xác, trung thực của số liệu lấy từ phần mềm (Điều 28 Thông tư 99/2025/TT-BTC). Tờ khai XML cần kiểm tra lại bằng ứng dụng HTKK trước khi nộp."), "warning", title=_("Lưu ý pháp lý"), cls="mb-6") %}{% endcall %}
+{% call ui.alert(_("Phần mềm hỗ trợ lập chứng từ, sổ kế toán, báo cáo tài chính và tờ khai thuế theo chế độ kế toán doanh nghiệp đã chọn (Thông tư 133/2016/TT-BTC, 99/2025/TT-BTC hoặc 58/2026/TT-BTC). Người quản lý, kế toán trưởng/người phụ trách kế toán chịu trách nhiệm về tính chính xác, trung thực của số liệu lấy từ phần mềm (Điều 28 Thông tư 99/2025/TT-BTC). Tờ khai XML cần kiểm tra lại bằng ứng dụng HTKK trước khi nộp."), "warning", title=_("Lưu ý pháp lý"), cls="mb-6") %}{% endcall %}
 
 <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
   {% call ui.card(_("Chế độ kế toán"), icon_name="book-open") %}
     {{ ui.desc_list([
-      (_("Chế độ áp dụng"), _("Thông tư 133/2016/TT-BTC – doanh nghiệp nhỏ và vừa")),
-      (_("Hệ thống tài khoản"), _("Cấp 1, cấp 2 theo Phụ lục 1 TT133; thêm được tài khoản chi tiết")),
+      (_("Chế độ áp dụng"), _(regime.name)),
+      (_("Hệ thống tài khoản"), _(regime.chart_note)),
       (_("Hình thức sổ"), _("Nhật ký chung")),
       (_("Đơn vị tiền tệ"), "VND"),
     ], cols="sm:grid-cols-1") }}
-    <p class="mt-4 text-[13px] text-fg-3">{{ issued }}</p>
+    <p class="mt-2 text-[13px] text-fg-2">{{ _(regime.description) }}</p>
+    <p class="mt-4 text-[13px] text-fg-3">{{ regime.issued }}</p>
   {% endcall %}
 
   {% call ui.card(_("Nguyên tắc dữ liệu"), icon_name="shield") %}

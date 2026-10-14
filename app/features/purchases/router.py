@@ -54,9 +54,10 @@ register(router, CONFIG)
 # ------------------------------------------------------- XML e-invoices
 
 
-def _ctx_accounts():
+def _ctx_accounts(request: Request):
+    company = getattr(request.state, "company", None)
     return {
-        "purchase_accounts": imp.PURCHASE_ACCOUNTS,
+        "purchase_accounts": imp.purchase_accounts(company),
         "sales_accounts": imp.SALES_ACCOUNTS,
     }
 
@@ -73,7 +74,7 @@ def einvoices_page(
                 ("Mua hàng", "/purchases"),
                 ("Nhập hóa đơn điện tử", None),
             ],
-            **_ctx_accounts(),
+            **_ctx_accounts(request),
         },
     )
 
@@ -104,7 +105,7 @@ async def einvoices_upload(
                 ("Nhập hóa đơn điện tử", "/einvoices"),
                 ("Xem trước", None),
             ],
-            **_ctx_accounts(),
+            **_ctx_accounts(request),
         },
     )
 
@@ -127,7 +128,8 @@ async def einvoices_confirm(
         get_ctx(request),
         token,
         keys,
-        purchase_account=form.get("purchase_account") or "6422",
+        purchase_account=form.get("purchase_account")
+        or service.expense_default(getattr(request.state, "company", None)),
         sales_account=form.get("sales_account") or "5113",
     )
     msg = (

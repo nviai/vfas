@@ -23,7 +23,10 @@ from app.features.journal import queries
 def check_assets_vs_ledger(db, ctx):
     d = today()
     rows = service.register(db, ctx.company_id, d)
-    gl_cost = queries.balance(db, ctx.company_id, "211", upto=d)
+    gl_cost = sum(
+        queries.balance(db, ctx.company_id, acc, upto=d)
+        for acc in ("211", "212", "213")
+    )
     gl_acc = -queries.balance(db, ctx.company_id, "214", upto=d)
     cost = sum(r.cost for r in rows)
     acc = sum(r.accumulated for r in rows)

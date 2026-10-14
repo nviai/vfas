@@ -18,6 +18,7 @@ from app.core.dates import parse_date, today
 from app.core.errors import BusinessError
 from app.core.money import format_vnd
 from app.core.pdf import render_pdf
+from app.core.regimes import account as regime_account
 from app.core.security import CurrentUser, require
 from app.core.web import form_data, get_ctx, get_tenant_db, redirect, render
 from app.core.xlsx import Col, ReportBook, pdf_response, xlsx_response
@@ -388,7 +389,7 @@ def _employee_input(form: dict) -> EmployeeInput:
         insurance_salary=money_field(form, "insurance_salary"),
         taxable_allowance=money_field(form, "taxable_allowance"),
         nontaxable_allowance=money_field(form, "nontaxable_allowance"),
-        expense_account=form.get("expense_account") or "6422",
+        expense_account=form.get("expense_account") or "",
         start_date=_date(form, "start_date"),
         end_date=_date(form, "end_date"),
         tax_code=form.get("tax_code") or "",
@@ -404,13 +405,14 @@ def _employee_input(form: dict) -> EmployeeInput:
 
 
 def _expense_accounts(db: Session, company_id: int) -> list[tuple[str, str]]:
+    prefixes = service.salary_expense_prefixes(db.get(Company, company_id))
     return [
         (a.code, a.label)
         for a in list_accounts(
             db,
             company_id,
             postable=True,
-            prefix="154,241,632,6421,6422",
+            prefix=",".join(prefixes),
             active=True,
         )
     ]
@@ -465,7 +467,7 @@ def employee_new(
     form = {
         "contract_type": "long",
         "is_resident": True,
-        "expense_account": "6422",
+        "expense_account": regime_account(_company(db, user), "expense_staff"),
         "dependents": 0,
         "is_active": True,
     }

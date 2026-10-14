@@ -18,6 +18,8 @@ from app.core.audit import write_audit
 from app.core.dates import month_bounds
 from app.core.errors import BusinessError, NotFoundError
 from app.core.money import MoneyError, format_vnd, parse_vnd
+from app.core.regimes import account as regime_account
+from app.core.regimes import regime_of
 from app.features.accounts.models import Account
 from app.features.journal import service as js
 from app.features.journal.models import CANCELLED, DRAFT, POSTED, JournalEntry
@@ -81,7 +83,8 @@ class EmployeeInput:
     insurance_salary: int = 0
     taxable_allowance: int = 0
     nontaxable_allowance: int = 0
-    expense_account: str = "6422"
+    # Empty = the regime's default (staff expenses).
+    expense_account: str = ""
     start_date: date | None = None
     end_date: date | None = None
     tax_code: str = ""
@@ -141,9 +144,17 @@ def get_employee(db: Session, company_id: int, employee_id: int) -> Employee:
     return e
 
 
+def salary_expense_prefixes(company) -> tuple[str, ...]:
+    """Accounts a salary may be charged to (company regime)."""
+    return tuple(p for p in regime_of(company).expense_prefixes if p != "811")
+
+
 def _validate_employee(
     db: Session, company_id: int, inp: EmployeeInput
 ) -> None:
+    company = db.get(Company, company_id)
+    if not inp.expense_account:
+        inp.expense_account = regime_account(company, "expense_staff")
     if not inp.full_name.strip():
         raise BusinessError("Nhập họ tên nhân viên")
     if inp.contract_type not in CONTRACT_TYPES:
@@ -158,16 +169,14 @@ def _validate_employee(
             Account.code == inp.expense_account,
         )
     )
+    allowed = salary_expense_prefixes(company)
     if (
         acc is None
         or not acc.is_postable
-        or not inp.expense_account.startswith(
-            ("154", "6421", "6422", "632", "241")
-        )
+        or not inp.expense_account.startswith(allowed)
     ):
         raise BusinessError(
-            "TK chi phí lương phải là TK chi tiết thuộc "
-            "154, 241, 632, 6421 hoặc 6422"
+            "TK chi phí lương phải là TK chi tiết thuộc " + ", ".join(allowed)
         )
 
 
@@ -217,7 +226,14 @@ def create_from_partner(db: Session, ctx, partner_id: int) -> Employee:
     if existing is not None:
         return existing
     p.is_employee = True
-    e = Employee(company_id=ctx.company_id, partner_id=p.id, created_at=_now())
+    e = Employee(
+        company_id=ctx.company_id,
+        partner_id=p.id,
+        created_at=_now(),
+        expense_account=regime_account(
+            db.get(Company, ctx.company_id), "expense_staff"
+        ),
+    )
     db.add(e)
     db.flush()
     write_audit(
@@ -577,11 +593,13 @@ def totals(run: PayrollRun) -> dict[str, int]:
     return out
 
 
-def build_entry_lines(run: PayrollRun) -> list[js.LineIn]:
+def build_entry_lines(run: PayrollRun, bhtn: str = "3385") -> list[js.LineIn]:
     """Build the payroll journal lines.
 
     TK 334 lines are detailed per employee; the employer's insurance
-    contributions are grouped by expense account.
+    contributions are grouped by expense account. `bhtn` is the
+    unemployment insurance account of the regime (3385 under TT133,
+    3386 under TT99).
     """
     period = run.period_label
     out: list[js.LineIn] = []
@@ -602,7 +620,7 @@ def build_entry_lines(run: PayrollRun) -> list[js.LineIn]:
         for amount, acc, label in (
             (ln.emp_bhxh, "3383", "BHXH"),
             (ln.emp_bhyt, "3384", "BHYT"),
-            (ln.emp_bhtn, "3385", "BHTN"),
+            (ln.emp_bhtn, bhtn, "BHTN"),
         ):
             if amount > 0:
                 out.append(
@@ -638,12 +656,12 @@ def build_entry_lines(run: PayrollRun) -> list[js.LineIn]:
         for amount, acc in (
             (ln.er_bhxh, "3383"),
             (ln.er_bhyt, "3384"),
-            (ln.er_bhtn, "3385"),
+            (ln.er_bhtn, bhtn),
             (ln.er_kpcd, "3382"),
         ):
             if amount > 0:
                 employer[(ln.expense_account, acc)] += amount
-    labels = {"3383": "BHXH", "3384": "BHYT", "3385": "BHTN", "3382": "KPCĐ"}
+    labels = {"3383": "BHXH", "3384": "BHYT", bhtn: "BHTN", "3382": "KPCĐ"}
     for (exp, acc), amount in sorted(employer.items()):
         out.append(
             js.LineIn(
@@ -663,7 +681,12 @@ def post_run(db: Session, ctx, run: PayrollRun) -> JournalEntry:
         raise BusinessError("Bảng lương chưa có nhân viên")
     recompute_run(db, run)
     db.flush()
-    lines = build_entry_lines(run)
+    lines = build_entry_lines(
+        run,
+        regime_account(
+            db.get(Company, run.company_id), "unemployment_insurance"
+        ),
+    )
     if not lines:
         raise BusinessError("Bảng lương không có số tiền để hạch toán")
     inp = js.EntryIn(

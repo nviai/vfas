@@ -1,10 +1,10 @@
 {% extends "gl/print/_base.html" %}
 {% import "gl/print/_base.html" as p %}
-{% block title %}Bảng cân đối tài khoản{% endblock %}
+{% block title %}{{ tb_title or "Bảng cân đối tài khoản" }}{% endblock %}
 {% block page_size %}size: A4 landscape; margin: 12mm 10mm 14mm 12mm;{% endblock %}
 {% block body %}
 {{ p.head(company, "F01-DNN", issued) }}
-<p class="title">BẢNG CÂN ĐỐI TÀI KHOẢN</p>
+<p class="title">{{ (tb_title or "Bảng cân đối tài khoản")|upper }}</p>
 <p class="subtitle">{{ subtitle }}</p>
 <p class="unit">Đơn vị tính: Đồng Việt Nam</p>
 <table class="book">

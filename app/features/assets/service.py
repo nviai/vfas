@@ -26,11 +26,14 @@ from app.core.audit import snapshot, write_audit
 from app.core.dates import fmt_date, month_bounds
 from app.core.errors import BusinessError, NotFoundError
 from app.core.money import format_vnd
+from app.core.regimes import account as regime_account
+from app.core.regimes import regime_of
 from app.features.accounts.models import Account
 from app.features.assets.models import (
     ASSET_CATEGORIES,
     DEPRECIATION_ACCOUNT,
     DISPOSED,
+    FIXED_ASSET_PREFIXES,
     IN_USE,
     PREPAID_KINDS,
     RUN_ALLOCATION,
@@ -220,9 +223,10 @@ class AssetInput:
     acquired_date: date
     code: str = ""
     category: str = "office"
-    asset_account: str = "2111"
+    # Empty = the regime's defaults (TT133 2111/6422, TT99 211/6424).
+    asset_account: str = ""
     depreciation_account: str = ""
-    expense_account: str = "6422"
+    expense_account: str = ""
     department: str = ""
     manufacturer: str = ""
     serial_no: str = ""
@@ -321,7 +325,9 @@ def _postable(
         )
 
 
-EXPENSE_PREFIXES = ("154", "241", "632", "6421", "6422", "811")
+def expense_prefixes(db: Session, company_id: int) -> tuple[str, ...]:
+    """Expense accounts depreciation/allocation may be charged to."""
+    return regime_of(db.get(Company, company_id)).expense_prefixes
 
 
 def _check_refs(
@@ -372,17 +378,31 @@ def _normalize_asset(
         raise BusinessError(
             "Số tháng đã khấu hao phải nhỏ hơn thời gian sử dụng"
         )
-    _postable(db, company_id, inp.asset_account, ("211",), "TK nguyên giá")
+    company = db.get(Company, company_id)
+    inp.asset_account = inp.asset_account or regime_account(
+        company, "fixed_asset"
+    )
+    inp.expense_account = inp.expense_account or regime_account(
+        company, "expense_depreciation"
+    )
+    _postable(
+        db,
+        company_id,
+        inp.asset_account,
+        FIXED_ASSET_PREFIXES,
+        "TK nguyên giá",
+    )
     inp.depreciation_account = (
         inp.depreciation_account
-        or DEPRECIATION_ACCOUNT.get(inp.asset_account[:4], "2141")
+        or DEPRECIATION_ACCOUNT.get(inp.asset_account[:4])
+        or DEPRECIATION_ACCOUNT.get(inp.asset_account[:3], "2141")
     )
     _postable(db, company_id, inp.depreciation_account, ("214",), "TK hao mòn")
     _postable(
         db,
         company_id,
         inp.expense_account,
-        EXPENSE_PREFIXES,
+        expense_prefixes(db, company_id),
         "TK chi phí khấu hao",
     )
     start = inp.depreciation_start or first_of_month(inp.acquired_date)
@@ -528,7 +548,7 @@ def purchase_prefill(db: Session, ctx, entry_id: int) -> list[dict]:
             ).all()
             for ln in lines:
                 acc = getattr(ln, "debit_account", "") or ""
-                if acc.startswith("211"):
+                if acc.startswith(FIXED_ASSET_PREFIXES):
                     vat_extra = (
                         0
                         if getattr(ln, "deductible", True)
@@ -548,7 +568,7 @@ def purchase_prefill(db: Session, ctx, entry_id: int) -> list[dict]:
             out = []
     if not out:
         for ln in e.lines:
-            if ln.debit_account.startswith("211"):
+            if ln.debit_account.startswith(FIXED_ASSET_PREFIXES):
                 out.append(
                     {
                         "name": ln.description or e.description,
@@ -581,7 +601,8 @@ class PrepaidInput:
     kind: str = "tool"
     quantity: int = 1
     prepaid_account: str = "242"
-    expense_account: str = "6422"
+    # Empty = the regime's default (TT133 6422, TT99 6423).
+    expense_account: str = ""
     department: str = ""
     opening_allocated: int = 0
     opening_months_used: int = 0
@@ -662,8 +683,15 @@ def _normalize_prepaid(
     _postable(
         db, company_id, inp.prepaid_account, ("242",), "TK chi phí trả trước"
     )
+    inp.expense_account = inp.expense_account or regime_account(
+        db.get(Company, company_id), "expense_tools"
+    )
     _postable(
-        db, company_id, inp.expense_account, EXPENSE_PREFIXES, "TK chi phí"
+        db,
+        company_id,
+        inp.expense_account,
+        expense_prefixes(db, company_id),
+        "TK chi phí",
     )
     inp.start_month = first_of_month(inp.start_month)
     code = inp.code.strip()
@@ -1012,7 +1040,7 @@ def dispose(
         db,
         ctx.company_id,
         loss_account,
-        ("811", "632", "6422", "6421"),
+        ("811", "632", "642", "641"),
         "TK ghi nhận giá trị còn lại",
     )
     accumulated = (a.opening_accumulated or 0) + posted_depreciation(

@@ -1,7 +1,9 @@
-"""B09-DNN notes to the financial statements.
+"""Notes to the financial statements (B09-DNN under TT133, B09-DN
+under TT99).
 
-Layout follows TT133; the main figure tables are filled in
-automatically.
+The layout follows TT133; under TT99 the account groups and the
+section numbers of the income items (VII) follow the B09-DN form. The
+main figure tables are filled in automatically.
 """
 
 from __future__ import annotations
@@ -11,6 +13,7 @@ from datetime import date
 
 from sqlalchemy.orm import Session
 
+from app.core.regimes import regime_of
 from app.features.gl import books
 from app.features.gl.periods import ReportPeriod, day_before
 from app.features.org.models import Company
@@ -62,6 +65,9 @@ def _net_credit(bal: dict, prefixes) -> int:
 
 
 def build(db: Session, company: Company, period: ReportPeriod) -> Notes:
+    regime = regime_of(company)
+    tt99 = regime.code == "tt99"
+    deposits = regime.account("deposits_paid")
     accs = books.accounts_map(db, company.id)
     end = period.end
     year_start = day_before(max(date(end.year, 1, 1), company.start_date))
@@ -83,6 +89,7 @@ def build(db: Session, company: Company, period: ReportPeriod) -> Notes:
             [
                 ("Tiền mặt", ("111",)),
                 ("Tiền gửi ngân hàng không kỳ hạn", ("112",)),
+                ("Tiền đang chuyển", ("113",)),
             ],
             _debit,
         ),
@@ -93,7 +100,7 @@ def build(db: Session, company: Company, period: ReportPeriod) -> Notes:
                 ("Phải thu của khách hàng", ("131",)),
                 ("Trả trước cho người bán", ("331",)),
                 ("Tạm ứng", ("141",)),
-                ("Phải thu khác", ("1386", "1388", "334", "338")),
+                ("Phải thu khác", (deposits, "1388", "334", "338")),
             ],
             _debit,
         ),
@@ -157,10 +164,10 @@ def build(db: Session, company: Company, period: ReportPeriod) -> Notes:
         "V.04", "Tài sản cố định", ("Nguyên giá", "Giá trị hao mòn lũy kế")
     )
     for label, cost_p, dep_p, bal in (
-        ("Số dư đầu năm", "211", "214", prev),
-        ("Số dư cuối kỳ", "211", "214", cur),
+        ("Số dư đầu năm", ("211", "212", "213"), "214", prev),
+        ("Số dư cuối kỳ", ("211", "212", "213"), "214", cur),
     ):
-        fa.rows.append((label, _debit(bal, (cost_p,)), _credit(bal, (dep_p,))))
+        fa.rows.append((label, _debit(bal, cost_p), _credit(bal, (dep_p,))))
     if any(r[1] or r[2] for r in fa.rows):
         balance_tables.insert(3, fa)
 
@@ -172,7 +179,10 @@ def build(db: Session, company: Company, period: ReportPeriod) -> Notes:
         db, company.id, prev_p.start, prev_p.end, exclude_closing=True
     )
 
+    income = "VII" if tt99 else "VI"
+
     def flow_tbl(code, title, items, kind):
+        code = code.replace("VI.", f"{income}.", 1)
         t = NoteTable(code, title, ("Kỳ này", "Cùng kỳ năm trước"))
         for label, prefixes in items:
 
@@ -220,10 +230,15 @@ def build(db: Session, company: Company, period: ReportPeriod) -> Notes:
         ),
         flow_tbl(
             "VI.05",
-            "Chi phí quản lý kinh doanh",
+            "Chi phí bán hàng và chi phí quản lý doanh nghiệp"
+            if tt99
+            else "Chi phí quản lý kinh doanh",
             [
-                ("Chi phí bán hàng", ("6421",)),
-                ("Chi phí quản lý doanh nghiệp", ("6422",)),
+                ("Chi phí bán hàng", ("641",) if tt99 else ("6421",)),
+                (
+                    "Chi phí quản lý doanh nghiệp",
+                    ("642",) if tt99 else ("6422",),
+                ),
             ],
             "debit",
         ),
@@ -259,8 +274,11 @@ def build(db: Session, company: Company, period: ReportPeriod) -> Notes:
         ("Đơn vị tiền tệ sử dụng trong kế toán", "Đồng Việt Nam (VND)"),
         (
             "Chế độ kế toán áp dụng",
-            "Chế độ kế toán doanh nghiệp nhỏ và vừa ban hành theo Thông tư số "
-            "133/2016/TT-BTC ngày 26/8/2016 của Bộ Tài chính",
+            "Chế độ kế toán doanh nghiệp ban hành kèm theo Thông tư số "
+            "99/2025/TT-BTC ngày 27/10/2025 của Bộ Tài chính"
+            if tt99
+            else "Chế độ kế toán doanh nghiệp nhỏ và vừa ban hành theo "
+            "Thông tư số 133/2016/TT-BTC ngày 26/8/2016 của Bộ Tài chính",
         ),
         (
             "Hình thức kế toán",
@@ -269,8 +287,12 @@ def build(db: Session, company: Company, period: ReportPeriod) -> Notes:
         (
             "Tuyên bố về việc tuân thủ",
             "Báo cáo tài chính được lập và trình bày phù hợp với "
-            "chế độ kế toán doanh nghiệp nhỏ và vừa và các quy định "
-            "pháp lý có liên quan",
+            + (
+                "chế độ kế toán doanh nghiệp"
+                if tt99
+                else "chế độ kế toán doanh nghiệp nhỏ và vừa"
+            )
+            + " và các quy định pháp lý có liên quan",
         ),
     ]
     policies = [

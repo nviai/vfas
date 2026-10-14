@@ -31,7 +31,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, Side
 from openpyxl.utils import get_column_letter
 
-from app.core.charts.tt133 import ISSUED
+from app.core.regimes import form_for, issued_for
 
 MONEY_FMT = '#,##0;-#,##0;""'
 QTY_FMT = '#,##0.###;-#,##0.###;""'
@@ -68,9 +68,18 @@ class ReportBook:
         title: str = "",
         subtitle: str = "",
         columns: list[Col],
-        issued: str = ISSUED,
+        issued: str | None = None,
         extra_lines: list[str] | None = None,
     ):
+        """Add a sheet with the form header.
+
+        `form_code` is the TT133 code; it is translated to the
+        company's accounting regime (TT58 internal books have none).
+        """
+        if company is not None and form_code:
+            form_code = form_for(company, form_code)
+        if form_code and issued is None:
+            issued = issued_for(company)
         if self._first:
             ws = self.wb.active
             ws.title = name[:31]

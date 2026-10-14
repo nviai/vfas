@@ -11,6 +11,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - Prebuilt Docker image `ghcr.io/nviai/vfas` (linux/amd64 + linux/arm64) published by the "Docker image" workflow on
   release tags (`X.Y.Z`, `X.Y`, `X`, `latest`) and on `main` (`edge`), with SBOM/provenance and a cosign signature;
   `docker-compose.yml` pulls it by default (`VFAS_VERSION`).
+- Accounting regimes per company (`app/core/regimes.py`): **Circular 99/2025** (full chart, B01-DN with
+  short/long-term presentation settings, B02-DN, B03-DN, B09-DN, trial balance S06-DN, ledgers coded -DN) and
+  **Circular 58/2026** for micro enterprises (B01-DNSN, B02-DNSN); chosen when creating a company and changeable in
+  Settings while the books are empty. Default accounts of payroll, fixed assets, purchases, cash purposes and CIT
+  follow the regime; printed and Excel forms carry the regime's form codes and "Kèm theo Thông tư…" line.
 
 ### Upgrade notes
 - Migration `0004` adds `users.email_verified_at`; existing accounts are marked as verified.

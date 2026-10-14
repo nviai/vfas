@@ -1,9 +1,10 @@
 {% extends "base.html" %}
 {% import "macros.html" as ui with context %}
 {% import "gl/_macros.html" as gm with context %}
-{% block title %}{{ _("Bảng cân đối tài khoản") }}{% endblock %}
+{% block title %}{{ _(report_title) }}{% endblock %}
 {% block content %}
-{{ ui.page_header(_("Bảng cân đối tài khoản"), _("Mẫu F01-DNN · số dư đầu kỳ, phát sinh và số dư cuối kỳ của từng tài khoản"), breadcrumbs=breadcrumbs, icon_name="scale") }}
+{% set _code = regime_form(company, "F01-DNN") %}
+{{ ui.page_header(_(report_title), ((_("Mẫu {c}", c=_code) ~ " · ") if _code else "") ~ _("số dư đầu kỳ, phát sinh và số dư cuối kỳ của từng tài khoản"), breadcrumbs=breadcrumbs, icon_name="scale") }}
 
 {% call gm.report_bar(period, years, "/reports/f01", extra={"level": level, "show_zero": 1 if show_zero else 0}) %}
   <form method="get" action="/reports/f01" class="flex items-center gap-3" x-data>
@@ -26,7 +27,7 @@
   <div class="table-wrap">
     <div class="min-w-[1000px] p-6 sm:p-10">
       {{ ui.official_header(company, "F01-DNN") }}
-      {{ ui.report_title("Bảng cân đối tài khoản", period.label) }}
+      {{ ui.report_title(report_title, period.label) }}
       <table class="table table-report">
         <thead>
           <tr><th rowspan="2" class="w-20">Số hiệu tài khoản</th><th rowspan="2">Tên tài khoản</th><th colspan="2">Số dư đầu kỳ</th><th colspan="2">Số phát sinh trong kỳ</th><th colspan="2">Số dư cuối kỳ</th></tr>

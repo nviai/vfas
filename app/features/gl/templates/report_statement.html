@@ -3,8 +3,8 @@
 {% import "gl/_macros.html" as gm with context %}
 {% block title %}{{ _(report_title) }}{% endblock %}
 {% block content %}
-{% call ui.page_header(_(report_title), _("Mẫu {c} · Thông tư 133/2016/TT-BTC", c=st.code), breadcrumbs=breadcrumbs, icon_name="chart-column") %}
-  {% for k, label in [("b01a", "B01a"), ("b02", "B02"), ("b03", "B03"), ("b09", "B09")] %}
+{% call ui.page_header(_(report_title), _("Mẫu {c}", c=st.code) ~ " · " ~ _(regime.name), breadcrumbs=breadcrumbs, icon_name="chart-column") %}
+  {% for k, label in tabs %}
     {{ ui.link_button(label, "/reports/" ~ k ~ "?" ~ period.query(), "primary" if k == kind else "ghost", size="sm") }}
   {% endfor %}
 {% endcall %}
@@ -13,7 +13,21 @@
 
 {% for w in st.warnings %}{{ ui.alert(_(w), "warning", cls="mb-4") }}{% endfor %}
 {% if kind == "b01a" and not st.warnings %}
-<div class="mb-4 flex items-center gap-2 text-[13px] text-emerald-700 dark:text-emerald-400">{{ ui.icon("circle-check") }}{{ _("Tổng tài sản (200) = Tổng nguồn vốn (500)") }}</div>
+<div class="mb-4 flex items-center gap-2 text-[13px] text-emerald-700 dark:text-emerald-400">{{ ui.icon("circle-check") }}{{ _("Tổng tài sản ({a}) = Tổng nguồn vốn ({s})", a=lines.assets, s=lines.sources) }}</div>
+{% endif %}
+
+{% if kind == "b01a" and regime.code == "tt99" and can("settings.manage") %}
+<details class="card mb-4 px-5 py-3 text-[13.5px]">
+  <summary class="cursor-pointer font-medium text-fg">{{ _("Trình bày ngắn hạn / dài hạn") }}</summary>
+  <p class="mt-2 text-fg-3">{{ _("Sổ sách không lưu kỳ hạn còn lại của từng khoản. Liệt kê tài khoản (hoặc tài khoản chi tiết) cần trình bày ở cột dài hạn – kỳ hạn còn lại trên 12 tháng – hoặc ngược lại.") }}</p>
+  <form method="post" action="/reports/b01-terms" class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+    {{ ui.csrf_field() }}
+    <input type="hidden" name="query" value="{{ period.query() }}">
+    {{ ui.input("long_term", _("Trình bày dài hạn"), terms[0]|join(", "), placeholder="34112, 1311", input_cls="font-mono") }}
+    {{ ui.input("short_term", _("Trình bày ngắn hạn"), terms[1]|join(", "), placeholder="2281", input_cls="font-mono") }}
+    {{ ui.button(_("Lưu"), "secondary", icon_name="check") }}
+  </form>
+</details>
 {% endif %}
 
 <div class="paper overflow-hidden">
@@ -23,8 +37,8 @@
       {{ ui.report_title(st.title, subtitle) }}
       <table class="table table-report">
         <thead>
-          <tr><th>CHỈ TIÊU</th><th class="w-16">Mã số</th><th class="w-20">Thuyết minh</th><th class="w-40">{{ st.current_label }}</th><th class="w-40">{{ st.previous_label }}</th></tr>
-          <tr class="italic"><th>A</th><th>B</th><th>C</th><th>1</th><th>2</th></tr>
+          <tr><th>CHỈ TIÊU</th><th class="w-16">Mã số</th>{% if st.has_notes %}<th class="w-20">Thuyết minh</th>{% endif %}<th class="w-40">{{ st.current_label }}</th><th class="w-40">{{ st.previous_label }}</th></tr>
+          <tr class="italic"><th>A</th><th>B</th>{% if st.has_notes %}<th>C</th>{% endif %}<th>1</th><th>2</th></tr>
         </thead>
         <tbody>
           {% for r in st.rows %}
@@ -32,7 +46,7 @@
           <tr class="{{ 'font-semibold' if r.line.level < 2 }} {{ 'bg-surface-2/60' if r.line.level == 0 and not heading }}">
             <td style="padding-left: {{ 0.5 + (r.line.level == 2) * 1.2 }}rem">{{ r.line.name }}</td>
             <td class="text-center tabular-nums">{{ '' if heading else r.line.code }}</td>
-            <td class="text-center">{{ r.line.note }}</td>
+            {% if st.has_notes %}<td class="text-center">{{ r.line.note }}</td>{% endif %}
             <td class="num">{% if not heading %}{{ gm.paren(r.current) }}{% endif %}</td>
             <td class="num">{% if not heading %}{{ gm.paren(r.previous) }}{% endif %}</td>
           </tr>

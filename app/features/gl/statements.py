@@ -1,6 +1,8 @@
 """Financial statements under Circular 133/2016/TT-BTC (TT133).
 
-Covers B01a-DNN, B02-DNN and B03-DNN (direct method).
+Covers B01a-DNN, B02-DNN and B03-DNN (direct method). The statements of
+the other regimes live in statements_tt99.py and statements_tt58.py;
+`statement_set(company)` picks the set of the company's regime.
 
 The line item ↔ account mapping is declared as data below. Reference
 for the line item codes and how each figure is derived: the TT133
@@ -56,6 +58,8 @@ class Statement:
     previous_label: str
     warnings: list[str] = field(default_factory=list)
     unmapped: dict = field(default_factory=dict)
+    # The form has a "Thuyết minh" (notes reference) column.
+    has_notes: bool = True
 
     def value(self, code: str, which: str = "current") -> int:
         for r in self.rows:
@@ -65,16 +69,27 @@ class Statement:
 
 
 def _calc_formulas(lines: list[Line], values: dict[str, int]) -> None:
-    for ln in lines:
-        if ln.formula:
-            total = 0
-            for f in ln.formula:
-                total += (
-                    -values.get(f[1:], 0)
-                    if f.startswith("-")
-                    else values.get(f, 0)
-                )
-            values[ln.code] = total
+    """Fill the total lines.
+
+    Totals may be nested and listed before their parts (B01-DN puts 100
+    before 110), so passes repeat until nothing changes.
+    """
+    for _ in range(10):
+        changed = False
+        for ln in lines:
+            if ln.formula:
+                total = 0
+                for f in ln.formula:
+                    total += (
+                        -values.get(f[1:], 0)
+                        if f.startswith("-")
+                        else values.get(f, 0)
+                    )
+                if values.get(ln.code) != total:
+                    values[ln.code] = total
+                    changed = True
+        if not changed:
+            return
 
 
 # ========================================================= B01a-DNN
@@ -557,6 +572,7 @@ B03_OUT: list[tuple[str, str]] = [
     ("331", "02"),
     ("15", "02"),
     ("133", "02"),
+    ("641", "02"),
     ("642", "02"),
     ("632", "02"),
     ("242", "02"),
@@ -657,3 +673,83 @@ def b03(db: Session, company: Company, period: ReportPeriod) -> Statement:
 
 
 STATEMENTS = {"b01a": b01a, "b02": b02, "b03": b03}
+
+
+@dataclass(frozen=True)
+class StatementSet:
+    """The statements of one accounting regime.
+
+    Keys of `builders`/`titles` are the URL names (b01a, b02, b03);
+    `lines` names the line codes the dashboard and checks read.
+    """
+
+    builders: dict
+    titles: dict  # kind -> (title, form code)
+    lines: dict  # assets, sources, equity, revenue, profit
+    notes_code: str | None  # None = no notes form
+    trial_balance: tuple[str, str]  # (title, form code; "" = internal)
+
+
+TT133_SET = StatementSet(
+    STATEMENTS,
+    {
+        "b01a": ("Báo cáo tình hình tài chính", "B01a-DNN"),
+        "b02": ("Báo cáo kết quả hoạt động kinh doanh", "B02-DNN"),
+        "b03": ("Báo cáo lưu chuyển tiền tệ", "B03-DNN"),
+    },
+    {
+        "assets": "200",
+        "sources": "500",
+        "equity": "400",
+        "revenue": "10",
+        "profit": "60",
+    },
+    "B09-DNN",
+    ("Bảng cân đối tài khoản", "F01-DNN"),
+)
+
+
+def statement_set(company) -> StatementSet:
+    from app.core.regimes import regime_of
+
+    kind = regime_of(company).statements
+    if kind == "tt99":
+        from app.features.gl import statements_tt99 as m
+
+        return StatementSet(
+            m.STATEMENTS,
+            {
+                "b01a": ("Báo cáo tình hình tài chính", "B01-DN"),
+                "b02": ("Báo cáo kết quả hoạt động kinh doanh", "B02-DN"),
+                "b03": ("Báo cáo lưu chuyển tiền tệ", "B03-DN"),
+            },
+            {
+                "assets": "280",
+                "sources": "440",
+                "equity": "400",
+                "revenue": "10",
+                "profit": "60",
+            },
+            "B09-DN",
+            ("Bảng cân đối số phát sinh", "S06-DN"),
+        )
+    if kind == "tt58":
+        from app.features.gl import statements_tt58 as m
+
+        return StatementSet(
+            m.STATEMENTS,
+            {
+                "b01a": ("Báo cáo tình hình tài chính", "B01-DNSN"),
+                "b02": ("Báo cáo kết quả hoạt động kinh doanh", "B02-DNSN"),
+            },
+            {
+                "assets": "200",
+                "sources": "500",
+                "equity": "400",
+                "revenue": "01",
+                "profit": "20",
+            },
+            None,
+            ("Bảng cân đối tài khoản (sổ nội bộ)", ""),
+        )
+    return TT133_SET

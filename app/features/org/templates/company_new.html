@@ -2,7 +2,7 @@
 {% import "macros.html" as ui with context %}
 {% block title %}{{ _("Tạo công ty") }}{% endblock %}
 {% block content %}
-{{ ui.page_header(_("Tạo công ty"), _("Hệ thống tài khoản TT133 được tạo sẵn; bạn là chủ doanh nghiệp của công ty mới."), back="/select-company", icon_name="building") }}
+{{ ui.page_header(_("Tạo công ty"), _("Hệ thống tài khoản theo chế độ kế toán được tạo sẵn; bạn là chủ doanh nghiệp của công ty mới."), back="/select-company", icon_name="building") }}
 <form method="post" action="/companies/new" class="card max-w-3xl">
   {{ ui.csrf_field() }}
   <div class="card-body divide-y divide-line">
@@ -13,6 +13,16 @@
         {{ ui.date_input("start_date", _("Ngày bắt đầu hạch toán"), form.get("start_date") or "", errors=errors, hint=_("Mặc định 01/01 năm nay")) }}
       </div>
       {{ ui.input("address", _("Địa chỉ"), form.get("address", ""), errors=errors) }}
+    {% endcall %}
+    {% call ui.form_section(_("Chế độ kế toán"), _("Đổi được trong Cài đặt cho đến khi có chứng từ hoặc số dư đầu kỳ.")) %}
+      <div class="space-y-2">
+        {% for r in regimes %}
+        <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-line p-3 has-[:checked]:border-primary has-[:checked]:bg-primary-soft/40">
+          <input type="radio" name="regime" value="{{ r.code }}" class="mt-1" {{ "checked" if (form.get("regime") or "tt133") == r.code }}>
+          <span><span class="block font-medium text-fg">{{ _(r.name) }}</span><span class="block text-[13px] text-fg-3">{{ _(r.description) }}</span></span>
+        </label>
+        {% endfor %}
+      </div>
     {% endcall %}
     {% call ui.form_section(_("Thuế")) %}
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">

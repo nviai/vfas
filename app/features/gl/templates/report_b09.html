@@ -3,7 +3,7 @@
 {% import "gl/_macros.html" as gm with context %}
 {% block title %}{{ _("Thuyết minh báo cáo tài chính") }}{% endblock %}
 {% block content %}
-{% call ui.page_header(_("Bản thuyết minh báo cáo tài chính"), _("Mẫu B09-DNN · khung tự điền số liệu; phần chữ sửa trên file Excel/Word trước khi nộp"), breadcrumbs=breadcrumbs, icon_name="file-text") %}
+{% call ui.page_header(_("Bản thuyết minh báo cáo tài chính"), _("Mẫu {c}", c=regime_form(company, "B09-DNN")) ~ " · " ~ _("khung tự điền số liệu; phần chữ sửa trên file Excel/Word trước khi nộp"), breadcrumbs=breadcrumbs, icon_name="file-text") %}
   {% for k, label in [("b01a", "B01a"), ("b02", "B02"), ("b03", "B03"), ("b09", "B09")] %}
     {{ ui.link_button(label, "/reports/" ~ k ~ "?" ~ period.query(), "primary" if k == "b09" else "ghost", size="sm") }}
   {% endfor %}

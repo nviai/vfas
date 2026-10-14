@@ -13,7 +13,6 @@ from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.charts.tt133 import ISSUED
 from app.core.dates import parse_date, today
 from app.core.errors import BusinessError, NotFoundError, PermissionDeniedError
 from app.core.money import amount_in_words
@@ -432,7 +431,6 @@ def bank_print(
             "bank": bank,
             "partner": partner,
             "words": amount_in_words(e.total) + ".",
-            "issued": ISSUED,
             "watermark": "NHÁP"
             if e.status == "draft"
             else "ĐÃ HỦY"

@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 
-from app.core.charts.tt133 import ISSUED
 from app.core.dates import fmt_date
 from app.core.pdf import render_pdf
 from app.core.xlsx import Col, ReportBook
@@ -43,7 +42,6 @@ def ledger_pdf(company, led: ItemLedger, *, card: bool) -> bytes:
             "led": led,
             "form_code": code,
             "title": title,
-            "issued": ISSUED,
             "period_label": period_label(led.start, led.end),
         },
     )
@@ -58,7 +56,6 @@ def summary_pdf(company, s: Summary, warehouse=None) -> bytes:
             "s": s,
             "form_code": code,
             "title": title,
-            "issued": ISSUED,
             "warehouse": warehouse,
             "period_label": period_label(s.start, s.end),
         },
@@ -105,7 +102,6 @@ def doc_pdf(company, doc: StockDoc, entry=None, moves=None) -> bytes:
             "doc": doc,
             "form_code": code,
             "title": title,
-            "issued": ISSUED,
             "line_values": line_values,
             "total": total,
             "debit": debit,

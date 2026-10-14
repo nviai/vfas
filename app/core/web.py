@@ -33,7 +33,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from app.core import money
+from app.core import money, regimes
 from app.core.config import APP_DIR, get_settings
 from app.core.dates import fmt_date, fmt_datetime, today
 from app.core.db import SessionLocal, get_engine, session_scope
@@ -117,6 +117,11 @@ def _build_env() -> Environment:
     env.filters["tojson_attr"] = lambda v: json.dumps(
         v, ensure_ascii=False, default=str
     )
+    # Form codes and the "Ban hành theo / Kèm theo" line depend on the
+    # company's accounting regime.
+    env.globals["regime_form"] = regimes.form_for
+    env.globals["regime_issued"] = regimes.issued_for
+    env.globals["regime_of"] = regimes.regime_of
     return env
 
 

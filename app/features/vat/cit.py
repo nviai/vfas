@@ -43,7 +43,8 @@ LABELS = {
     "F": "Thuế TNDN còn phải nộp (+) / nộp thừa (−) (D − E)",
 }
 REVENUE_PREFIXES = ("511", "515", "711")
-COST_PREFIXES = ("632", "635", "642", "811")
+# 641 = selling expenses under TT99 (TT133 keeps them in 6421).
+COST_PREFIXES = ("632", "635", "641", "642", "811")
 
 
 def _now() -> datetime:
@@ -119,7 +120,7 @@ def profit_and_loss(
         other_income=net_credit("711"),
         cogs=net_debit("632"),
         financial_cost=net_debit("635"),
-        operating_cost=net_debit("642"),
+        operating_cost=net_debit("641") + net_debit("642"),
         other_cost=net_debit("811"),
     )
 

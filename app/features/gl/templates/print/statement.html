@@ -7,10 +7,11 @@
 <p class="subtitle">{{ subtitle }}</p>
 <p class="unit">Đơn vị tính: Đồng Việt Nam</p>
 <table class="book">
-  <colgroup><col style="width:52%"><col style="width:8%"><col style="width:9%"><col style="width:15.5%"><col style="width:15.5%"></colgroup>
+  {% if st.has_notes %}<colgroup><col style="width:52%"><col style="width:8%"><col style="width:9%"><col style="width:15.5%"><col style="width:15.5%"></colgroup>
+  {% else %}<colgroup><col style="width:58%"><col style="width:9%"><col style="width:16.5%"><col style="width:16.5%"></colgroup>{% endif %}
   <thead>
-    <tr><th>CHỈ TIÊU</th><th>Mã số</th><th>Thuyết minh</th><th>{{ st.current_label }}</th><th>{{ st.previous_label }}</th></tr>
-    <tr class="letters"><th>A</th><th>B</th><th>C</th><th>1</th><th>2</th></tr>
+    <tr><th>CHỈ TIÊU</th><th>Mã số</th>{% if st.has_notes %}<th>Thuyết minh</th>{% endif %}<th>{{ st.current_label }}</th><th>{{ st.previous_label }}</th></tr>
+    <tr class="letters"><th>A</th><th>B</th>{% if st.has_notes %}<th>C</th>{% endif %}<th>1</th><th>2</th></tr>
   </thead>
   <tbody>
     {% for r in st.rows %}
@@ -18,7 +19,7 @@
     <tr class="l{{ r.line.level }}">
       <td class="{{ 'ind2' if r.line.level == 2 }}">{{ r.line.name }}</td>
       <td class="c">{{ '' if heading else r.line.code }}</td>
-      <td class="c">{{ r.line.note }}</td>
+      {% if st.has_notes %}<td class="c">{{ r.line.note }}</td>{% endif %}
       <td class="num">{{ '' if heading else p.paren(r.current) }}</td>
       <td class="num">{{ '' if heading else p.paren(r.previous) }}</td>
     </tr>

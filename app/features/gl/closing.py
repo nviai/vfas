@@ -18,11 +18,13 @@ from sqlalchemy.orm import Session
 
 from app.core.dates import fmt_date
 from app.core.errors import BusinessError
+from app.core.regimes import account as regime_account
 from app.features.gl import books
 from app.features.gl.periods import ReportPeriod
 from app.features.journal import locks
 from app.features.journal import service as js
 from app.features.journal.models import POSTED, JournalEntry
+from app.features.org.models import Company
 
 PL_CLASSES = ("5", "6", "7", "8")
 SKIP = ("611", "631")  # periodic inventory method: not closed automatically
@@ -228,7 +230,7 @@ def run_retained(db: Session, ctx, year: int) -> JournalEntry:
 def record_cit(
     db: Session, ctx, on: date, amount: int, description: str = ""
 ) -> JournalEntry:
-    """Record corporate income tax expense (Dr 821 / Cr 3334).
+    """Record the CIT expense (Dr 821, TT99 82111 / Cr 3334).
 
     Creates a general journal voucher (PK) and posts it immediately.
     """
@@ -242,7 +244,10 @@ def record_cit(
         or f"Chi phí thuế TNDN đến ngày {fmt_date(on)}",
         lines=[
             js.LineIn(
-                "821", "3334", amount, "Chi phí thuế thu nhập doanh nghiệp"
+                regime_account(db.get(Company, ctx.company_id), "cit_expense"),
+                "3334",
+                amount,
+                "Chi phí thuế thu nhập doanh nghiệp",
             )
         ],
         source="closing",

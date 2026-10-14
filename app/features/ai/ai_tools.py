@@ -13,6 +13,7 @@ from app.core.dates import parse_date, today
 from app.core.db import like_contains, ulower
 from app.core.errors import BusinessError, NotFoundError
 from app.core.money import format_vnd
+from app.core.regimes import regime_of
 from app.core.registry import ROLE_LABELS, ai_tool, can_entry, doc_label
 from app.features.accounts.models import Account
 from app.features.journal import queries
@@ -123,7 +124,7 @@ def get_company_info(db, ctx):
         "short_name": c.short_name or None,
         "tax_code": c.tax_code or None,
         "address": c.address or None,
-        "regime": "TT133/2016/TT-BTC",
+        "regime": regime_of(c).name,
         "start_date": c.start_date.isoformat(),
         "vat_method": c.vat_method,
         "vat_period": c.vat_period,

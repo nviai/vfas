@@ -1,4 +1,5 @@
-{% macro doc_header(company, form_code, issued, unit_label="Bộ phận") -%}
+{% macro doc_header(company, form_code, issued=None, unit_label="Bộ phận") -%}
+{%- set form_code = regime_form(company, form_code) -%}
 <table class="doc-head">
   <tr>
     <td class="left">
@@ -7,7 +8,7 @@
       {% if company.tax_code %}<p><span class="b">Mã số thuế:</span> {{ company.tax_code }}</p>{% endif %}
     </td>
     <td class="right">
-      {% if form_code %}<p class="b">Mẫu số {{ form_code }}</p><p class="issued">{{ issued }}</p>{% endif %}
+      {% if form_code %}<p class="b">Mẫu số {{ form_code }}</p><p class="issued">{{ regime_issued(company) }}</p>{% endif %}
     </td>
   </tr>
 </table>

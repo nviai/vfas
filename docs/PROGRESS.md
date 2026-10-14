@@ -72,6 +72,6 @@ every High/Medium finding has been fixed with tests (`tests/core/test_security.p
 
 ## Still open
 - The 01/GTGT return XML has not been checked against an official XSD (must be opened in HTKK); XML for financial statements, 03/TNDN, 05/QTT-TNCN not done yet.
-- Codes of some book templates (inventory, fixed assets, payroll) follow advisory sources and need checking against the original TT133 text.
-- Issuing e-invoices, bank API connections, foreign currency, product costing, TT99/TT58, manual receivable/payable matching.
+- Codes of some book templates (inventory, fixed assets, payroll) follow advisory sources and need checking against the original TT133 text; the TT99 codes of the inventory and fixed-asset books (S10–S12, S21, S23-DN) follow the TT200 numbering kept by TT99 and the TT99 B01–B03 computation rules come from one transcription of Appendix IV.
+- Issuing e-invoices, bank API connections, foreign currency, product costing, manual receivable/payable matching.
 - The general journal voucher grid uses a partial of its own in the gl module (the shared `line_grid` macro has no debit/credit partner columns yet).

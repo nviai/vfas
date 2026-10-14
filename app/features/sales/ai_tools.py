@@ -261,7 +261,10 @@ def create_draft_purchase(db, ctx, **args) -> dict:
         args.get("supplier_name"),
     )
     lines = trade_lines(
-        db, ctx.company_id, args.get("lines") or [], ps.default_debit_account
+        db,
+        ctx.company_id,
+        args.get("lines") or [],
+        ps.debit_account_resolver(db, ctx.company_id),
     )
     doc = ps.create(
         db,

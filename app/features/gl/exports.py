@@ -9,9 +9,9 @@ from datetime import date
 from openpyxl.styles import Font
 from openpyxl.utils import get_column_letter
 
-from app.core.charts.tt133 import ISSUED
 from app.core.pdf import render_pdf
 from app.core.xlsx import BOLD, Col, ReportBook
+from app.features.gl.statements import statement_set
 
 
 def date_label(d: date | None = None) -> str:
@@ -20,7 +20,6 @@ def date_label(d: date | None = None) -> str:
 
 
 def pdf(template: str, **ctx) -> bytes:
-    ctx.setdefault("issued", ISSUED)
     ctx.setdefault("date_label", date_label())
     return render_pdf(f"gl/print/{template}.html", ctx)
 
@@ -30,6 +29,7 @@ def pdf(template: str, **ctx) -> bytes:
 
 def xlsx_statement(company, st, subtitle: str) -> bytes:
     book = ReportBook()
+    notes = [Col("Thuyết minh", 11)] if st.has_notes else []
     ws = book.add_sheet(
         st.code,
         company=company,
@@ -39,7 +39,7 @@ def xlsx_statement(company, st, subtitle: str) -> bytes:
         columns=[
             Col("CHỈ TIÊU", 62),
             Col("Mã số", 9),
-            Col("Thuyết minh", 11),
+            *notes,
             Col(st.current_label, 20, "money"),
             Col(st.previous_label, 20, "money"),
         ],
@@ -55,7 +55,7 @@ def xlsx_statement(company, st, subtitle: str) -> bytes:
             [
                 ("    " if r.line.level == 2 else "") + r.line.name,
                 "" if heading else r.line.code,
-                r.line.note,
+                *([r.line.note] if st.has_notes else []),
                 None if heading else r.current,
                 None if heading else r.previous,
             ],
@@ -65,7 +65,7 @@ def xlsx_statement(company, st, subtitle: str) -> bytes:
     for r in st.rows:
         if not r.line.formula:
             continue
-        for col in (4, 5):
+        for col in (4, 5) if st.has_notes else (3, 4):
             letter = get_column_letter(col)
             parts = []
             for f in r.line.formula:
@@ -91,7 +91,7 @@ def xlsx_trial_balance(company, tb, subtitle: str) -> bytes:
         "F01-DNN",
         company=company,
         form_code="F01-DNN",
-        title="BẢNG CÂN ĐỐI TÀI KHOẢN",
+        title=statement_set(company).trial_balance[0].upper(),
         subtitle=subtitle,
         columns=[
             Col("Số hiệu TK", 11),

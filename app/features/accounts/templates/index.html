@@ -2,7 +2,7 @@
 {% import "macros.html" as ui with context %}
 {% block title %}{{ _("Hệ thống tài khoản") }}{% endblock %}
 {% block content %}
-{% call ui.page_header(_("Hệ thống tài khoản"), _("Theo Thông tư 133/2016/TT-BTC. Tài khoản tổng hợp không hạch toán trực tiếp – thêm tài khoản chi tiết khi cần."), breadcrumbs=breadcrumbs, icon_name="book-open") %}
+{% call ui.page_header(_("Hệ thống tài khoản"), _(regime_of(company).name) ~ ". " ~ _("Tài khoản tổng hợp không hạch toán trực tiếp – thêm tài khoản chi tiết khi cần."), breadcrumbs=breadcrumbs, icon_name="book-open") %}
   {% if can("catalog.manage") %}
     {{ ui.button(_("Thêm tài khoản chi tiết"), "primary", icon_name="plus", type="button", attrs="@click=\"$dispatch('modal-open', 'acc-new')\"") }}
   {% endif %}

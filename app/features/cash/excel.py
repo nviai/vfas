@@ -15,8 +15,8 @@ from openpyxl.styles import Alignment, Border, Font, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.page import PageMargins
 
-from app.core.charts.tt133 import ISSUED
 from app.core.dates import fmt_date
+from app.core.regimes import form_for, issued_for
 from app.core.xlsx import save_workbook
 from app.features.cash.books import MoneyBook
 from app.features.cash.layout import (
@@ -137,16 +137,19 @@ def book_xlsx(
             merge_to=right_start - 1,
             align="left",
         )
+    code = form_for(company, book.code)
     _put(
         ws,
         1,
         right_start,
-        f"Mẫu số {book.code}",
+        f"Mẫu số {code}" if code else "",
         bold=True,
         align="center",
         merge_to=last_col,
     )
-    issued = ws.cell(row=2, column=right_start, value=ISSUED)
+    issued = ws.cell(
+        row=2, column=right_start, value=issued_for(company, book.code)
+    )
     issued.font = _font(9, italic=True)
     issued.alignment = Alignment(
         horizontal="center", vertical="top", wrap_text=True

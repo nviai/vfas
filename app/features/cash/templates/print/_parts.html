@@ -1,6 +1,7 @@
 {# Shared parts of the TT133 print forms (money module). Always Vietnamese. #}
 
-{% macro doc_header(company, code, issued) -%}
+{% macro doc_header(company, code, issued=None) -%}
+{%- set code = regime_form(company, code) -%}
 <table class="doc-head">
   <tr>
     <td class="left">
@@ -9,8 +10,8 @@
       {% if company.tax_code %}<p><span class="b">Mã số thuế:</span> {{ company.tax_code }}</p>{% endif %}
     </td>
     <td class="right">
-      <p class="form-code">Mẫu số {{ code }}</p>
-      <p class="issued">{{ issued }}</p>
+      {% if code %}<p class="form-code">Mẫu số {{ code }}</p>
+      <p class="issued">{{ regime_issued(company) }}</p>{% endif %}
     </td>
   </tr>
 </table>

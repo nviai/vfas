@@ -4,6 +4,7 @@
 - [2. AI assistant](#2-ai-assistant)
 - [3. API and OpenAI-style integration](#3-api-and-openai-style-integration)
 - [4. Keyboard shortcuts](#4-keyboard-shortcuts)
+- [5. Accounting regimes](#5-accounting-regimes)
 
 ## 1. Roles and permissions
 
@@ -84,3 +85,22 @@ Limit: 60 requests/minute/token.
 | ? | Shortcut list |
 
 Amount fields accept shorthand: `2tr` = 2.000.000, `500k` = 500.000, `1,5tr` = 1.500.000 (Vietnamese number format: `.` thousands separator, `,` decimal; "tr" = triệu, million).
+
+## 5. Accounting regimes
+
+| Regime | For | Chart of accounts | Financial statements |
+|---|---|---|---|
+| TT133/2016 | Small and medium-sized enterprises | Appendix 1 of TT133 | B01a-DNN, B02-DNN, B03-DNN, B09-DNN, trial balance F01-DNN |
+| TT99/2025 | Every enterprise from fiscal year 2026 (SMEs may choose it) | Appendix II of TT99 (selling expenses 641, admin expenses 642x by cost element, unemployment insurance 3386, deposits 244/344…) | B01-DN (short/long term), B02-DN, B03-DN, B09-DN, trial balance S06-DN |
+| TT58/2026 | Micro enterprises, fiscal years starting on or after 01/07/2026 | none prescribed – VFAS keeps double-entry books on the TT133 chart | B01-DNSN, B02-DNSN |
+
+- Choose the regime when creating the company; it can be changed in **Cài đặt → Kế toán & thuế** while the company has
+  no voucher and no opening balance (the chart of accounts is rebuilt).
+- Default accounts follow the regime: salaries (TT133 6422 / TT99 6421), depreciation (6422 / 6424), tools and prepaid
+  expenses (6422 / 6423), purchased services (6422 / 6427), unemployment insurance (3385 / 3386), CIT expense (821 /
+  82111).
+- **B01-DN (TT99)** splits receivables, payables, loans, prepaid expenses… into short and long term by remaining term.
+  The books do not store maturities, so balances go to the short-term lines by default (investments in other entities
+  to long term) and the statement lists the accounts that need a judgement. On the B01-DN page, **Trình bày ngắn hạn /
+  dài hạn** sets the accounts (or detail accounts, e.g. a `34112` long-term loan) presented the other way.
+

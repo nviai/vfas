@@ -5,14 +5,15 @@
 # VFAS
 
 **Vietnam Free Accounting Software**<br>
-Phần mềm kế toán **miễn phí, mã nguồn mở** cho doanh nghiệp nhỏ và vừa Việt Nam – chế độ kế toán Thông tư 133/2016/TT-BTC
+Phần mềm kế toán **miễn phí, mã nguồn mở** cho doanh nghiệp Việt Nam – chế độ kế toán Thông tư 133/2016 (DNNVV), 99/2025
+(doanh nghiệp) và 58/2026 (doanh nghiệp siêu nhỏ)
 
 [![CI](https://github.com/nviai/vfas/actions/workflows/ci.yml/badge.svg)](https://github.com/nviai/vfas/actions/workflows/ci.yml)
 [![Giấy phép: MIT](https://img.shields.io/badge/gi%E1%BA%A5y%20ph%C3%A9p-MIT-blue)](LICENSE)
 [![Python 3.12](https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Code style: PEP 8](https://img.shields.io/badge/code%20style-PEP%208%20(ruff)-261230)](CONTRIBUTING.md#code-style)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![Chế độ TT133](https://img.shields.io/badge/ch%E1%BA%BF%20%C4%91%E1%BB%99-TT133%2F2016-0f766e)](docs/DECISIONS.md)
+[![Chế độ TT133 · TT99 · TT58](https://img.shields.io/badge/ch%E1%BA%BF%20%C4%91%E1%BB%99-TT133%20%C2%B7%20TT99%20%C2%B7%20TT58-0f766e)](docs/DECISIONS.md)
 [![SQLite | PostgreSQL](https://img.shields.io/badge/CSDL-SQLite%20%7C%20PostgreSQL-4169E1?logo=postgresql&logoColor=white)](docs/DEPLOY.md#4-postgresql)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
 
@@ -33,7 +34,7 @@ Phần mềm kế toán **miễn phí, mã nguồn mở** cho doanh nghiệp nh�
 - **Dữ liệu là của bạn** – tự cài trên máy chủ của mình hoặc chạy dạng SaaS; xuất toàn bộ dữ liệu một công ty bất cứ lúc nào.
 - **Sổ sách sạch** – chứng từ đã ghi sổ không sửa được số liệu, không xóa được (chặn cả ở tầng cơ sở dữ liệu); sửa sai
   bằng hủy có lý do hoặc chứng từ điều chỉnh; nhật ký thao tác không xóa được.
-- **Đúng chế độ** – mẫu sổ, BCTC theo TT133, tờ khai 01/GTGT, thuế TNCN, bảo hiểm với tham số có ngày hiệu lực.
+- **Đúng chế độ** – mẫu sổ, BCTC theo TT133, TT99 hoặc TT58, tờ khai 01/GTGT, thuế TNCN, bảo hiểm với tham số có ngày hiệu lực.
 - **AI agent theo chuẩn OpenAI** – hỏi số liệu bằng tiếng Việt, lập chứng từ nháp; dùng Claude, OpenAI, OpenRouter hoặc
   Ollama tự host. AI chỉ lập nháp, người có quyền mới ghi sổ.
 - **Nhẹ** – chạy trên VPS 1 GB với SQLite, hoặc PostgreSQL nhiều tiến trình cho SaaS; một lệnh Docker.
@@ -52,7 +53,8 @@ Phần mềm kế toán **miễn phí, mã nguồn mở** cho doanh nghiệp nh�
 
 | Nhóm | Nội dung |
 |---|---|
-| **Sổ cái, báo cáo** | Bút toán kép, phiếu kế toán, số dư đầu kỳ (nhập Excel), Sổ Nhật ký chung S03a-DNN, Sổ Cái S03b-DNN, sổ chi tiết tài khoản, Bảng cân đối tài khoản F01-DNN, BCTC B01a-DNN, B02-DNN, B03-DNN, B09-DNN; kết chuyển cuối kỳ; khóa sổ tháng/năm |
+| **Chế độ kế toán** | **TT133** (DNNVV: B01a/B02/B03/B09-DNN, F01-DNN), **TT99/2025** (mọi doanh nghiệp từ 2026: hệ thống TK đầy đủ, B01-DN tách ngắn hạn/dài hạn, B02-DN, B03-DN, B09-DN, S06-DN, sổ mã -DN), **TT58/2026** (DN siêu nhỏ: B01-DNSN, B02-DNSN trên sổ kép nội bộ); chọn theo từng công ty, đổi được khi sổ còn trống |
+| **Sổ cái, báo cáo** | Bút toán kép, phiếu kế toán, số dư đầu kỳ (nhập Excel), Sổ Nhật ký chung, Sổ Cái, sổ chi tiết tài khoản, bảng cân đối tài khoản, BCTC theo chế độ của công ty; kết chuyển cuối kỳ; khóa sổ tháng/năm |
 | **Tiền mặt** | Phiếu thu 01-TT, phiếu chi 02-TT (form nhanh cho thủ quỹ trên điện thoại), sổ quỹ S04a/S04b-DNN, kiểm kê quỹ 08a-TT, nhập sổ quỹ cũ từ Excel |
 | **Ngân hàng** | Thu/chi tiền gửi, chuyển tiền nội bộ, sổ tiền gửi S05-DNN, ủy nhiệm chi, nhập sao kê CSV/XLSX, tự đối chiếu |
 | **Mua bán** | Hàng hóa/dịch vụ, chứng từ bán hàng, mua hàng, trả lại/giảm giá, **nhập hóa đơn điện tử XML** (file lẻ hoặc ZIP) |
@@ -138,7 +140,7 @@ Tài liệu chi tiết viết bằng tiếng Anh.
 - [x] Gửi email (SMTP): xác minh email, quên mật khẩu, gửi lời mời – cần có trước khi mở đăng ký công khai
 - [ ] Xuất hóa đơn điện tử qua nhà cung cấp (Viettel S-Invoice, MISA meInvoice, VNPT, BKAV) – thiết kế ở [docs/EINVOICE.md](docs/EINVOICE.md)
 - [ ] XML BCTC, 03/TNDN, 05/QTT-TNCN để nộp qua HTKK
-- [ ] Chế độ kế toán TT99/2025 và TT58/2026 (điểm mở rộng `app/core/regimes.py`)
+- [x] Chế độ kế toán TT99/2025 và TT58/2026 (`app/core/regimes.py`)
 - [x] Image Docker dựng sẵn (`ghcr.io/nviai/vfas`, amd64/arm64, có ký số)
 - [ ] Ngoại tệ, kết nối API ngân hàng, giá thành sản xuất
 
@@ -161,6 +163,8 @@ Phát hiện lỗ hổng? **Đừng mở issue công khai** – báo riêng theo
   trước khi nộp.
 - **XML tờ khai 01/GTGT** dựng theo cấu trúc HTKK phổ biến, chưa đối chiếu được với XSD chính thức: **mở bằng HTKK để
   kiểm tra trước khi nộp**.
+- Với **TT99**, B01-DN cần tách số dư ngắn hạn/dài hạn; sổ sách không lưu kỳ hạn nên hãy kiểm tra thiết lập "Trình bày
+  ngắn hạn / dài hạn" trước khi nộp.
 - Một số mã mẫu sổ (S06/S07/S08/S09/S11-DNN, 02-LĐTL, 06-TSCĐ…) lấy theo nguồn tư vấn, cần đối chiếu văn bản gốc TT133.
 - Tham số lương/thuế đã kiểm theo nguồn công khai tháng 10/2026 và **sửa được** ở Lương → Tham số khi luật đổi.
 

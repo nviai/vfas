@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.core.audit import write_audit
 from app.core.errors import BusinessError, NotFoundError, PermissionDeniedError
 from app.core.mail import valid_email
-from app.core.regimes import get_regime
+from app.core.regimes import REGIMES, get_regime
 from app.core.registry import OWNER, ROLE_LABELS, ROLES
 from app.core.security import hash_token
 from app.features.accounts.models import Account
@@ -53,15 +53,46 @@ def validate_tax_code(value: str) -> str | None:
     return None
 
 
+CHART_FIELDS = (
+    "name",
+    "parent_code",
+    "level",
+    "kind",
+    "normal",
+    "is_postable",
+    "partner_mode",
+    "needs_bank",
+    "tracks_item",
+    "tracks_asset",
+    "no_negative",
+)
+
+
 def seed_chart(db: Session, company: Company) -> None:
-    """Seed the chart of accounts of the company's accounting regime."""
-    existing = set(
-        db.scalars(
-            select(Account.code).where(Account.company_id == company.id)
+    """Seed the chart of accounts of the company's accounting regime.
+
+    Accounts of the chart that already exist are brought in line with
+    it (name, hierarchy, flags); system accounts that are not part of
+    the chart any more are deactivated. Accounts the company added
+    itself are left alone.
+    """
+    existing = {
+        a.code: a
+        for a in db.scalars(
+            select(Account).where(Account.company_id == company.id)
         )
-    )
-    for a in get_regime(company.regime).chart():
-        if a.code in existing:
+    }
+    chart = get_regime(company.regime).chart()
+    codes = {a.code for a in chart}
+    for code, acc in existing.items():
+        if acc.is_system and code not in codes:
+            acc.is_active = False
+    for a in chart:
+        acc = existing.get(a.code)
+        if acc is not None:
+            for f in CHART_FIELDS:
+                setattr(acc, f, getattr(a, f))
+            acc.is_system = acc.is_active = True
             continue
         db.add(
             Account(
@@ -94,6 +125,7 @@ class CompanyInput:
     legal_rep: str = ""
     vat_period: str = "quarter"
     business_type: str = "service"
+    regime: str = "tt133"
 
 
 def create_company(
@@ -110,6 +142,8 @@ def create_company(
     if err:
         raise BusinessError(err)
     start = inp.start_date or date(date.today().year, 1, 1)
+    if inp.regime not in REGIMES:
+        raise BusinessError("Chế độ kế toán không hợp lệ")
     c = Company(
         name=name,
         short_name=(inp.short_name or "").strip(),
@@ -121,6 +155,7 @@ def create_company(
         if inp.vat_period in ("month", "quarter")
         else "quarter",
         business_type=inp.business_type or "service",
+        regime=inp.regime,
         settings={},
         created_at=_now(),
         created_by=getattr(owner, "id", None),
@@ -580,6 +615,61 @@ def set_start_date(db: Session, ctx, start: date) -> Company:
         summary="Đổi ngày bắt đầu hạch toán",
         before={"start_date": before},
         after={"start_date": start},
+    )
+    db.commit()
+    return c
+
+
+def regime_locked(db: Session, company_id: int) -> str | None:
+    """Why the accounting regime can no longer change (None = it can).
+
+    The chart of accounts changes with the regime, so the books must
+    still be empty: no voucher (draft or posted) and no opening balance.
+    """
+    from app.features.journal.models import JournalEntry, OpeningBalance
+
+    if db.scalar(
+        select(func.count(JournalEntry.id)).where(
+            JournalEntry.company_id == company_id
+        )
+    ):
+        return "Đã có chứng từ"
+    if db.scalar(
+        select(func.count(OpeningBalance.id)).where(
+            OpeningBalance.company_id == company_id
+        )
+    ):
+        return "Đã nhập số dư đầu kỳ"
+    return None
+
+
+def set_regime(db: Session, ctx, code: str) -> Company:
+    """Change the accounting regime of a company with empty books."""
+    if code not in REGIMES:
+        raise BusinessError("Chế độ kế toán không hợp lệ")
+    c = db.get(Company, ctx.company_id)
+    if c.regime == code:
+        return c
+    reason = regime_locked(db, c.id)
+    if reason:
+        raise BusinessError(
+            f"{reason} – không đổi được chế độ kế toán. "
+            "Tạo công ty mới với chế độ cần dùng."
+        )
+    before = c.regime
+    c.regime = code
+    db.flush()
+    seed_chart(db, c)
+    write_audit(
+        db,
+        ctx,
+        action="company.regime",
+        entity_type="company",
+        entity_id=c.id,
+        summary=f"Đổi chế độ kế toán: {get_regime(before).short} → "
+        f"{get_regime(code).short}",
+        before={"regime": before},
+        after={"regime": code},
     )
     db.commit()
     return c

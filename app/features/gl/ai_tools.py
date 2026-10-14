@@ -203,13 +203,13 @@ def _key_lines(st, codes) -> dict:
     label="Báo cáo tài chính",
     perm="reports.view",
     description=(
-        "Summary of financial statements for a fiscal year (TT133): balance "
-        "sheet B01a-DNN key lines (110 cash, 130 receivables, 140 inventory, "
-        "150 fixed assets, 200 total assets, 300 liabilities, 400 equity, 417 "
-        "retained earnings, 500 total sources) and income statement B02-DNN "
-        "(01 revenue, 10 net revenue, 11 COGS, 24 operating expenses, 50 "
-        "profit before tax, 51 CIT, 60 profit after tax), with previous-year "
-        "comparatives and warnings."
+        "Summary of the financial statements for a fiscal year under the "
+        "company's accounting regime (TT133: B01a-DNN/B02-DNN; TT99: "
+        "B01-DN/B02-DN with short/long-term lines; TT58: B01-DNSN/"
+        "B02-DNSN): every non-zero line of the statement of financial "
+        "position and of the income statement with its code, name, current "
+        "and previous figures, the line codes of total assets, equity, net "
+        "revenue and profit after tax, and warnings."
     ),
     parameters={
         "type": "object",
@@ -220,49 +220,24 @@ def _key_lines(st, codes) -> dict:
 def get_financial_statements(db, ctx, year: int) -> dict:
     company = db.get(Company, ctx.company_id)
     p = make("year", int(year))
-    b01 = statements.b01a(db, company, p)
-    b02 = statements.b02(db, company, p)
+    ss = statements.statement_set(company)
+    b01 = ss.builders["b01a"](db, company, p)
+    b02 = ss.builders["b02"](db, company, p)
+
+    def lines(st) -> dict:
+        codes = {
+            r.line.code
+            for r in st.rows
+            if r.line.code[:1].isdigit() and (r.current or r.previous)
+        }
+        return _key_lines(st, codes)
+
     return {
         "year": int(year),
-        "balance_sheet": _key_lines(
-            b01,
-            {
-                "110",
-                "120",
-                "130",
-                "140",
-                "150",
-                "170",
-                "180",
-                "200",
-                "300",
-                "311",
-                "313",
-                "316",
-                "400",
-                "411",
-                "417",
-                "500",
-            },
-        ),
-        "income_statement": _key_lines(
-            b02,
-            {
-                "01",
-                "02",
-                "10",
-                "11",
-                "20",
-                "21",
-                "22",
-                "24",
-                "30",
-                "40",
-                "50",
-                "51",
-                "60",
-            },
-        ),
+        "forms": [b01.code, b02.code],
+        "key_lines": ss.lines,
+        "balance_sheet": lines(b01),
+        "income_statement": lines(b02),
         "warnings": b01.warnings + b02.warnings,
     }
 
@@ -272,7 +247,8 @@ def get_financial_statements(db, ctx, year: int) -> dict:
     label="Kết quả kinh doanh",
     perm="reports.view",
     description=(
-        "Income statement (B02-DNN) for an arbitrary date range: revenue, "
+        "Income statement (B02 form of the company's accounting regime) for "
+        "an arbitrary date range: revenue, "
         "deductions, COGS, financial income/expenses, operating expenses, "
         "other income/expenses, profit before/after tax."
     ),
@@ -283,7 +259,9 @@ def get_profit_and_loss(
 ) -> dict:
     s, e = _period(start, end)
     company = db.get(Company, ctx.company_id)
-    st = statements.b02(db, company, make("custom", s.year, start=s, end=e))
+    st = statements.statement_set(company).builders["b02"](
+        db, company, make("custom", s.year, start=s, end=e)
+    )
     return {
         "start": s.isoformat(),
         "end": e.isoformat(),

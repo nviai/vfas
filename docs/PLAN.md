@@ -2,8 +2,9 @@
 
 > The original working name was "NVIAI Kế toán"; it was renamed to **VFAS – Vietnam Free Accounting Software** when the source code was opened (D-v2-27).
 
-Online accounting software for Vietnamese small and medium-sized enterprises under the accounting regime of
-Circular 133/2016/TT-BTC, with many companies on one system (SaaS) or self-hosted on a VPS.
+Online accounting software for Vietnamese enterprises under the accounting regime of Circular 133/2016/TT-BTC (SMEs),
+Circular 99/2025/TT-BTC (all enterprises from 2026) or Circular 58/2026/TT-BTC (micro enterprises), with many companies
+on one system (SaaS) or self-hosted on a VPS.
 Continues from v1 "Cash book" ("Sổ quỹ tiền mặt") (v1 docs: `docs/v1/`).
 
 The product name is a working name and can be changed via the `PRODUCT_NAME` variable. The name "eTax" is not used
@@ -66,7 +67,6 @@ Product principles:
 - **New UI** (section 9): own design system, light/dark, mobile, keyboard shortcut sheet, Ctrl+K.
 
 ### Out of scope for this release (extension points exist)
-- Circular 99/2025 (large enterprises), Circular 58/2026 (micro enterprises): only needs a chart of accounts + forms added to `app/core/regimes`.
 - Issuing e-invoices (requires a provider accepted by the tax authority): an `EInvoiceProvider` interface exists, no provider implemented yet.
 - Direct bank API connections: replaced by statement import.
 - Foreign currencies, production costing, construction, contracts, budgets, subscription billing.

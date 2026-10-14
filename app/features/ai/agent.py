@@ -27,6 +27,7 @@ from app.core.audit import write_audit
 from app.core.config import get_settings
 from app.core.dates import fmt_date, today
 from app.core.errors import BusinessError, NotFoundError, PermissionDeniedError
+from app.core.regimes import regime_of
 from app.core.registry import ROLE_LABELS, AiTool, load_features, registry
 from app.core.tenancy import Ctx
 from app.features.ai.client import LLMClient, LLMError
@@ -40,8 +41,7 @@ MAX_TOOL_CALLS_PER_ROUND = 8
 SYSTEM_PROMPT = (
     "Bạn là trợ lý kế toán của phần mềm {product}, làm việc cho {company} "
     "(MST {tax_code}).\n"
-    "Chế độ kế toán: Thông tư 133/2016/TT-BTC (doanh nghiệp nhỏ và vừa), "
-    "hình thức Nhật ký chung, tiền VND.\n"
+    "Chế độ kế toán: {regime}, hình thức Nhật ký chung, tiền VND.\n"
     "Hôm nay là {today}. Người đang hỏi: {user} – vai trò {role}.\n"
     "\n"
     "Quy tắc bắt buộc:\n"
@@ -90,6 +90,7 @@ def system_prompt(db: Session, ctx: Ctx) -> str:
             if company and company.tax_code
             else "chưa khai báo"
         ),
+        regime=regime_of(company).name,
         today=fmt_date(today()),
         user=getattr(user, "full_name", None)
         or getattr(user, "email", "")

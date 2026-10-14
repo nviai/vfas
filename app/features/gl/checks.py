@@ -55,15 +55,17 @@ def check_trial_balance(db, ctx):
 )
 def check_balance_sheet(db, ctx):
     company = db.get(Company, ctx.company_id)
+    ss = statements.statement_set(company)
+    assets, sources = ss.lines["assets"], ss.lines["sources"]
     out = []
     for y in _years(company):
-        st = statements.b01a(db, company, make("year", y))
-        if st.value("200") != st.value("500"):
+        st = ss.builders["b01a"](db, company, make("year", y))
+        if st.value(assets) != st.value(sources):
             out.append(
                 CheckIssue(
-                    f"Năm {y}: tổng tài sản {format_vnd(st.value('200'))} "
+                    f"Năm {y}: tổng tài sản {format_vnd(st.value(assets))} "
                     "≠ tổng nguồn vốn "
-                    f"{format_vnd(st.value('500'))}",
+                    f"{format_vnd(st.value(sources))}",
                     "error",
                     f"/reports/b01a?mode=year&year={y}",
                 )
@@ -71,7 +73,8 @@ def check_balance_sheet(db, ctx):
         if st.unmapped:
             out.append(
                 CheckIssue(
-                    f"Năm {y}: số dư TK chưa xếp vào chỉ tiêu B01a: "
+                    f"Năm {y}: số dư TK chưa xếp vào chỉ tiêu "
+                    "Báo cáo tình hình tài chính: "
                     f"{', '.join(sorted(st.unmapped))}",
                     "warning",
                     f"/reports/b01a?mode=year&year={y}",

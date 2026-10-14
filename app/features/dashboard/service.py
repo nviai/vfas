@@ -20,7 +20,7 @@ from app.features.org.models import Company
 log = logging.getLogger(__name__)
 
 REVENUE = ("511", "515", "711")
-EXPENSE = ("632", "635", "642", "811", "821")
+EXPENSE = ("632", "635", "641", "642", "811", "821")
 MONEY = ("111", "112")
 
 

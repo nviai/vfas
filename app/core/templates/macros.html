@@ -914,8 +914,11 @@ btn-{{ variant }}{% if size %} btn-{{ size }}{% endif %}{% if cls %} {{ cls }}{%
 </form>
 {%- endmacro %}
 
-{#- Header block of a TT133 ledger/report form (web preview). company: .name .address .tax_code -#}
-{% macro official_header(company, form_code=None, regime_note="Ban hành theo Thông tư số 133/2016/TT-BTC ngày 26/8/2016 của Bộ Tài chính") -%}
+{#- Header block of a ledger/report form (web preview). company: .name .address .tax_code .regime;
+    form_code is the TT133 code, translated to the company's regime. -#}
+{% macro official_header(company, form_code=None, regime_note=None) -%}
+{%- set form_code = regime_form(company, form_code) if form_code else None -%}
+{%- set regime_note = regime_note or regime_issued(company)|trim("()") -%}
 <div class="flex flex-col gap-3 text-[13px] leading-snug sm:flex-row sm:items-start sm:justify-between">
   <div class="space-y-0.5">
     <p><span class="font-semibold">Đơn vị:</span> {{ company.name if company else "" }}</p>

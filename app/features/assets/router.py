@@ -16,6 +16,7 @@ from app.core.dates import fmt_date, parse_date, today
 from app.core.errors import BusinessError
 from app.core.money import MoneyError, parse_vnd
 from app.core.pdf import render_pdf
+from app.core.regimes import account as regime_account
 from app.core.security import CurrentUser, require
 from app.core.web import form_data, get_ctx, get_tenant_db, redirect, render
 from app.core.xlsx import Col, ReportBook, pdf_response, xlsx_response
@@ -110,7 +111,7 @@ def _asset_accounts(db: Session, company_id: int) -> list[tuple[str, str]]:
     return [
         (a.code, a.label)
         for a in list_accounts(
-            db, company_id, postable=True, prefix="211", active=True
+            db, company_id, postable=True, prefix="211,212,213", active=True
         )
     ]
 
@@ -122,7 +123,7 @@ def _expense_accounts(db: Session, company_id: int) -> list[tuple[str, str]]:
             db,
             company_id,
             postable=True,
-            prefix="154,241,632,6421,6422,811",
+            prefix=",".join(service.expense_prefixes(db, company_id)),
             active=True,
         )
     ]
@@ -277,9 +278,9 @@ def _asset_input(
         acquired_date=acquired,
         code=form.get("code") or "",
         category=form.get("category") or "office",
-        asset_account=form.get("asset_account") or "2111",
+        asset_account=form.get("asset_account") or "",
         depreciation_account="",
-        expense_account=form.get("expense_account") or "6422",
+        expense_account=form.get("expense_account") or "",
         department=form.get("department") or "",
         manufacturer=form.get("manufacturer") or "",
         serial_no=form.get("serial_no") or "",
@@ -340,10 +341,11 @@ def asset_new(
     user: CurrentUser = Depends(require("assets.create")),
     db: Session = Depends(get_tenant_db),
 ):
+    company = db.get(Company, user.company_id)
     form: dict = {
         "category": "office",
-        "asset_account": "2111",
-        "expense_account": "6422",
+        "asset_account": regime_account(company, "fixed_asset"),
+        "expense_account": regime_account(company, "expense_depreciation"),
         "acquired_date": today().isoformat(),
         "useful_life_months": "",
     }
@@ -829,7 +831,7 @@ def _prepaid_input(form: dict, existing=None) -> service.PrepaidInput:
         kind=form.get("kind") or "tool",
         quantity=_int(form, "quantity", 1) or 1,
         prepaid_account=form.get("prepaid_account") or "242",
-        expense_account=form.get("expense_account") or "6422",
+        expense_account=form.get("expense_account") or "",
         department=form.get("department") or "",
         opening_allocated=_money(form, "opening_allocated")
         if is_opening
@@ -926,7 +928,9 @@ def prepaid_new(
 ):
     form: dict = {
         "kind": "tool",
-        "expense_account": "6422",
+        "expense_account": regime_account(
+            db.get(Company, user.company_id), "expense_tools"
+        ),
         "start_month": f"{today():%Y-%m}",
         "months": 12,
         "quantity": 1,

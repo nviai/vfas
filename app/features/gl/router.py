@@ -17,9 +17,11 @@ from sqlalchemy.orm import Session
 from app.core.dates import parse_date, today
 from app.core.errors import BusinessError, NotFoundError, PermissionDeniedError
 from app.core.money import MoneyError, parse_vnd
+from app.core.regimes import form_for, regime_of
 from app.core.registry import can_entry, doc_url
 from app.core.security import CurrentUser, require
 from app.core.web import (
+    form_data,
     form_multi,
     get_ctx,
     get_tenant_db,
@@ -38,6 +40,7 @@ from app.features.gl import (
     opening_io,
     periods,
     statements,
+    statements_tt99,
 )
 from app.features.journal import locks, opening
 from app.features.journal import service as js
@@ -741,6 +744,12 @@ def _fmt(request: Request) -> str:
     )
 
 
+def _file(company: Company, code: str, ext: str, suffix: str = "") -> str:
+    """Download name: the form code of the company's regime."""
+    name = form_for(company, code) or code.split("-")[0].lower()
+    return f"{name}{suffix}.{ext}"
+
+
 def _check_export(user: CurrentUser, fmt: str) -> None:
     if fmt != "html" and not user.can("reports.export"):
         raise PermissionDeniedError()
@@ -754,10 +763,50 @@ def reports_hub(
 ):
     company = _company(db, user)
     period = periods.resolve(request.query_params, default_mode="year")
-    st = statements.b01a(db, company, period)
-    pl = statements.b02(db, company, period)
+    ss = statements.statement_set(company)
+    st = ss.builders["b01a"](db, company, period)
+    pl = ss.builders["b02"](db, company, period)
     tb = books.trial_balance(db, company.id, period.start, period.end, level=1)
     unclosed = bool(books.pl_balances(db, company.id, period.end))
+    descriptions = {
+        "b01a": (
+            "Tài sản, nợ phải trả và vốn chủ sở hữu tại ngày cuối kỳ",
+            "scale",
+        ),
+        "b02": ("Doanh thu, chi phí và lợi nhuận trong kỳ", "trending-up"),
+        "b03": ("Dòng tiền theo phương pháp trực tiếp", "arrow-left-right"),
+    }
+    cards = [
+        {
+            "key": kind,
+            "title": title,
+            "code": code,
+            "desc": descriptions[kind][0],
+            "icon": descriptions[kind][1],
+        }
+        for kind, (title, code) in ss.titles.items()
+    ]
+    if ss.notes_code:
+        cards.append(
+            {
+                "key": "b09",
+                "title": "Bản thuyết minh báo cáo tài chính",
+                "code": ss.notes_code,
+                "desc": "Chính sách kế toán và chi tiết các khoản mục",
+                "icon": "file-text",
+            }
+        )
+    tb_title, tb_code = ss.trial_balance
+    cards.append(
+        {
+            "key": "f01",
+            "title": tb_title,
+            "code": tb_code,
+            "desc": "Số dư đầu kỳ, phát sinh và số dư cuối kỳ "
+            "của các tài khoản",
+            "icon": "table",
+        }
+    )
     return render(
         request,
         "gl/reports.html",
@@ -768,6 +817,9 @@ def reports_hub(
             "Báo cáo tài chính",
             b01a=st,
             b02=pl,
+            lines=ss.lines,
+            cards=cards,
+            regime=regime_of(company),
             tb=tb,
             unclosed=unclosed,
         ),
@@ -798,11 +850,12 @@ def report_s03a(
             exports.pdf(
                 "s03a", company=company, book=book, subtitle=period.label
             ),
-            "S03a-DNN.pdf",
+            _file(company, "S03a-DNN", "pdf"),
         )
     if fmt == "xlsx":
         return xlsx_response(
-            exports.xlsx_journal(company, book, period.label), "S03a-DNN.xlsx"
+            exports.xlsx_journal(company, book, period.label),
+            _file(company, "S03a-DNN", "xlsx"),
         )
     limit = 3000
     return render(
@@ -882,7 +935,7 @@ def report_s03b(
                 title="SỔ CÁI",
                 form_code="S03b-DNN",
             ),
-            f"S03b-DNN-{account}.pdf",
+            _file(company, "S03b-DNN", "pdf", f"-{account}"),
         )
     if fmt == "xlsx":
         return xlsx_response(
@@ -893,7 +946,7 @@ def report_s03b(
                 form_code="S03b-DNN",
                 title="SỔ CÁI",
             ),
-            f"S03b-DNN-{account}.xlsx",
+            _file(company, "S03b-DNN", "xlsx", f"-{account}"),
         )
     level1 = [a for a in accs.values() if a.level == 1 and a.is_active]
     return render(
@@ -1026,34 +1079,34 @@ def report_f01(
     )
     if fmt == "pdf":
         return pdf_response(
-            exports.pdf("f01", company=company, tb=tb, subtitle=period.label),
-            "F01-DNN.pdf",
+            exports.pdf(
+                "f01",
+                company=company,
+                tb=tb,
+                subtitle=period.label,
+                tb_title=statements.statement_set(company).trial_balance[0],
+            ),
+            _file(company, "F01-DNN", "pdf"),
         )
     if fmt == "xlsx":
         return xlsx_response(
             exports.xlsx_trial_balance(company, tb, period.label),
-            "F01-DNN.xlsx",
+            _file(company, "F01-DNN", "xlsx"),
         )
+    tb_title = statements.statement_set(company).trial_balance[0]
     return render(
         request,
         "gl/report_f01.html",
         _report_ctx(
             company,
             period,
-            "Bảng cân đối tài khoản",
-            "Bảng cân đối tài khoản",
+            tb_title,
+            tb_title,
             tb=tb,
             level=level,
             show_zero=bool(show_zero),
         ),
     )
-
-
-STATEMENT_TITLES = {
-    "b01a": ("Báo cáo tình hình tài chính", "B01a-DNN"),
-    "b02": ("Báo cáo kết quả hoạt động kinh doanh", "B02-DNN"),
-    "b03": ("Báo cáo lưu chuyển tiền tệ", "B03-DNN"),
-}
 
 
 def _statement_route(kind: str):
@@ -1066,7 +1119,13 @@ def _statement_route(kind: str):
         _check_export(user, fmt)
         company = _company(db, user)
         period = periods.resolve(request.query_params, default_mode="year")
-        st = statements.STATEMENTS[kind](db, company, period)
+        ss = statements.statement_set(company)
+        if kind not in ss.builders:
+            raise NotFoundError(
+                f"Chế độ kế toán {regime_of(company).short} "
+                "không có báo cáo này"
+            )
+        st = ss.builders[kind](db, company, period)
         subtitle = (
             f"Tại ngày {period.end:%d/%m/%Y}"
             if kind == "b01a"
@@ -1084,7 +1143,7 @@ def _statement_route(kind: str):
                 exports.xlsx_statement(company, st, subtitle),
                 f"{st.code}.xlsx",
             )
-        title, _code = STATEMENT_TITLES[kind]
+        title, _code = ss.titles[kind]
         return render(
             request,
             "gl/report_statement.html",
@@ -1096,6 +1155,11 @@ def _statement_route(kind: str):
                 st=st,
                 kind=kind,
                 subtitle=subtitle,
+                regime=regime_of(company),
+                lines=ss.lines,
+                tabs=[(k, code) for k, (_t, code) in ss.titles.items()]
+                + ([("b09", ss.notes_code)] if ss.notes_code else []),
+                terms=statements_tt99.term_settings(company),
             ),
         )
 
@@ -1121,6 +1185,40 @@ for _kind in ("b01a", "b02", "b03"):
     )
 
 
+@router.post("/reports/b01-terms")
+def report_b01_terms(
+    request: Request,
+    form: dict = Depends(form_data),
+    _u: CurrentUser = Depends(require("settings.manage")),
+    db: Session = Depends(get_tenant_db),
+):
+    """Accounts presented as long-term / short-term on B01-DN (TT99)."""
+    from app.features.org import service as org
+
+    def codes(name: str) -> list[str]:
+        out = []
+        for part in (form.get(name) or "").replace(";", ",").split(","):
+            code = part.strip()
+            if code:
+                if not code.isdigit() or len(code) > 10:
+                    raise BusinessError(
+                        f"Số hiệu tài khoản không hợp lệ: {code}"
+                    )
+                out.append(code)
+        return out
+
+    org.update_company_settings(
+        db,
+        get_ctx(request),
+        "b01",
+        {"long_term": codes("long_term"), "short_term": codes("short_term")},
+    )
+    return redirect(
+        "/reports/b01a?" + (form.get("query") or "mode=year"),
+        "Đã lưu cách trình bày ngắn hạn/dài hạn",
+    )
+
+
 @router.get("/reports/b09")
 @router.get("/reports/b09.pdf")
 @router.get("/reports/b09.xlsx")
@@ -1132,6 +1230,10 @@ def report_b09(
     fmt = _fmt(request)
     _check_export(user, fmt)
     company = _company(db, user)
+    if not statements.statement_set(company).notes_code:
+        raise NotFoundError(
+            "Doanh nghiệp siêu nhỏ (TT58) không phải lập thuyết minh BCTC"
+        )
     period = periods.resolve(request.query_params, default_mode="year")
     data = notes.build(db, company, period)
     if fmt == "pdf":
@@ -1139,11 +1241,12 @@ def report_b09(
             exports.pdf(
                 "b09", company=company, notes=data, subtitle=period.label
             ),
-            "B09-DNN.pdf",
+            _file(company, "B09-DNN", "pdf"),
         )
     if fmt == "xlsx":
         return xlsx_response(
-            exports.xlsx_notes(company, data, period.label), "B09-DNN.xlsx"
+            exports.xlsx_notes(company, data, period.label),
+            _file(company, "B09-DNN", "xlsx"),
         )
     return render(
         request,

@@ -12,6 +12,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import BusinessError
+from app.core.regimes import account as regime_account
+from app.core.regimes import regime_of
 from app.features.accounts.models import Account
 from app.features.org.models import Company
 
@@ -71,11 +73,25 @@ def _load(raw: list | None, default: list[Purpose]) -> list[Purpose]:
     return out or list(default)
 
 
+def _defaults(company: Company, default: list[Purpose]) -> list[Purpose]:
+    """Default purposes with the accounts of the company's regime."""
+    swap = {
+        "6422": regime_account(company, "expense_general"),
+        "6421": regime_account(company, "expense_selling"),
+    }
+    if regime_of(company).code == "tt99":
+        swap["4111"] = "41111"
+    return [
+        Purpose(p.label, swap.get(p.account, p.account), p.role)
+        for p in default
+    ]
+
+
 def purposes(company: Company) -> dict[str, list[Purpose]]:
     raw = (company.settings or {}).get("cash_purposes") or {}
     return {
-        "in": _load(raw.get("in"), DEFAULT_IN),
-        "out": _load(raw.get("out"), DEFAULT_OUT),
+        "in": _load(raw.get("in"), _defaults(company, DEFAULT_IN)),
+        "out": _load(raw.get("out"), _defaults(company, DEFAULT_OUT)),
     }
 
 

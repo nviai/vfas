@@ -29,7 +29,17 @@ ASSET_CATEGORIES = {
     "other": "TSCĐ khác",
 }
 # Cost account -> matching accumulated depreciation account
-DEPRECIATION_ACCOUNT = {"2111": "2141", "2112": "2142", "2113": "2143"}
+# Cost account -> accumulated depreciation account (TT133 details 211x,
+# TT99 level-1 accounts 211/212/213).
+DEPRECIATION_ACCOUNT = {
+    "2111": "2141",
+    "2112": "2142",
+    "2113": "2143",
+    "211": "2141",
+    "212": "2142",
+    "213": "2143",
+}
+FIXED_ASSET_PREFIXES = ("211", "212", "213")
 
 IN_USE = "in_use"
 DISPOSED = "disposed"

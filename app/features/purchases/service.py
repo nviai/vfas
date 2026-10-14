@@ -19,8 +19,10 @@ from sqlalchemy.orm import Session
 
 from app.core.db import like_contains, like_prefix, ulower
 from app.core.errors import BusinessError
+from app.core.regimes import account as regime_account
 from app.features.journal import service as js
 from app.features.journal.models import JournalEntry
+from app.features.org.models import Company
 from app.features.partners import service as partners
 from app.features.partners.models import Partner
 from app.features.purchases.models import (
@@ -56,19 +58,33 @@ DEBIT_PREFIXES = (
     "335",
     "217",
 )
+# TT133 default; the company's regime may differ (see expense_default).
 DEFAULT_EXPENSE_ACCOUNT = "6422"
+
+
+def expense_default(company) -> str:
+    """Default expense account of purchased services (by regime)."""
+    return regime_account(company, "expense_services")
+
+
+def debit_account_resolver(db: Session, company_id: int):
+    """`default_debit_account` with the company default expense."""
+    fallback = expense_default(db.get(Company, company_id))
+    return lambda item: default_debit_account(item, fallback)
 
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def default_debit_account(item) -> str:
+def default_debit_account(
+    item, fallback: str = DEFAULT_EXPENSE_ACCOUNT
+) -> str:
     if item is None:
-        return DEFAULT_EXPENSE_ACCOUNT
+        return fallback
     if item.stock_account:
         return item.stock_account
-    return item.expense_account or DEFAULT_EXPENSE_ACCOUNT
+    return item.expense_account or fallback
 
 
 def input_vat_account(ln: TradeLine) -> str:
@@ -104,7 +120,7 @@ def parse_form(
         db,
         ctx.company_id,
         read_grid(form),
-        default_account=default_debit_account,
+        default_account=debit_account_resolver(db, ctx.company_id),
         account_prefixes=DEBIT_PREFIXES,
         use_discount=False,
     )

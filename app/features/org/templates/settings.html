@@ -40,7 +40,14 @@
       </div>
     {% endcall %}
   {% elif tab == "accounting" %}
-    {% call ui.form_section(_("Chế độ kế toán"), _("Thông tư 133/2016/TT-BTC, hình thức Nhật ký chung, đơn vị tiền tệ VND.")) %}
+    {% call ui.form_section(_("Chế độ kế toán"), _("Hình thức Nhật ký chung, đơn vị tiền tệ VND. Đổi chế độ tạo lại hệ thống tài khoản – chỉ được khi chưa có chứng từ và số dư đầu kỳ.")) %}
+      <div>
+        <label class="label" for="f-regime">{{ _("Chế độ áp dụng") }}</label>
+        <select id="f-regime" name="regime" class="input" {{ "disabled" if regime_locked }}>
+          {% for r in regimes %}<option value="{{ r.code }}" {{ "selected" if c.regime == r.code }}>{{ _(r.name) }}</option>{% endfor %}
+        </select>
+        <p class="hint">{% if regime_locked %}{{ _(regime_locked) }} – {{ _("không đổi được chế độ kế toán.") }}{% else %}{{ _("Đổi được khi chưa có chứng từ và số dư đầu kỳ.") }}{% endif %}</p>
+      </div>
       {{ ui.date_input("start_date", _("Ngày bắt đầu hạch toán trên phần mềm"), c.start_date,
                        hint=(_("Số liệu trước ngày này nhập vào Số dư đầu kỳ.") if can_change_start else _("Đã có chứng từ ghi sổ – không đổi được.")),
                        attrs=("" if can_change_start else "disabled")) }}

@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
-from app.core.charts.tt133 import ISSUED
 from app.core.money import amount_in_words
 from app.core.pdf import render_pdf
 from app.features.cash.books import MoneyBook
@@ -75,7 +74,6 @@ def voucher_pdf(
             "entry": e,
             "code": code,
             "title": title,
-            "issued": ISSUED,
             "is_receipt": is_receipt,
             "number": e.number if e.status != DRAFT else None,
             "doc_date": e.doc_date or e.date,
@@ -99,7 +97,6 @@ def book_pdf(
         {
             "company": company,
             "book": book,
-            "issued": ISSUED,
             "period_label": period_label,
             "subtitles": subtitles,
             "detail": book.form != "s04a",
@@ -115,7 +112,6 @@ def cashcount_pdf(company: Company, cc: CashCount) -> bytes:
         {
             "company": company,
             "cc": cc,
-            "issued": ISSUED,
             "lines": [ln for ln in cc.lines if ln.quantity],
             "hour": hour or "....",
             "minute": minute or "....",

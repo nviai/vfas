@@ -15,6 +15,7 @@ from app.core.config import get_settings
 from app.core.dates import parse_date
 from app.core.db import get_db
 from app.core.errors import BusinessError, NotFoundError, PermissionDeniedError
+from app.core.regimes import REGIMES
 from app.core.registry import ROLE_LABELS, ROLES
 from app.core.security import (
     CurrentUser,
@@ -61,7 +62,11 @@ def company_new(
         raise PermissionDeniedError(
             "Chỉ quản trị hệ thống được tạo công ty mới"
         )
-    return render(request, "org/company_new.html", {"form": {}, "errors": {}})
+    return render(
+        request,
+        "org/company_new.html",
+        {"form": {}, "errors": {}, "regimes": list(REGIMES.values())},
+    )
 
 
 @router.post("/companies/new")
@@ -120,6 +125,7 @@ def company_create(
                     start_date=start,
                     vat_period=form.get("vat_period") or "quarter",
                     business_type=form.get("business_type") or "service",
+                    regime=form.get("regime") or "tt133",
                 ),
             )
         except BusinessError as e:
@@ -129,7 +135,11 @@ def company_create(
         return render(
             request,
             "org/company_new.html",
-            {"form": form, "errors": errors},
+            {
+                "form": form,
+                "errors": errors,
+                "regimes": list(REGIMES.values()),
+            },
             status_code=400,
         )
     sess = db.get(UserSession, user.session_id) if user.session_id else None
@@ -169,6 +179,8 @@ def settings_page(
             "tab": tab,
             "errors": {},
             "can_change_start": not _has_entries(db, c.id),
+            "regimes": list(REGIMES.values()),
+            "regime_locked": org.regime_locked(db, c.id),
             "prefixes": c.setting("prefixes") or {},
             "breadcrumbs": [("Cài đặt", None)],
         },
@@ -192,6 +204,8 @@ def settings_save(
             start = parse_date(form["start_date"])
             if start != c.start_date:
                 org.set_start_date(db, ctx, start)
+        if form.get("regime") and form["regime"] != c.regime:
+            org.set_regime(db, ctx, form["regime"])
         prefixes = {
             k[7:]: v.strip().upper()
             for k, v in form.items()

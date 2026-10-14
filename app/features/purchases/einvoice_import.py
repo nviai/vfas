@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.db import ulower
 from app.core.errors import BusinessError, NotFoundError
+from app.core.regimes import regime_of
 from app.features.items.models import Item
 from app.features.journal import service as js
 from app.features.org.models import Company
@@ -39,6 +40,25 @@ PURCHASE_ACCOUNTS = [
     ("242", "242 – Chi phí trả trước"),
     ("2111", "2111 – TSCĐ hữu hình"),
 ]
+TT99_PURCHASE_ACCOUNTS = [
+    ("156", "156 – Hàng hóa"),
+    ("152", "152 – Nguyên liệu, vật liệu"),
+    ("153", "153 – Công cụ, dụng cụ"),
+    ("6427", "6427 – Chi phí dịch vụ mua ngoài (quản lý)"),
+    ("6428", "6428 – Chi phí bằng tiền khác (quản lý)"),
+    ("6417", "6417 – Chi phí dịch vụ mua ngoài (bán hàng)"),
+    ("242", "242 – Chi phí chờ phân bổ"),
+    ("211", "211 – TSCĐ hữu hình"),
+]
+
+
+def purchase_accounts(company) -> list[tuple[str, str]]:
+    """Default debit accounts offered for imported purchase invoices."""
+    if regime_of(company).code == "tt99":
+        return TT99_PURCHASE_ACCOUNTS
+    return PURCHASE_ACCOUNTS
+
+
 SALES_ACCOUNTS = [
     ("5111", "5111 – Doanh thu bán hàng hóa"),
     ("5113", "5113 – Doanh thu cung cấp dịch vụ"),
@@ -219,7 +239,7 @@ def _trade_lines(
         item = _match_item(db, company_id, ln.code, ln.description)
         if direction == "in":
             account = (
-                purchases.default_debit_account(item)
+                purchases.default_debit_account(item, default_account)
                 if item
                 else default_account
             )
@@ -283,7 +303,7 @@ def confirm(
     token: str,
     keys: set[str],
     *,
-    purchase_account: str = "6422",
+    purchase_account: str = "",
     sales_account: str = "5113",
 ) -> dict:
     """Create draft documents for the selected invoices.
@@ -291,6 +311,12 @@ def confirm(
     Returns the count per direction and the list of errors.
     """
     invoices, prev = load(db, ctx, token)
+    if not purchase_account:
+        from app.features.org.models import Company
+
+        purchase_account = purchases.expense_default(
+            db.get(Company, ctx.company_id)
+        )
     status = {r["key"]: r for r in prev.rows}
     result = {"in": 0, "out": 0, "errors": [], "entry_ids": []}
     for inv in invoices:

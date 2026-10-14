@@ -25,7 +25,7 @@
         {{ ui.input("address", _("Địa chỉ"), company.address) }}
       {% endcall %}
       {% call ui.form_section(_("Chế độ kế toán"), _("Không đổi được sau khi đã có chứng từ ghi sổ.")) %}
-        {{ ui.radio_group("regime", None, [{"value": "tt133", "label": "Thông tư 133/2016/TT-BTC", "hint": _("Doanh nghiệp nhỏ và vừa")}, {"value": "tt99", "label": "Thông tư 99/2025/TT-BTC", "hint": _("Sắp hỗ trợ")}], "tt133", style="cards") }}
+        {{ ui.radio_group("regime", None, [{"value": "tt133", "label": "Thông tư 133/2016/TT-BTC", "hint": _("Doanh nghiệp nhỏ và vừa")}, {"value": "tt99", "label": "Thông tư 99/2025/TT-BTC", "hint": _("Mọi doanh nghiệp, từ năm 2026")}], "tt133", style="cards") }}
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {{ ui.date_input("start_date", _("Ngày bắt đầu ghi sổ"), settings.start_date, hint=_("Số dư đầu kỳ tính tại ngày này.")) }}
           {{ ui.select("fiscal_start", _("Năm tài chính bắt đầu"), [(1, _("Tháng 1")), (4, _("Tháng 4")), (7, _("Tháng 7")), (10, _("Tháng 10"))], 1) }}

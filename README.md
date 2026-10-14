@@ -5,7 +5,8 @@
 # VFAS
 
 **Vietnam Free Accounting Software**<br>
-Free, open-source accounting for Vietnamese small and medium businesses – Circular 133/2016/TT-BTC (TT133) regime
+Free, open-source accounting for Vietnamese businesses – Circular 133/2016 (SMEs), 99/2025 (enterprises) and 58/2026
+(micro enterprises) regimes
 
 [![CI](https://github.com/nviai/vfas/actions/workflows/ci.yml/badge.svg)](https://github.com/nviai/vfas/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
@@ -32,7 +33,7 @@ Free, open-source accounting for Vietnamese small and medium businesses – Circ
 - **Your data** – self-host on your own server or run it as SaaS; export all data of a company at any time.
 - **Clean books** – posted vouchers cannot be edited or deleted (enforced in the database); mistakes are fixed by a
   reasoned cancellation or an adjusting entry; the audit log is append-only.
-- **Statutory coverage** – TT133 ledgers and financial statements, VAT return 01/GTGT, personal income tax and social
+- **Statutory coverage** – ledgers and financial statements under TT133, TT99 or TT58, VAT return 01/GTGT, personal income tax and social
   insurance with effective-dated parameters.
 - **OpenAI-style AI agent** – ask about your figures in Vietnamese and let the agent draft vouchers; works with Claude,
   OpenAI, OpenRouter or self-hosted Ollama. The agent only drafts – a person with the right role posts.
@@ -54,7 +55,8 @@ The user interface defaults to Vietnamese and is fully translated into English.
 
 | Area | What you get |
 |---|---|
-| **Ledger & reports** | Double-entry journal, opening balances (Excel import), general journal S03a-DNN, general ledger S03b-DNN, account detail ledgers, trial balance F01-DNN, financial statements B01a/B02/B03/B09-DNN, period-end closing entries, monthly/yearly period locks |
+| **Accounting regimes** | **TT133** (SMEs: B01a/B02/B03/B09-DNN, F01-DNN), **TT99/2025** (all enterprises from 2026: full chart, B01-DN with short/long-term lines, B02-DN, B03-DN, B09-DN, S06-DN, ledgers coded -DN), **TT58/2026** (micro enterprises: B01-DNSN, B02-DNSN on internal double-entry books); chosen per company, changeable while the books are empty |
+| **Ledger & reports** | Double-entry journal, opening balances (Excel import), general journal, general ledger, account detail ledgers, trial balance, financial statements of the company's regime, period-end closing entries, monthly/yearly period locks |
 | **Cash** | Cash receipts 01-TT and payments 02-TT (quick phone form for cashiers), cash books S04a/S04b-DNN, cash counts 08a-TT, import of legacy cash books from Excel |
 | **Bank** | Deposits/withdrawals, internal transfers, bank book S05-DNN, payment orders, CSV/XLSX statement import with auto-matching |
 | **Sales & purchases** | Goods and services, sales and purchase vouchers, returns and allowances, **e-invoice XML import** (single files or ZIP) |
@@ -142,7 +144,7 @@ openpyxl · SQLite/PostgreSQL.
 - [x] Email (SMTP): address verification, password reset, invitation emails – required before opening public sign-up
 - [ ] Issue e-invoices through providers (Viettel S-Invoice, MISA meInvoice, VNPT, BKAV) – design in [docs/EINVOICE.md](docs/EINVOICE.md)
 - [ ] XML export of financial statements, 03/TNDN and 05/QTT-TNCN for HTKK
-- [ ] Accounting regimes under Circular 99/2025 and Circular 58/2026 (extension point `app/core/regimes.py`)
+- [x] Accounting regimes under Circular 99/2025 and Circular 58/2026 (`app/core/regimes.py`)
 - [x] Prebuilt Docker image (`ghcr.io/nviai/vfas`, amd64/arm64, signed)
 - [ ] Foreign currencies, bank API connections, production costing
 
@@ -166,6 +168,8 @@ Found a vulnerability? **Do not open a public issue** – report it privately as
   reports before filing.
 - The **01/GTGT XML** follows the common HTKK layout but has not been validated against the official XSD: **open it in
   HTKK before filing**.
+- Under **TT99**, B01-DN needs the short/long-term split of balances; the books do not store maturities, so check the
+  "Trình bày ngắn hạn / dài hạn" setting before filing.
 - Some ledger form codes (S06/S07/S08/S09/S11-DNN, 02-LĐTL, 06-TSCĐ…) come from advisory sources and still need to be
   checked against the original TT133 text.
 - Payroll and tax parameters were checked against public sources in October 2026 and **can be edited** under

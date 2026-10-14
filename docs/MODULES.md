@@ -82,6 +82,10 @@ Read first: `docs/PLAN.md`, `docs/CONTRACTS.md`, `docs/UI.md`, `docs/DECISIONS.m
   credit_partner_code?}])` (write, perm `journal.create`).
 - **Checks**: trial balance does not balance; B01a assets ≠ liabilities and equity; year locked but accounts of classes 5–9 still
   have balances (not closed).
+- **Accounting regimes** (`app/core/regimes.py`): `statements.statement_set(company)` returns the statements of the
+  company's regime – TT133 (`statements.py`: B01a/B02/B03-DNN), TT99 (`statements_tt99.py`: B01-DN with short/long-term
+  rules, B02-DN, B03-DN) or TT58 (`statements_tt58.py`: B01-DNSN, B02-DNSN). URLs stay `/reports/b01a|b02|b03`; printed
+  codes come from `regime_form(company, code)`.
 
 ## Team B – Cash, bank deposits (`cash`, `bank`)
 

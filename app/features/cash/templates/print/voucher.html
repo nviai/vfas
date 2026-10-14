@@ -31,8 +31,8 @@
       <p><span class="b">Địa chỉ:</span> {{ company.address }}</p>
     </td>
     <td class="right">
-      <p class="form-code">Mẫu số {{ code }}</p>
-      <p class="issued">{{ issued }}</p>
+      <p class="form-code">Mẫu số {{ regime_form(company, code) }}</p>
+      <p class="issued">{{ regime_issued(company) }}</p>
     </td>
   </tr>
 </table>

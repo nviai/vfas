@@ -1,5 +1,6 @@
 {# Shared parts of the asset and payroll print forms (Vietnamese, not translated). #}
-{% macro doc_header(company, form_code=None, issued="(Ban hành theo Thông tư số 133/2016/TT-BTC ngày 26/8/2016 của Bộ Tài chính)") -%}
+{% macro doc_header(company, form_code=None, issued=None) -%}
+{%- set form_code = regime_form(company, form_code) -%}
 <table class="doc-head">
   <tr>
     <td class="left">
@@ -8,7 +9,7 @@
       {% if company.tax_code %}<p><span class="b">Mã số thuế:</span> {{ company.tax_code }}</p>{% endif %}
     </td>
     <td class="right">
-      {% if form_code %}<p class="form-code">Mẫu số {{ form_code }}</p><p class="issued">{{ issued }}</p>{% endif %}
+      {% if form_code %}<p class="form-code">Mẫu số {{ form_code }}</p><p class="issued">{{ regime_issued(company) }}</p>{% endif %}
     </td>
   </tr>
 </table>
