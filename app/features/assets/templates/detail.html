@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ a.code }} – {{ a.name }}{% endblock %}
+{% block content %}
+{% set badge = ui.status_badge("disposed" if a.status == "disposed" else "active") %}
+{% call ui.page_header(a.code ~ " · " ~ a.name, _(a.category_label) ~ ((" · " ~ a.department) if a.department else ""), breadcrumbs=breadcrumbs, back="/assets", badge=badge) %}
+  {% if can("assets.export") %}{{ ui.link_button(_("In thẻ TSCĐ"), "/assets/" ~ a.id ~ "/card.pdf", "secondary", icon_name="printer", target="_blank") }}{% endif %}
+  {% if a.status == "in_use" and (can("assets.manage") or can("assets.post")) %}
+  {% call ui.dropdown(icon_name="ellipsis", aria_label=_("Thao tác khác"), width="w-56") %}
+    {% if can("assets.manage") %}{{ ui.menu_item(_("Sửa thẻ tài sản"), "/assets/" ~ a.id ~ "/edit", "pencil") }}{% endif %}
+    {% if can("assets.post") %}{{ ui.menu_item(_("Ghi giảm / thanh lý…"), None, "archive", danger=True, attrs="@click=\"$dispatch('modal-open', 'dispose')\"") }}{% endif %}
+    {% if can("assets.manage") and not history %}{{ ui.menu_sep() }}{{ ui.menu_post(_("Xóa thẻ"), "/assets/" ~ a.id ~ "/delete", "trash", danger=True, confirm=_("Xóa thẻ tài sản này?")) }}{% endif %}
+  {% endcall %}
+  {% endif %}
+{% endcall %}
+
+{% if a.status == "disposed" %}
+<div class="mb-5 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-[13px] text-fg-2">
+  <span class="inline-flex items-center gap-1.5 font-medium">{{ ui.icon("archive", "size-3.5") }}{{ _("Đã ghi giảm ngày {d}", d=a.disposal_date|date) }}</span>
+  {% if a.disposal_reason %}<span>{{ a.disposal_reason }}</span>{% endif %}
+</div>
+{% endif %}
+
+<div class="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
+  <div class="min-w-0 space-y-5">
+    {% call ui.card(_("Thông tin tài sản")) %}
+      {{ ui.desc_list([
+        (_("Ngày ghi tăng"), a.acquired_date|date), (_("Bắt đầu khấu hao"), a.depreciation_start.strftime("%m/%Y")),
+        (_("Thời gian sử dụng"), _("{n} tháng", n=a.useful_life_months)),
+        (_("TK nguyên giá / hao mòn"), a.asset_account ~ " / " ~ a.depreciation_account),
+        (_("TK chi phí"), a.expense_account), (_("Nhà cung cấp"), partner.name if partner else ""),
+        (_("Nước/hãng sản xuất"), a.manufacturer), (_("Số hiệu"), a.serial_no), (_("Năm sản xuất"), a.year_made or ""),
+      ]) }}
+      {% if a.opening_accumulated or a.opening_months_used %}
+        <p class="mt-4 text-[13px] text-fg-3">{{ _("Tài sản đầu kỳ: đã khấu hao {m} tháng, hao mòn lũy kế {v} đồng trước khi đưa vào phần mềm.", m=a.opening_months_used, v=a.opening_accumulated|money) }}</p>
+      {% endif %}
+      {% if a.note %}<p class="mt-3 text-[13px] text-fg-2">{{ a.note }}</p>{% endif %}
+    {% endcall %}
+
+    {% call ui.card(_("Lịch khấu hao"), _("Theo đường thẳng; dòng đậm là các tháng đã trích có chứng từ ghi sổ"), flush=True) %}
+      <div class="table-wrap max-h-[28rem] overflow-y-auto">
+        <table class="table table-compact table-sticky">
+          <thead><tr><th class="w-24">{{ _("Tháng") }}</th><th class="num">{{ _("Số khấu hao") }}</th><th class="num">{{ _("Hao mòn lũy kế") }}</th><th class="num">{{ _("Giá trị còn lại") }}</th><th class="w-36">{{ _("Chứng từ") }}</th></tr></thead>
+          <tbody>
+            {% set posted_months = {} %}
+            {% for h in history %}{% if h.posted %}{% do posted_months.update({(h.year, h.month): h.entry}) %}{% endif %}{% endfor %}
+            {% for m, amt, acc in schedule %}
+            {% set ent = posted_months.get((m.year, m.month)) %}
+            <tr class="{{ 'font-medium' if ent else 'text-fg-2' }}">
+              <td class="tabular-nums">{{ m.strftime("%m/%Y") }}</td>
+              <td class="num">{{ amt|money }}</td>
+              <td class="num">{{ acc|money }}</td>
+              <td class="num">{{ (a.cost - acc)|money }}</td>
+              <td>{% if ent %}<a href="{{ ent.url }}" class="doc-no whitespace-nowrap hover:underline">{{ ent.number }}</a>{% endif %}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endcall %}
+  </div>
+
+  <aside class="space-y-5">
+    <section class="card p-5">
+      <p class="text-[13px] font-medium text-fg-3">{{ _("Giá trị còn lại") }}</p>
+      <p class="mt-1 text-3xl font-semibold tracking-tight tabular-nums">{{ remaining|money }} <span class="text-base font-normal text-fg-3">đ</span></p>
+      {{ ui.progress(accumulated, a.cost, "amber", cls="mt-4") }}
+      <dl class="mt-4 space-y-2 text-[13px]">
+        <div class="flex justify-between gap-3"><dt class="text-fg-3">{{ _("Nguyên giá") }}</dt><dd class="tabular-nums">{{ a.cost|money }}</dd></div>
+        <div class="flex justify-between gap-3"><dt class="text-fg-3">{{ _("Hao mòn lũy kế") }}</dt><dd class="tabular-nums">{{ accumulated|money }}</dd></div>
+        <div class="flex justify-between gap-3"><dt class="text-fg-3">{{ _("Khấu hao mỗi tháng") }}</dt><dd class="tabular-nums">{{ monthly|money }}</dd></div>
+      </dl>
+    </section>
+    {% if entries %}
+    {% call ui.card(_("Chứng từ liên quan"), flush=True) %}
+      <ul class="divide-y divide-line">
+        {% for e in entries %}
+        <li><a href="{{ e.url }}" class="flex items-center gap-3 px-5 py-3 hover:bg-surface-2">
+          {{ ui.kind_badge(e.doc_type) }}<span class="doc-no whitespace-nowrap flex-1">{{ e.display_number }}</span>
+          <span class="tabular-nums text-[13px]">{{ e.total|money }}</span></a></li>
+        {% endfor %}
+      </ul>
+    {% endcall %}
+    {% endif %}
+  </aside>
+</div>
+
+{% if a.status == "in_use" and can("assets.post") %}
+{% call ui.modal("dispose", _("Ghi giảm TSCĐ") ~ " " ~ a.code, description=_("Phần mềm lập chứng từ: Nợ TK hao mòn (hao mòn lũy kế), Nợ TK chi phí (giá trị còn lại) / Có TK nguyên giá. Tiền thu thanh lý lập phiếu thu hoặc chứng từ bán hàng riêng.")) %}
+<form method="post" action="/assets/{{ a.id }}/dispose">
+  {{ ui.csrf_field() }}
+  <div class="space-y-4 px-5 pb-5">
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {{ ui.date_input("date", _("Ngày ghi giảm"), today, required=True) }}
+      {{ ui.select("loss_account", _("TK ghi nhận giá trị còn lại"), [("811", "811 – " ~ _("Chi phí khác")), ("6422", "6422 – " ~ _("Chi phí quản lý doanh nghiệp")), ("6421", "6421 – " ~ _("Chi phí bán hàng")), ("632", "632 – " ~ _("Giá vốn hàng bán"))], "811") }}
+    </div>
+    {{ ui.textarea("reason", _("Lý do"), rows=2, required=True, placeholder=_("Thanh lý, nhượng bán, hư hỏng…")) }}
+  </div>
+  <div class="flex justify-end gap-2 border-t border-line bg-surface-2 px-5 py-3">
+    {{ ui.button(_("Đóng"), "secondary", type="button", attrs="@click=\"$dispatch('modal-close')\"") }}
+    {{ ui.button(_("Ghi giảm"), "danger", icon_name="archive") }}
+  </div>
+</form>
+{% endcall %}
+{% endif %}
+{% endblock %}

@@ -1,0 +1,54 @@
+{#- PATTERN (b) – Sales invoice: buyer details + item grid (ui.invoice_grid) + payment. -#}
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Hóa đơn bán hàng mới") }}{% endblock %}
+{% block content %}
+<form method="post" action="" x-data="docForm()" @keydown="keys($event)" novalidate>
+  {{ ui.csrf_field() }}
+  {% call ui.page_header(_("Hóa đơn bán hàng"), _("Ghi nhận doanh thu, thuế GTGT đầu ra và công nợ phải thu."),
+                         breadcrumbs=[(_("Bán hàng"), "#"), (_("Hóa đơn bán hàng"), "#"), (_("Tạo mới"), None)], back="/ui-kit/list",
+                         badge=ui.status_badge("draft")) %}
+    {{ ui.button(_("Nhập từ XML"), "secondary", icon_name="file-up", type="button", cls="max-sm:hidden") }}
+  {% endcall %}
+
+  <div class="space-y-5">
+    {% call ui.card(_("Người mua")) %}
+    <div class="grid grid-cols-1 gap-4 lg:grid-cols-3" x-data="{ address: '', tax: '' }"
+         @combobox-select="if ($event.detail.extra) { address = $event.detail.extra.address || ''; tax = $event.detail.extra.tax_code || '' }">
+      {{ ui.combobox("partner_id", _("Khách hàng"), url=lookup_base ~ "/partners", params={"role": "customer"}, local_filter=True, required=True,
+                     placeholder=_("Mã, tên hoặc MST…"), cls="lg:col-span-2") }}
+      <div>
+        <label class="label" for="f-buyer_tax">{{ _("Mã số thuế") }}</label>
+        <input id="f-buyer_tax" name="buyer_tax_code" class="input tabular-nums" x-model="tax">
+      </div>
+      <div class="lg:col-span-2">
+        <label class="label" for="f-buyer_address">{{ _("Địa chỉ") }}</label>
+        <input id="f-buyer_address" name="buyer_address" class="input" x-model="address">
+      </div>
+      {{ ui.input("buyer_name", _("Người mua hàng"), placeholder=_("Họ tên người mua (nếu có)")) }}
+    </div>
+    {% endcall %}
+
+    {% call ui.card(_("Hóa đơn")) %}
+    <div class="grid grid-cols-2 gap-4 lg:grid-cols-5">
+      {{ ui.date_input("date", _("Ngày hạch toán"), invoice.date, required=True) }}
+      {{ ui.date_input("invoice_date", _("Ngày hóa đơn"), invoice.date) }}
+      {{ ui.input("invoice_series", _("Ký hiệu"), invoice.series, input_cls="uppercase tabular-nums") }}
+      {{ ui.input("invoice_no", _("Số hóa đơn"), invoice.number, input_cls="tabular-nums") }}
+      {{ ui.date_input("due_date", _("Hạn thanh toán"), invoice.due_date) }}
+      {{ ui.radio_group("payment", _("Hình thức thanh toán"), [("credit", _("Ghi nợ (131)")), ("cash", _("Tiền mặt")), ("bank", _("Chuyển khoản"))], invoice.payment, cls="col-span-2 lg:col-span-5") }}
+    </div>
+    {% endcall %}
+
+    {% call ui.card(_("Hàng hóa, dịch vụ"), _("Giá chưa thuế. Thuế suất 8% áp dụng theo NĐ 174/2025 đến hết 31/12/2026.")) %}
+      {{ ui.invoice_grid(lines, items_url=lookup_base ~ "/items", price_field="sale_price", local_filter=True) }}
+    {% endcall %}
+  </div>
+
+  {% call ui.form_actions() %}
+    {{ ui.link_button(_("Hủy bỏ"), "/ui-kit/list", "ghost") }}
+    {{ ui.button(_("Lưu nháp"), "secondary", name="action", value="save", hotkey="save") }}
+    {{ ui.button(_("Lưu và ghi sổ"), icon_name="check", name="action", value="post", hotkey="post", kbd_hint="Ctrl+Enter") }}
+  {% endcall %}
+</form>
+{% endblock %}

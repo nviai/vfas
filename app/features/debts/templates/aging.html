@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Tuổi nợ") }}{% endblock %}
+{% block content %}
+{% set crumbs = [] %}{% for b in breadcrumbs %}{% do crumbs.append((_(b[0]), b[1])) %}{% endfor %}
+{% call ui.page_header(_("Tuổi nợ") ~ " – " ~ _(title), _("Thanh toán trừ vào khoản phát sinh cũ nhất trước (FIFO). Hạn = hạn trên chứng từ hoặc ngày chứng từ + hạn thanh toán của đối tượng."), breadcrumbs=crumbs, back="/debts/" ~ path, icon_name="clock") %}
+  <form method="get" class="flex items-end gap-2">
+    {{ ui.date_input("as_of", _("Đến ngày"), as_of, input_cls="input-sm") }}
+    <button class="btn-secondary btn-sm" type="submit">{{ _("Xem") }}</button>
+  </form>
+  {% if can("debts.export") %}{{ ui.report_toolbar(xlsx_href="/debts/" ~ path ~ "/aging.xlsx?as_of=" ~ as_of.isoformat()) }}{% endif %}
+{% endcall %}
+
+<div class="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
+  {% for k, label in buckets %}
+    {% set tone = {"current": "", "d30": "", "d60": "text-amber-600", "d90": "text-amber-700", "over90": "text-rose-600"}[k] %}
+    <div class="card p-4"><p class="text-[13px] font-medium text-fg-3">{{ _(label) }}</p><p class="mt-1.5 text-xl font-semibold tabular-nums {{ tone }}">{{ totals[k]|money }}</p></div>
+  {% endfor %}
+</div>
+
+<div class="card">
+  {% if not rows %}
+    {{ ui.empty_state(_("Không còn công nợ"), "circle-check") }}
+  {% else %}
+  <div class="table-wrap">
+    <table class="table table-hover">
+      <thead><tr><th>{{ _(info.partner) }}</th><th class="num w-36">{{ _("Còn nợ") }}</th>
+        {% for k, label in buckets %}<th class="num w-32 {{ 'max-lg:hidden' if k in ('d30', 'd60', 'd90') }}">{{ _(label) }}</th>{% endfor %}
+        <th class="num w-32 max-xl:hidden">{{ _("Trả trước") }}</th></tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr class="is-link">
+          <td class="max-w-0">{% if r.partner %}<a class="font-medium text-fg hover:underline" href="/debts/partner/{{ r.partner.id }}?kind={{ kind }}">{{ r.partner.name }}</a><p class="text-xs text-fg-3">{{ r.partner.code }}{% if r.items %} · {{ _("quá hạn tối đa {n} ngày", n=r.max_overdue(as_of)) if r.max_overdue(as_of) > 0 else _("chưa quá hạn") }}{% endif %}</p>{% else %}{{ _("(không đối tượng)") }}{% endif %}</td>
+          <td class="num font-semibold {{ 'amount-neg' if r.balance < 0 }}">{{ r.balance|money }}</td>
+          {% for k, label in buckets %}<td class="num {{ 'max-lg:hidden' if k in ('d30', 'd60', 'd90') }} {{ 'text-rose-600 dark:text-rose-400' if k == 'over90' and r.buckets[k] }}">{{ r.buckets[k]|money0 }}</td>{% endfor %}
+          <td class="num max-xl:hidden">{{ r.buckets.prepaid|money0 }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot><tr class="row-total"><td>{{ _("Tổng cộng") }}</td><td class="num">{{ totals.balance|money }}</td>
+        {% for k, label in buckets %}<td class="num {{ 'max-lg:hidden' if k in ('d30', 'd60', 'd90') }}">{{ totals[k]|money }}</td>{% endfor %}
+        <td class="num max-xl:hidden">{{ totals.prepaid|money }}</td></tr></tfoot>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

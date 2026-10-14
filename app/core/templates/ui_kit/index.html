@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Thành phần giao diện") }}{% endblock %}
+{% block content %}
+{% call ui.page_header(_("Design system"), _("Trang mẫu dữ liệu giả – sao chép khuôn trang khi làm module mới. Tài liệu: docs/UI.md"), icon_name="layers") %}
+  {{ ui.link_button(_("Thành phần"), "/ui-kit/components", "secondary", icon_name="layers") }}
+{% endcall %}
+<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+  {% for key, title, desc, ic in kit_pages %}
+  <a href="/ui-kit/{{ key }}" class="card group flex items-start gap-3.5 p-4 transition hover:border-line-strong">
+    <span class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-line bg-surface-2 text-fg-2 group-hover:text-primary">{{ ui.icon(ic, "size-[18px]") }}</span>
+    <span class="min-w-0">
+      <span class="block text-[14px] font-medium text-fg">{{ title }}</span>
+      <span class="mt-0.5 block text-[13px] text-fg-3">{{ desc }}</span>
+    </span>
+    {{ ui.icon("arrow-right", "ml-auto size-4 shrink-0 self-center text-fg-3 opacity-0 transition group-hover:translate-x-0.5 group-hover:opacity-100") }}
+  </a>
+  {% endfor %}
+</div>
+{% endblock %}

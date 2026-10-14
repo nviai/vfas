@@ -1,0 +1,56 @@
+{% extends "assets/print/_layout.html" %}
+{% import "assets/print/_parts.html" as parts %}
+{% block title %}Bảng thanh toán tiền lương tháng {{ run.period_label }}{% endblock %}
+{% block page_size %}size: A4 landscape; margin: 10mm 8mm 12mm 8mm;{% endblock %}
+{% block css %}
+  table.book th, table.book td { font-size: 8.5pt; padding: .8mm 1mm; }
+  table.book td.name { white-space: normal; }
+{% endblock %}
+{% block body %}
+{% if run.status != "posted" %}<div class="watermark">CHƯA GHI SỔ</div>{% endif %}
+{{ parts.doc_header(company, "02-LĐTL") }}
+<p class="title">BẢNG THANH TOÁN TIỀN LƯƠNG</p>
+<p class="subtitle i">Tháng {{ "%02d"|format(run.month) }} năm {{ run.year }}{% if run.entry and run.status == "posted" %} – Chứng từ {{ run.entry.number }}{% endif %}</p>
+<p class="r i small">Đơn vị tính: Đồng · Công chuẩn: {{ run.standard_days|qty }} ngày</p>
+<table class="book">
+  <colgroup>
+    <col style="width:3%"><col style="width:13%"><col style="width:4.5%"><col style="width:7.5%"><col style="width:6.5%"><col style="width:6.5%">
+    <col style="width:7.5%"><col style="width:6%"><col style="width:5.5%"><col style="width:5%"><col style="width:6%"><col style="width:6%"><col style="width:6%"><col style="width:7.5%"><col style="width:9.5%">
+  </colgroup>
+  <thead>
+    <tr>
+      <th rowspan="2">STT</th><th rowspan="2">Họ và tên</th><th rowspan="2">Ngày công</th><th rowspan="2">Lương theo ngày công</th>
+      <th rowspan="2">Phụ cấp</th><th rowspan="2">Thu nhập khác</th><th rowspan="2">Tổng số</th>
+      <th colspan="3">Các khoản khấu trừ bảo hiểm</th><th rowspan="2">Thuế TNCN</th><th rowspan="2">Trừ tạm ứng</th>
+      <th rowspan="2">Thu nhập tính thuế</th><th rowspan="2">Thực lĩnh</th><th rowspan="2">Ký nhận</th>
+    </tr>
+    <tr><th>BHXH</th><th>BHYT</th><th>BHTN</th></tr>
+    <tr class="letters"><th>A</th><th>B</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th><th>11</th><th>12</th><th>C</th></tr>
+  </thead>
+  <tbody>
+    {% for ln in lines %}
+    <tr>
+      <td class="code">{{ loop.index }}</td><td class="name">{{ ln.employee.full_name }}</td><td class="code">{{ ln.days_worked|qty }}</td>
+      <td class="num">{{ ln.salary_by_days|money }}</td><td class="num">{{ (ln.taxable_allowance + ln.nontaxable_allowance)|money0 }}</td>
+      <td class="num">{{ ln.other_income|money0 }}</td><td class="num">{{ ln.gross|money }}</td>
+      <td class="num">{{ ln.emp_bhxh|money0 }}</td><td class="num">{{ ln.emp_bhyt|money0 }}</td><td class="num">{{ ln.emp_bhtn|money0 }}</td>
+      <td class="num">{{ ln.pit|money0 }}</td><td class="num">{{ ln.advance_deduction|money0 }}</td><td class="num">{{ ln.assessable_income|money0 }}</td>
+      <td class="num b">{{ ln.net_pay|money }}</td><td></td>
+    </tr>
+    {% endfor %}
+    <tr class="summary">
+      <td></td><td class="label c">Cộng</td><td></td>
+      <td class="num">{{ t.salary_by_days|money }}</td><td class="num">{{ (t.taxable_allowance + t.nontaxable_allowance)|money0 }}</td>
+      <td class="num">{{ t.other_income|money0 }}</td><td class="num">{{ t.gross|money }}</td>
+      <td class="num">{{ t.emp_bhxh|money0 }}</td><td class="num">{{ t.emp_bhyt|money0 }}</td><td class="num">{{ t.emp_bhtn|money0 }}</td>
+      <td class="num">{{ t.pit|money0 }}</td><td class="num">{{ t.advance_deduction|money0 }}</td><td class="num">{{ t.assessable_income|money0 }}</td>
+      <td class="num">{{ t.net_pay|money }}</td><td></td>
+    </tr>
+  </tbody>
+</table>
+<div class="after-table">
+  <p>Tổng số tiền (viết bằng chữ): <span class="i">{{ t.net_pay|words }}</span></p>
+  <p class="small">Bảo hiểm, KPCĐ phần doanh nghiệp: BHXH {{ t.er_bhxh|money }} · BHYT {{ t.er_bhyt|money }} · BHTN {{ t.er_bhtn|money }} · KPCĐ {{ t.er_kpcd|money }}</p>
+  {{ parts.signatures(company, left="Người lập biểu", right="Giám đốc") }}
+</div>
+{% endblock %}

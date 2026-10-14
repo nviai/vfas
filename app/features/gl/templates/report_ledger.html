@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% import "gl/_macros.html" as gm with context %}
+{% set is_s03b = kind == "s03b" %}
+{% block title %}{{ _(report_title) }}{% endblock %}
+{% block content %}
+{{ ui.page_header(_(report_title), (_("Mẫu S03b-DNN · ") if is_s03b else "") ~ account_label, breadcrumbs=breadcrumbs, icon_name="book-open" if is_s03b else "book-text") }}
+
+{% set extra = {"account": account} %}
+{% if not is_s03b %}{% do extra.update({"partner_id": partner.id if partner else "", "bank_account_id": bank.id if bank else ""}) %}{% endif %}
+<div class="card mb-3 p-3 sm:px-5">
+  <form method="get" action="/reports/{{ 's03b' if is_s03b else 'ledger' }}" class="flex flex-wrap items-end gap-3">
+    {% for k, v in [("mode", period.mode), ("month", period.start.strftime("%Y-%m")), ("quarter", period.quarter or ""), ("year", period.year), ("start", period.start.isoformat()), ("end", period.end.isoformat())] %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+    {% if is_s03b %}
+      {{ ui.combobox("account", _("Tài khoản"), items=account_items, value=account, value_label=account_label, cls="w-full sm:w-80", input_cls="input-sm") }}
+    {% else %}
+      {{ ui.combobox("account", _("Tài khoản"), "/lookup/accounts", value=account, value_label=account_label, params={"postable": 0}, cls="w-full sm:w-72", input_cls="input-sm") }}
+      {{ ui.combobox("partner_id", _("Đối tượng"), "/lookup/partners", value=partner.id if partner else None, value_label=partner.label if partner else "", cls="w-full sm:w-64", input_cls="input-sm") }}
+      {% if banks %}
+        {% set bank_opts = [("", _("Tất cả"))] %}{% for b in banks %}{% do bank_opts.append((b.id|string, b.label)) %}{% endfor %}
+        {{ ui.select("bank_account_id", _("Tài khoản ngân hàng"), bank_opts, (bank.id|string) if bank else "", input_cls="input-sm w-56") }}
+      {% endif %}
+    {% endif %}
+    {{ ui.button(_("Xem"), "secondary", size="sm", icon_name="search") }}
+  </form>
+</div>
+{{ gm.report_bar(period, years, "/reports/" ~ ("s03b" if is_s03b else "ledger"), extra=extra) }}
+
+{% set od, oc = book.opening_split %}
+{% set cd, cc = book.closing_split %}
+<div class="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+  {{ ui.stat_card(_("Số dư đầu kỳ"), book.opening, hint=_("Dư Nợ") if book.opening >= 0 else _("Dư Có")) }}
+  {{ ui.stat_card(_("Phát sinh Nợ"), book.total_debit) }}
+  {{ ui.stat_card(_("Phát sinh Có"), book.total_credit) }}
+  {{ ui.stat_card(_("Số dư cuối kỳ"), book.closing, hint=_("Dư Nợ") if book.closing >= 0 else _("Dư Có")) }}
+</div>
+
+<div class="paper overflow-hidden">
+  <div class="table-wrap">
+    <div class="min-w-[1000px] p-6 sm:p-10">
+      {{ ui.official_header(company, "S03b-DNN" if is_s03b else None) }}
+      {{ ui.report_title("Sổ Cái" if is_s03b else "Sổ chi tiết tài khoản", period.label, extra="Tài khoản: " ~ book.account ~ " – " ~ book.account_name ~ (" – Đối tượng: " ~ partner.name if partner else "") ~ (" – " ~ bank.label if bank else "")) }}
+      <table class="table table-report">
+        <thead>
+          {% if is_s03b %}
+          <tr><th rowspan="2" class="w-24">Ngày, tháng ghi sổ</th><th colspan="2">Chứng từ</th><th rowspan="2">Diễn giải</th><th rowspan="2" class="w-16">STT dòng NKC</th><th rowspan="2" class="w-20">TK đối ứng</th><th colspan="2">Số tiền</th></tr>
+          <tr><th class="w-32">Số hiệu</th><th class="w-24">Ngày, tháng</th><th class="w-36">Nợ</th><th class="w-36">Có</th></tr>
+          {% else %}
+          <tr><th rowspan="2" class="w-24">Ngày, tháng ghi sổ</th><th colspan="2">Chứng từ</th><th rowspan="2">Diễn giải</th><th rowspan="2" class="w-20">TK đối ứng</th><th colspan="2">Số phát sinh</th><th colspan="2">Số dư</th></tr>
+          <tr><th class="w-32">Số hiệu</th><th class="w-24">Ngày, tháng</th><th class="w-32">Nợ</th><th class="w-32">Có</th><th class="w-32">Nợ</th><th class="w-32">Có</th></tr>
+          {% endif %}
+        </thead>
+        <tbody>
+          <tr class="font-semibold"><td></td><td></td><td></td><td>- Số dư đầu kỳ</td><td></td>
+            {% if is_s03b %}<td></td>{% endif %}
+            <td class="num">{{ od|money0 }}</td><td class="num">{{ oc|money0 }}</td>{% if not is_s03b %}<td></td><td></td>{% endif %}</tr>
+          {% for r in book.rows %}
+          <tr>
+            <td class="text-center tabular-nums">{{ r.date|date }}</td>
+            <td class="text-center">{% if r.entry_id %}<a href="/entries/{{ r.entry_id }}" class="tabular-nums underline-offset-2 hover:underline">{{ r.number }}</a>{% endif %}</td>
+            <td class="text-center tabular-nums">{{ (r.doc_date or r.date)|date }}</td>
+            <td>{{ r.description }}</td>
+            {% if is_s03b %}<td class="text-center tabular-nums opacity-70">{{ r.nkc_stt or "" }}</td>{% endif %}
+            <td class="text-center tabular-nums">{{ r.contra or "" }}</td>
+            <td class="num">{{ r.debit|money0 }}</td>
+            <td class="num">{{ r.credit|money0 }}</td>
+            {% if not is_s03b %}
+            <td class="num">{{ r.balance|money0 if r.balance > 0 }}</td>
+            <td class="num">{{ (-r.balance)|money0 if r.balance < 0 }}</td>
+            {% endif %}
+          </tr>
+          {% else %}
+          <tr><td colspan="{{ 8 if is_s03b else 9 }}" class="py-6 text-center text-fg-3">{{ _("Không có phát sinh trong kỳ") }}</td></tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr class="row-total"><td colspan="{{ 6 if is_s03b else 5 }}">- Cộng số phát sinh</td><td class="num">{{ book.total_debit|money }}</td><td class="num">{{ book.total_credit|money }}</td>{% if not is_s03b %}<td></td><td></td>{% endif %}</tr>
+          <tr class="row-total"><td colspan="{{ 6 if is_s03b else 5 }}">- Số dư cuối kỳ</td>{% if is_s03b %}<td class="num">{{ cd|money0 }}</td><td class="num">{{ cc|money0 }}</td>{% else %}<td></td><td></td><td class="num">{{ cd|money0 }}</td><td class="num">{{ cc|money0 }}</td>{% endif %}</tr>
+          {% if is_s03b %}<tr><td colspan="6">- Cộng lũy kế từ đầu năm</td><td class="num">{{ book.ytd_debit|money }}</td><td class="num">{{ book.ytd_credit|money }}</td></tr>{% endif %}
+        </tfoot>
+      </table>
+      {{ gm.signatures(company, left="Người ghi sổ") }}
+    </div>
+  </div>
+</div>
+{% endblock %}

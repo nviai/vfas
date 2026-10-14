@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("CCDC & chi phí trả trước") }}{% endblock %}
+{% block content %}
+{% call ui.page_header(_("CCDC & chi phí trả trước"), _("Theo dõi giá trị trên TK 242 và phân bổ dần vào chi phí theo tháng"), breadcrumbs=breadcrumbs, icon_name="package") %}
+  {{ ui.link_button(_("Phân bổ tháng"), "/prepaid/allocation", "secondary", icon_name="calendar") }}
+  {% if can("assets.create") %}{{ ui.link_button(_("Ghi tăng"), "/prepaid/new", "primary", icon_name="plus") }}{% endif %}
+{% endcall %}
+
+<div class="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+  {{ ui.stat_card(_("Tổng giá trị"), total, icon_name="package") }}
+  {{ ui.stat_card(_("Còn phải phân bổ"), total_remaining, icon_name="clock") }}
+</div>
+
+{{ ui.tabs([{"key": "active", "label": _("Đang phân bổ"), "href": "/prepaid"}, {"key": "all", "label": _("Tất cả"), "href": "/prepaid?show=all"}], show, cls="mb-4") }}
+
+<div class="card">
+  {% if not rows %}
+    {% call ui.empty_state(_("Chưa có công cụ dụng cụ hay khoản chi phí trả trước"), "package", _("Ghi tăng từ chứng từ có dòng Nợ TK 242, hoặc nhập khoản đang phân bổ dở khi bắt đầu dùng phần mềm.")) %}
+      {% if can("assets.create") %}{{ ui.link_button(_("Ghi tăng"), "/prepaid/new", "primary", icon_name="plus") }}{% endif %}
+    {% endcall %}
+  {% else %}
+  <div class="table-wrap">
+    <table class="table table-hover">
+      <thead><tr><th class="w-28">{{ _("Mã") }}</th><th>{{ _("Tên") }}</th><th class="w-28 max-lg:hidden">{{ _("Bắt đầu") }}</th><th class="num w-36">{{ _("Giá trị") }}</th><th class="num w-20 max-md:hidden">{{ _("Số tháng") }}</th><th class="num w-36 max-md:hidden">{{ _("Đã phân bổ") }}</th><th class="num w-36">{{ _("Còn lại") }}</th><th class="num w-32 max-lg:hidden">{{ _("Mỗi tháng") }}</th></tr></thead>
+      <tbody>
+        {% for r in rows %}{% set p = r.p %}
+        <tr class="is-link {{ 'is-muted' if not p.is_active }}">
+          <td><a href="/prepaid/{{ p.id }}" class="doc-no whitespace-nowrap hover:underline">{{ p.code }}</a></td>
+          <td class="max-w-0"><p class="truncate">{{ p.name }}</p><p class="truncate text-xs text-fg-3">{{ _(p.kind_label) }}{% if not p.is_active %} · {{ _("Đã dừng") }}{% endif %}</p></td>
+          <td class="max-lg:hidden tabular-nums text-fg-2">{{ p.start_month.strftime("%m/%Y") }}</td>
+          <td class="num">{{ p.amount|money }}</td>
+          <td class="num max-md:hidden">{{ p.months }}</td>
+          <td class="num max-md:hidden text-fg-2">{{ r.allocated|money0 }}</td>
+          <td class="num font-medium">{{ r.remaining|money }}</td>
+          <td class="num max-lg:hidden text-fg-2">{{ r.monthly|money0 }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

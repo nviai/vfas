@@ -1,0 +1,122 @@
+{#- Goods grid for purchase/sales documents: like ui.invoice_grid plus an
+    account column (revenue / debit account) and "Khấu trừ" (purchases).
+    Uses Alpine invoiceGrid; input names: lines-{i}-item_id, -description,
+    -unit, -quantity, -unit_price, -amount, -discount, -vat_rate,
+    -vat_amount, -account, -deductible. -#}
+{% import "macros.html" as ui with context %}
+
+{% macro _combo_cell(url, params, placeholder, init_value, init_label, on_select) -%}
+<div x-data='combobox({"url": {{ url|tojson }}, "params": {{ (params or {})|tojson }}})'
+     x-init="setInitial({{ init_value }}, {{ init_label }})" @click.outside="open = false"
+     @combobox-select.stop="{{ on_select }}">
+  <div class="relative">
+    <input x-ref="input" data-cell type="text" autocomplete="off" role="combobox" class="input input-sm pr-6"
+           placeholder="{{ placeholder }}" x-model="query" @focus="onFocus()" @input="onInput()" @keydown="onKey($event); keys($event, i)" @blur="onBlur()">
+    <div x-show="open && items.length" x-cloak data-fixed class="menu fixed z-[55] max-h-64 max-w-[min(28rem,90vw)] overflow-y-auto p-1" x-ref="list">
+      <template x-for="(it, j) in items" :key="String(it.value) + ':' + j">
+        <button type="button" tabindex="-1" :data-i="j" class="flex w-full flex-col rounded-md px-2.5 py-1.5 text-left" :class="j === active ? 'bg-surface-3' : ''"
+                @mousedown.prevent="select(it)" @mouseenter="active = j">
+          <span class="truncate text-[13px]" x-text="it.label"></span>
+          <span class="truncate text-xs text-fg-3" x-show="it.hint" x-text="it.hint"></span>
+        </button>
+      </template>
+    </div>
+  </div>
+</div>
+{%- endmacro %}
+
+{% macro trade_grid(cfg, lines, rates) -%}
+{%- set opts = {"prefix": "lines", "lines": lines or [], "priceField": cfg.price_field, "defaultVat": "10",
+                "showDiscount": cfg.show_discount, "vatRates": rates} -%}
+<div x-data='invoiceGrid({{ opts|tojson }})' class="min-w-0">
+  <input type="hidden" name="lines-count" :value="lines.length">
+  <div class="table-wrap rounded-lg border border-line">
+    <table class="table table-compact table-fixed min-w-[1320px]">
+      <colgroup>
+        <col class="w-10"><col class="w-44"><col class="min-w-48"><col class="w-36"><col class="w-16"><col class="w-20"><col class="w-28"><col class="w-32">
+        {% if cfg.show_discount %}<col class="w-24">{% endif %}<col class="w-24"><col class="w-28">
+        {% if cfg.deductible %}<col class="w-20">{% endif %}<col class="w-10">
+      </colgroup>
+      <thead>
+        <tr>
+          <th class="text-center">#</th>
+          <th>{{ _("Hàng hóa, dịch vụ") }}</th>
+          <th>{{ _("Diễn giải") }}</th>
+          <th>{{ _(cfg.account_label) }}</th>
+          <th>{{ _("ĐVT") }}</th>
+          <th class="num">{{ _("Số lượng") }}</th>
+          <th class="num">{{ _("Đơn giá") }}</th>
+          <th class="num">{{ _("Thành tiền") }}</th>
+          {% if cfg.show_discount %}<th class="num">{{ _("Chiết khấu") }}</th>{% endif %}
+          <th>{{ _("Thuế suất") }}</th>
+          <th class="num">{{ _("Tiền thuế") }}</th>
+          {% if cfg.deductible %}<th class="text-center" title="{{ _('Thuế GTGT đầu vào được khấu trừ') }}">{{ _("Khấu trừ") }}</th>{% endif %}
+          <th><span class="sr-only">{{ _("Xóa") }}</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <template x-for="(line, i) in lines" :key="line.uid">
+          <tr data-row class="group">
+            <td class="text-center text-xs text-fg-3 tabular-nums" x-text="i + 1"></td>
+            <td class="!px-1.5">
+              {{ _combo_cell("/lookup/items", {}, _("Mã hàng…"), "line.item_id", "line.item_label",
+                             "onItem(line, $event.detail); line.account = " ~ cfg.item_account_expr ~ "; line.account_label = line.account; line.account_tick = (line.account_tick || 0) + 1") }}
+              <input type="hidden" :name="name(i, 'item_id')" :value="line.item_id">
+            </td>
+            <td class="!px-1.5"><input data-cell type="text" class="input input-sm" x-model="line.description" :name="name(i, 'description')" @keydown="keys($event, i)"></td>
+            <td class="!px-1.5">
+              <template x-for="t in [line.account_tick || 0]" :key="t">
+                {{ _combo_cell("/lookup/accounts", cfg.account_params, _("TK…"), "line.account", "line.account_label",
+                               "line.account = $event.detail.value; line.account_label = $event.detail.label") }}
+              </template>
+              <input type="hidden" :name="name(i, 'account')" :value="line.account || ''">
+            </td>
+            <td class="!px-1.5"><input data-cell type="text" class="input input-sm" x-model="line.unit" :name="name(i, 'unit')" @keydown="keys($event, i)"></td>
+            <td class="!px-1.5"><input data-cell type="text" inputmode="decimal" class="input input-sm input-num"
+                 x-effect="qtyEffect($el, line.quantity)" @input="setQty(line, 'quantity', $event)" @blur="$el.value = fmtQty(line.quantity)" @keydown="keys($event, i)">
+                 <input type="hidden" :name="name(i, 'quantity')" :value="num(line.quantity)"></td>
+            <td class="!px-1.5"><input data-cell type="text" inputmode="decimal" class="input input-sm input-num"
+                 x-effect="qtyEffect($el, line.unit_price)" @input="setQty(line, 'unit_price', $event)" @blur="$el.value = fmtQty(line.unit_price)" @keydown="keys($event, i)">
+                 <input type="hidden" :name="name(i, 'unit_price')" :value="num(line.unit_price)"></td>
+            <td class="!px-1.5"><input data-cell type="text" inputmode="decimal" class="input input-sm input-num" :class="line.amountLocked && 'border-amber-400'"
+                 x-effect="moneyEffect($el, line.amount)" @change="setMoney(line, 'amount', $event)" @keydown="keys($event, i)">
+                 <input type="hidden" :name="name(i, 'amount')" :value="num(line.amount)"></td>
+            {% if cfg.show_discount %}
+            <td class="!px-1.5"><input data-cell type="text" inputmode="decimal" class="input input-sm input-num" placeholder="0"
+                 x-effect="moneyEffect($el, line.discount)" @change="setMoney(line, 'discount', $event)" @keydown="keys($event, i)">
+                 <input type="hidden" :name="name(i, 'discount')" :value="num(line.discount)"></td>
+            {% endif %}
+            <td class="!px-1.5"><select data-cell class="input input-sm" x-model="line.vat_rate" :name="name(i, 'vat_rate')" @change="recalc(line)" @keydown="keys($event, i)">
+                 <template x-for="r in rates" :key="r.value"><option :value="r.value" x-text="r.label" :selected="r.value === line.vat_rate"></option></template>
+               </select></td>
+            <td class="!px-1.5"><input data-cell type="text" inputmode="decimal" class="input input-sm input-num" :class="line.vatLocked && 'border-amber-400'"
+                 x-effect="moneyEffect($el, line.vat_amount)" @change="setMoney(line, 'vat_amount', $event)" @keydown="keys($event, i)">
+                 <input type="hidden" :name="name(i, 'vat_amount')" :value="num(line.vat_amount)"></td>
+            {% if cfg.deductible %}
+            <td class="text-center"><input type="checkbox" class="checkbox" x-model="line.deductible" x-init="if (line.deductible === undefined) line.deductible = true">
+                 <input type="hidden" :name="name(i, 'deductible')" :value="line.deductible === false ? 'false' : 'true'"></td>
+            {% endif %}
+            <td class="!px-1 text-center">
+              <button type="button" class="btn-ghost btn-xs btn-icon text-fg-3 opacity-60 hover:text-rose-600 group-hover:opacity-100" @click="removeLine(i)" aria-label="{{ _('Xóa dòng') }}" tabindex="-1">{{ ui.icon("trash", "size-3.5") }}</button>
+            </td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+  </div>
+  <div class="mt-3 flex flex-col-reverse gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <div>
+      <button type="button" class="btn-ghost btn-sm -ml-2 text-primary dark:text-brand-400" @click="addLine(); focusRow(lines.length - 1)">{{ ui.icon("plus") }}{{ _("Thêm dòng") }}</button>
+      <p class="mt-1 hidden max-w-md text-xs text-fg-3 sm:block">{{ _("Sửa tay Thành tiền / Tiền thuế khi cần làm tròn theo hóa đơn – ô được viền vàng. Bỏ trống TK để dùng TK mặc định của hàng hóa.") }}</p>
+    </div>
+    <dl class="w-full max-w-sm space-y-1.5 text-[13.5px]">
+      <div class="flex justify-between gap-4"><dt class="text-fg-3">{{ _("Cộng tiền hàng") }}</dt><dd class="tabular-nums" x-text="fmt(subtotal)"></dd></div>
+      {% if cfg.show_discount %}<div class="flex justify-between gap-4" x-show="discountTotal"><dt class="text-fg-3">{{ _("Chiết khấu") }}</dt><dd class="tabular-nums" x-text="'−' + fmt(discountTotal)"></dd></div>{% endif %}
+      <template x-for="g in vatGroups" :key="g.rate">
+        <div class="flex justify-between gap-4 text-[13px]"><dt class="text-fg-3"><span>{{ _("Thuế GTGT") }}</span> <span x-text="rateLabel(g.rate)"></span></dt><dd class="tabular-nums" x-text="fmt(g.vat)"></dd></div>
+      </template>
+      <div class="flex justify-between gap-4 border-t border-line pt-2 text-[15px] font-semibold"><dt>{{ _("Tổng thanh toán") }}</dt><dd class="tabular-nums" x-text="fmt(total)"></dd></div>
+    </dl>
+  </div>
+</div>
+{%- endmacro %}

@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Quyết toán thuế TNDN") }} {{ year }}{% endblock %}
+{% block content %}
+{% set crumbs = [] %}{% for b in breadcrumbs %}{% do crumbs.append((_(b[0]), b[1])) %}{% endfor %}
+{% set editable = not final and can("vat.manage") %}
+{% call ui.page_header(_("Bảng tính thuế TNDN năm {y}", y=year), _("Tham khảo chỉ tiêu chính của tờ khai quyết toán 03/TNDN – lợi nhuận lấy từ sổ, không gồm bút toán kết chuyển."),
+                       breadcrumbs=crumbs, icon_name="landmark", badge=(ui.badge(_("Đã chốt"), "green", dot=True) if final else none)) %}
+  {% call ui.dropdown(_("Năm {y}", y=year), icon_name="calendar", width="w-36") %}
+    {% for y in years %}{{ ui.menu_item(_("Năm {y}", y=y), "/vat/cit?year=" ~ y) }}{% endfor %}
+  {% endcall %}
+  {% if can("vat.export") %}{{ ui.report_toolbar(pdf_href="/vat/cit.pdf?year=" ~ year, xlsx_href="/vat/cit.xlsx?year=" ~ year) }}{% endif %}
+{% endcall %}
+
+{% set pl = v._pl %}
+<div class="mb-5 grid grid-cols-2 gap-3 xl:grid-cols-4">
+  {{ ui.stat_card(_("Doanh thu, thu nhập"), pl.total_revenue, icon_name="trending-up") }}
+  {{ ui.stat_card(_("Lợi nhuận kế toán trước thuế"), v.A1, icon_name="scale") }}
+  {{ ui.stat_card(_("Thuế TNDN phải nộp"), v.D, icon_name="landmark") }}
+  {{ ui.stat_card(_("Còn phải nộp / (nộp thừa)"), v.F, icon_name="wallet") }}
+</div>
+
+<form method="post" action="/vat/cit">
+  {{ ui.csrf_field() }}
+  <input type="hidden" name="year" value="{{ year }}">
+  <div class="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_20rem]">
+    {% call ui.card(flush=True) %}
+    <div class="table-wrap">
+      <table class="table table-compact">
+        <thead><tr><th class="w-16 text-center">{{ _("Mã") }}</th><th>{{ _("Chỉ tiêu") }}</th><th class="num w-52">{{ _("Số tiền") }}</th></tr></thead>
+        <tbody>
+          {% for code, label in labels.items() %}
+          <tr class="{{ 'bg-surface-2/60 font-semibold' if code in ('A1', 'B12', 'C4', 'D', 'F') }}">
+            <td class="text-center text-xs text-fg-3">{{ code }}</td>
+            <td>{{ _(label) }}
+              {% if code == "C7" %}<p class="text-xs font-normal text-fg-3">{{ _("Doanh thu năm trước {v} đ → thuế suất {r}% (Luật 67/2025/QH15)", v=v._prev_revenue|money, r=v._auto_rate) }}</p>{% endif %}
+              {% if code == "E" %}<p class="text-xs font-normal text-fg-3">{{ _("Phát sinh Nợ TK 3334 đối ứng tiền mặt, tiền gửi trong năm") }}</p>{% endif %}
+            </td>
+            <td class="num">
+              {% if code in ("B1", "B8", "C2", "C3", "C5", "C9") and editable %}
+                {% set mv = v.get(code) or 0 %}
+                <div x-data='moneyInput({{ mv }})'>
+                  <input type="text" inputmode="decimal" value="{{ mv|money }}" class="input input-sm input-num" aria-label="{{ code }}" @input="onInput($event)" @blur="onBlur($event)">
+                  <input type="hidden" name="{{ code }}" :value="value === null ? '' : value" value="{{ mv }}">
+                </div>
+              {% elif code == "C7" and editable %}
+                <select name="rate" class="input input-sm">
+                  <option value="">{{ _("Tự động ({r}%)", r=v._auto_rate) }}</option>
+                  {% for r in (15, 17, 20) %}<option value="{{ r }}" {{ "selected" if v._rate_override == r }}>{{ r }}%</option>{% endfor %}
+                </select>
+              {% elif code == "C7" %}<span class="tabular-nums">{{ v.C7 }}%</span>
+              {% else %}<span class="tabular-nums {{ 'amount-neg' if v.get(code, 0) < 0 }}">{{ v.get(code, 0)|money }}</span>{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endcall %}
+    <aside class="space-y-5">
+      {% call ui.card(_("Kết quả kinh doanh {y}", y=year)) %}
+      <dl class="space-y-1.5 text-[13.5px]">
+        {% for k, label in [("revenue", "Doanh thu bán hàng, dịch vụ (511)"), ("financial_income", "Doanh thu tài chính (515)"), ("other_income", "Thu nhập khác (711)"), ("cogs", "Giá vốn (632)"), ("financial_cost", "Chi phí tài chính (635)"), ("operating_cost", "Chi phí quản lý kinh doanh (642)"), ("other_cost", "Chi phí khác (811)")] %}
+        <div class="flex justify-between gap-3"><dt class="text-fg-3">{{ _(label) }}</dt><dd class="tabular-nums">{{ pl[k]|money }}</dd></div>
+        {% endfor %}
+      </dl>
+      {% endcall %}
+      {% if editable %}
+      <section class="card flex flex-col gap-2 p-5">
+        {{ ui.button(_("Lưu"), "secondary", name="action", value="save", icon_name="save") }}
+        {{ ui.button(_("Chốt"), "primary", name="action", value="final", icon_name="lock", confirm=_("Chốt bảng tính thuế TNDN năm {y}?", y=year)) }}
+      </section>
+      {% elif final and can("vat.manage") %}
+      <section class="card p-5"><button type="submit" form="cit-reopen" class="btn-secondary w-full">{{ ui.icon("unlock") }}<span>{{ _("Mở lại để sửa") }}</span></button></section>
+      {% endif %}
+      {{ ui.alert(_("Các khoản điều chỉnh (chi phí không được trừ, thu nhập miễn thuế, lỗ chuyển…) nhập tay theo hồ sơ của doanh nghiệp. Tờ khai 03/TNDN và các phụ lục lập trên HTKK."), "info") }}
+    </aside>
+  </div>
+</form>
+<form id="cit-reopen" method="post" action="/vat/cit/reopen">{{ ui.csrf_field() }}<input type="hidden" name="year" value="{{ year }}"></form>
+{% endblock %}

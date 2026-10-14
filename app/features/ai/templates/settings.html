@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Cài đặt trợ lý AI") }}{% endblock %}
+{% block content %}
+{% set badge %}{% if cfg.ready %}{{ ui.badge(_("Đang hoạt động"), "green", dot=True) }}{% elif cfg.enabled %}{{ ui.badge(_("Chưa cấu hình đủ"), "amber", dot=True) }}{% else %}{{ ui.badge(_("Đang tắt"), "gray") }}{% endif %}{% endset %}
+{% call ui.page_header(_("Trợ lý AI"), _("Kết nối mô hình ngôn ngữ qua giao thức OpenAI Chat Completions – dùng được Claude, OpenAI, OpenRouter, Ollama hoặc máy chủ riêng."), breadcrumbs=breadcrumbs, icon_name="sparkles", badge=badge) %}
+  {% if cfg.ready %}{{ ui.link_button(_("Mở trợ lý"), "/ai", "secondary", icon_name="sparkles") }}{% endif %}
+{% endcall %}
+
+{% if errors.form %}{{ ui.alert(_(errors.form), "error", cls="mb-5") }}{% endif %}
+
+<div class="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_20rem]">
+<form method="post" action="/settings/ai" class="card" x-data='{ preset: {{ (form.get("preset") or cfg.preset)|tojson }}, presets: {{ presets_json|tojson }} }'>
+  {{ ui.csrf_field() }}
+  <div class="card-body divide-y divide-line">
+    {% call ui.form_section(_("Trạng thái"), _("Khi bật, mọi thành viên có quyền dùng trợ lý sẽ thấy nút Trợ lý AI trên thanh công cụ (phím tắt Ctrl+J).")) %}
+      {{ ui.switch("enabled", _("Bật trợ lý AI cho công ty"), cfg.enabled, hint=_("Trợ lý chỉ đọc số liệu theo quyền của từng người và chỉ lập chứng từ nháp.")) }}
+    {% endcall %}
+
+    {% call ui.form_section(_("Nhà cung cấp"), _("Giao thức chuẩn OpenAI: POST {địa chỉ}/chat/completions với tools và stream.")) %}
+      {{ ui.select("preset", _("Nhà cung cấp"), preset_options, form.get("preset") or cfg.preset, attrs='x-model="preset"') }}
+      {{ ui.input("base_url", _("Địa chỉ API (base URL)"), form.get("base_url", raw.get("base_url", "")), input_cls="font-mono text-[13px]",
+                  hint=_("Để trống dùng địa chỉ mặc định của nhà cung cấp"), attrs=':placeholder="presets[preset].base_url || \'https://…/v1\'"') }}
+      {{ ui.input("model", _("Model"), form.get("model", raw.get("model", "")), input_cls="font-mono text-[13px]",
+                  hint=_("Ví dụ: claude-opus-5-5, hoặc tên model trên máy chủ Ollama/OpenRouter"), attrs=':placeholder="presets[preset].model || \'tên model\'"') }}
+      <div>
+        {{ ui.password_input("api_key", _("API key"), required=False, autocomplete="off",
+                             hint=(_("Đã lưu khóa (đã mã hóa). Để trống để giữ nguyên.") if cfg.has_key else _("Khóa được mã hóa khi lưu, không hiển thị lại."))) }}
+        {% if cfg.has_key %}{{ ui.checkbox("clear_key", _("Xóa API key đã lưu"), False, cls="mt-2") }}{% endif %}
+      </div>
+    {% endcall %}
+
+    {% call ui.form_section(_("Giới hạn"), _("Kiểm soát chi phí và độ ổn định của câu trả lời.")) %}
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {{ ui.input("temperature", _("Nhiệt độ"), form.get("temperature", cfg.temperature), type="number", input_cls="tabular-nums",
+                    attrs='step="0.1" min="0" max="2"', hint=_("0–2; thấp = ổn định")) }}
+        {{ ui.input("max_rounds", _("Số vòng tối đa"), form.get("max_rounds", cfg.max_rounds), type="number", input_cls="tabular-nums",
+                    attrs='min="1" max="20"', hint=_("Vòng gọi công cụ")) }}
+        {{ ui.input("daily_limit", _("Lượt/người/ngày"), form.get("daily_limit", cfg.daily_limit), type="number", input_cls="tabular-nums",
+                    attrs='min="0"', hint=_("0 = không giới hạn")) }}
+      </div>
+      {{ ui.checkbox("allow_payroll_tools", _("Cho trợ lý đọc dữ liệu lương"), cfg.allow_payroll_tools,
+                     hint=_("Tắt mặc định: dữ liệu lương là dữ liệu cá nhân, sẽ được gửi tới nhà cung cấp AI. Chỉ bật khi đã có đồng ý của người lao động hoặc dùng AI tự host.")) }}
+    {% endcall %}
+  </div>
+  <div class="card-footer flex flex-wrap items-center justify-between gap-2">
+    <div class="flex items-center gap-2">
+      {% if cfg.ready %}
+      <button type="button" class="btn-secondary btn-sm" hx-post="/settings/ai/test" hx-target="#ai-test-result" hx-swap="innerHTML"
+              hx-indicator="#ai-test-spin">
+        <svg id="ai-test-spin" class="htmx-indicator size-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+        {{ ui.icon("plug", "size-3.5") }}<span>{{ _("Kiểm tra kết nối") }}</span>
+      </button>
+      {% endif %}
+    </div>
+    {{ ui.button(_("Lưu cấu hình"), "primary", icon_name="check", hotkey="save", kbd_hint="Ctrl+S") }}
+  </div>
+  <div id="ai-test-result" class="px-5 pb-5 empty:hidden"></div>
+</form>
+
+<div class="space-y-5">
+  {% call ui.card(_("Hôm nay")) %}
+    <p class="text-2xl font-semibold tabular-nums">{{ usage_today }}<span class="text-[13px] font-normal text-fg-3"> / {{ cfg.daily_limit if cfg.daily_limit else "∞" }}</span></p>
+    <p class="mt-1 text-[13px] text-fg-3">{{ _("lượt hỏi của bạn") }}</p>
+  {% endcall %}
+  {% call ui.card(_("An toàn dữ liệu"), icon_name="shield") %}
+    <ul class="space-y-2.5 text-[13px] text-fg-2">
+      <li class="flex gap-2">{{ ui.icon("check", "mt-0.5 size-3.5 shrink-0 text-primary") }}<span>{{ _("Trợ lý dùng đúng quyền của người hỏi: thủ quỹ chỉ xem được quỹ, người chỉ xem không lập được chứng từ.") }}</span></li>
+      <li class="flex gap-2">{{ ui.icon("check", "mt-0.5 size-3.5 shrink-0 text-primary") }}<span>{{ _("Mọi chứng từ do AI lập ở trạng thái nháp và được ghi nhật ký với kênh “Trợ lý AI”.") }}</span></li>
+      <li class="flex gap-2">{{ ui.icon("check", "mt-0.5 size-3.5 shrink-0 text-primary") }}<span>{{ _("Số liệu gửi tới nhà cung cấp AI chỉ gồm câu hỏi và kết quả tra cứu cần thiết. Chọn nhà cung cấp phù hợp chính sách dữ liệu của công ty.") }}</span></li>
+    </ul>
+  {% endcall %}
+</div>
+</div>
+{% endblock %}

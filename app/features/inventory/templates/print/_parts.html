@@ -1,0 +1,27 @@
+{% macro doc_header(company, form_code, issued, unit_label="Bộ phận") -%}
+<table class="doc-head">
+  <tr>
+    <td class="left">
+      <p><span class="b">Đơn vị:</span> {{ company.name }}</p>
+      <p><span class="b">Địa chỉ:</span> {{ company.address }}</p>
+      {% if company.tax_code %}<p><span class="b">Mã số thuế:</span> {{ company.tax_code }}</p>{% endif %}
+    </td>
+    <td class="right">
+      {% if form_code %}<p class="b">Mẫu số {{ form_code }}</p><p class="issued">{{ issued }}</p>{% endif %}
+    </td>
+  </tr>
+</table>
+{%- endmacro %}
+
+{% macro page_no(n) -%}{% if n %}{{ '%02d' % n }}{% else %}..{% endif %}{%- endmacro %}
+
+{% macro book_signatures(company, roles=None) -%}
+{% set roles = roles or [("Người ghi sổ", "(Ký, họ tên)", company.preparer), ("Kế toán trưởng", "(Ký, họ tên)", company.chief_accountant), ("Người đại diện theo pháp luật", "(Ký, họ tên, đóng dấu)", company.legal_rep)] %}
+<table class="signatures">
+  <tr>{% for _r in roles %}<td>{% if loop.last %}<p class="i" style="padding-bottom:1mm;white-space:nowrap;text-align:right">Ngày ..... tháng ..... năm ..........</p>{% endif %}</td>{% endfor %}</tr>
+  <tr>{% for role, hint, name in roles %}<td style="width:{{ (100 / roles|length)|round(1) }}%"><p class="role">{{ role }}</p><p class="hint">{{ hint }}</p></td>{% endfor %}</tr>
+  <tr>{% for role, hint, name in roles %}<td class="name">{{ name or "" }}</td>{% endfor %}</tr>
+</table>
+{%- endmacro %}
+
+{% macro qty(v) -%}{{ v|qty if v else "" }}{%- endmacro %}

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Hàng hóa, dịch vụ") }}{% endblock %}
+{% block content %}
+{% set crumbs = [] %}{% for b in breadcrumbs %}{% do crumbs.append((_(b[0]), b[1])) %}{% endfor %}
+{% call ui.page_header(_("Hàng hóa, dịch vụ"), _("Vật tư, hàng hóa, thành phẩm và dịch vụ dùng trên chứng từ mua bán"), breadcrumbs=crumbs, icon_name="package") %}
+  {{ ui.link_button(_("Xuất Excel"), "/items/export.xlsx", "secondary", icon_name="file-spreadsheet", cls="max-sm:hidden") }}
+  {% if can("catalog.create") %}
+    {{ ui.link_button(_("Nhập Excel"), "/items/import", "secondary", icon_name="upload", cls="max-sm:hidden") }}
+    {% call ui.dropdown(_("Thêm mới"), icon_name="plus", variant="primary", size=None) %}
+      {% for k, label in kinds.items() %}{{ ui.menu_item(_(label), "/items/new?kind=" ~ k, {"service": "briefcase", "goods": "package", "material": "boxes", "tool": "sliders-horizontal", "product": "package"}.get(k, "package")) }}{% endfor %}
+    {% endcall %}
+  {% endif %}
+{% endcall %}
+
+{% set tab_items = [{"key": "", "label": _("Tất cả"), "href": "/items"}] %}{% for k, v in kinds.items() %}{% do tab_items.append({"key": k, "label": _(v), "href": "/items?kind=" ~ k}) %}{% endfor %}
+{{ ui.tabs(tab_items, kind, cls="mb-4") }}
+
+<div class="card">
+  <div class="border-b border-line p-3 sm:px-5">
+    {% call ui.filter_bar("/items", reset_href="/items", hx_target="#item-results") %}
+      <input type="hidden" name="kind" value="{{ kind }}">
+      <div class="w-full sm:w-72">{{ ui.input("q", None, q, "search", placeholder=_("Mã hoặc tên…"), prefix=ui.icon("search"), input_cls="input-sm") }}</div>
+      {{ ui.select("show", None, [("active", _("Đang dùng")), ("all", _("Tất cả"))], show, input_cls="input-sm w-36") }}
+    {% endcall %}
+  </div>
+  <div id="item-results">{% include "items/_rows.html" %}</div>
+</div>
+{% endblock %}

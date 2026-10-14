@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% set editing = emp is not none %}
+{% block title %}{{ emp.full_name if editing else _("Thêm nhân viên") }}{% endblock %}
+{% block content %}
+{{ ui.page_header(emp.full_name if editing else _("Thêm nhân viên"), (emp.code ~ " · " ~ _(emp.contract_label)) if editing else _("Mã để trống sẽ tự cấp NV0001…"), breadcrumbs=breadcrumbs, back="/payroll/employees", icon_name="user", badge=(ui.status_badge("active" if emp.is_active else "inactive") if editing else None)) }}
+{% if errors.get("_") %}{{ ui.alert(_(errors["_"]), "error", cls="mb-5") }}{% endif %}
+
+{% if editing and summary %}
+<div class="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+  {{ ui.stat_card(_("Thu nhập {y}", y=year), summary.gross, icon_name="banknote") }}
+  {{ ui.stat_card(_("BH bắt buộc NLĐ"), summary.emp_insurance, icon_name="shield") }}
+  {{ ui.stat_card(_("Thuế TNCN đã khấu trừ"), summary.pit, icon_name="percent") }}
+  {{ ui.stat_card(_("Thực lĩnh"), summary.net_pay, icon_name="wallet") }}
+</div>
+{% endif %}
+
+{% set readonly = not can("payroll.manage") %}
+<form method="post" action="{{ '/payroll/employees/' ~ emp.id if editing else '/payroll/employees' }}" class="card" x-data="docForm()" @keydown="keys($event)">
+  {{ ui.csrf_field() }}
+  <fieldset {{ "disabled" if readonly }} class="card-body divide-y divide-line">
+    {% call ui.form_section(_("Thông tin cá nhân")) %}
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-[10rem_minmax(0,1fr)]">
+        {{ ui.input("code", _("Mã nhân viên"), form.get("code", ""), input_cls="tabular-nums") }}
+        {{ ui.input("full_name", _("Họ và tên"), form.get("full_name", ""), required=True, autofocus=not editing) }}
+      </div>
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {{ ui.input("tax_code", _("Mã số thuế cá nhân"), form.get("tax_code", ""), input_cls="tabular-nums") }}
+        {{ ui.input("id_number", _("Số CCCD"), form.get("id_number", ""), input_cls="tabular-nums") }}
+        {{ ui.input("phone", _("Điện thoại"), form.get("phone", ""), type="tel") }}
+        {{ ui.input("email", _("Email"), form.get("email", ""), type="email") }}
+      </div>
+      {{ ui.input("address", _("Địa chỉ"), form.get("address", "")) }}
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {{ ui.input("bank_account", _("Số tài khoản nhận lương"), form.get("bank_account", ""), input_cls="tabular-nums") }}
+        {{ ui.input("bank_name", _("Ngân hàng"), form.get("bank_name", "")) }}
+      </div>
+    {% endcall %}
+    {% call ui.form_section(_("Công việc, hợp đồng"), _("HĐLĐ dưới 3 tháng, thử việc, cộng tác viên: khấu trừ 10% khi thu nhập từ ngưỡng (2 triệu; 5 triệu từ 01/7/2026). Người không cư trú: 20%.")) %}
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {{ ui.input("department", _("Bộ phận"), form.get("department", "")) }}
+        {{ ui.input("position", _("Chức vụ"), form.get("position", "")) }}
+        {{ ui.select("contract_type", _("Loại hợp đồng"), contract_types, form.get("contract_type")) }}
+        {{ ui.select("is_resident", _("Cư trú"), [("1", _("Cá nhân cư trú")), ("0", _("Không cư trú"))], "1" if form.get("is_resident") in (True, "1", None) else "0") }}
+        {{ ui.date_input("start_date", _("Ngày vào làm"), form.get("start_date")) }}
+        {{ ui.date_input("end_date", _("Ngày nghỉ việc"), form.get("end_date")) }}
+      </div>
+    {% endcall %}
+    {% call ui.form_section(_("Lương, bảo hiểm, thuế"), _("Lương đóng bảo hiểm để trống = không tham gia BH bắt buộc. Trần đóng tự áp theo tham số.")) %}
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {{ ui.money_input("base_salary", _("Lương theo hợp đồng / tháng"), form.get("base_salary") or none) }}
+        {{ ui.money_input("insurance_salary", _("Lương đóng bảo hiểm"), form.get("insurance_salary") or none) }}
+        {{ ui.money_input("taxable_allowance", _("Phụ cấp chịu thuế / tháng"), form.get("taxable_allowance") or none) }}
+        {{ ui.money_input("nontaxable_allowance", _("Phụ cấp không chịu thuế / tháng"), form.get("nontaxable_allowance") or none, hint=_("Ăn trưa, điện thoại… trong mức miễn thuế")) }}
+        {{ ui.input("dependents", _("Số người phụ thuộc"), form.get("dependents", 0), type="number", input_cls="tabular-nums") }}
+        {{ ui.select("expense_account", _("TK chi phí lương"), expense_accounts, form.get("expense_account")) }}
+      </div>
+      {% if editing %}{{ ui.select("is_active", _("Trạng thái"), [("1", _("Đang làm việc")), ("0", _("Đã nghỉ"))], "1" if form.get("is_active") in (True, "1") else "0", cls="sm:w-64") }}{% endif %}
+      {{ ui.textarea("note", _("Ghi chú"), form.get("note", ""), rows=2) }}
+    {% endcall %}
+  </fieldset>
+  {% if not readonly %}
+  <div class="card-footer flex justify-end gap-2">
+    {{ ui.link_button(_("Hủy"), "/payroll/employees", "secondary") }}
+    {{ ui.button(_("Lưu"), "primary", icon_name="check", hotkey="save", kbd_hint="Ctrl+S") }}
+  </div>
+  {% endif %}
+</form>
+{% endblock %}

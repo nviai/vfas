@@ -1,0 +1,47 @@
+{% import "macros.html" as ui with context %}
+{% macro page_url(p) %}/items?page={{ p }}&q={{ q|urlencode }}&kind={{ kind }}&show={{ show }}{% endmacro %}
+{% if not items %}
+  {% call ui.empty_state(_("Chưa có hàng hóa, dịch vụ nào") if not q else _("Không tìm thấy"), "package", _("Thêm từng mã, nhập từ Excel hoặc để phần mềm tự khớp khi nhập hóa đơn điện tử.")) %}
+    {% if can("catalog.create") %}{{ ui.link_button(_("Thêm mới"), "/items/new", "primary", icon_name="plus") }}{% endif %}
+  {% endcall %}
+{% else %}
+<div class="table-wrap max-md:hidden">
+  <table class="table table-hover">
+    <thead><tr>
+      <th class="w-32">{{ _("Mã") }}</th><th>{{ _("Tên") }}</th><th class="w-24">{{ _("ĐVT") }}</th>
+      <th class="w-36">{{ _("Loại") }}</th><th class="w-24">{{ _("Thuế suất") }}</th>
+      <th class="num w-36 max-lg:hidden">{{ _("Giá bán") }}</th><th class="num w-36 max-lg:hidden">{{ _("Giá mua") }}</th>
+      <th class="w-40 max-xl:hidden">{{ _("Tài khoản") }}</th>
+    </tr></thead>
+    <tbody>
+      {% for it in items %}
+      <tr class="is-link {{ 'is-muted' if not it.is_active }}">
+        <td><a href="/items/{{ it.id }}" class="doc-no hover:underline">{{ it.code }}</a></td>
+        <td class="max-w-0"><p class="truncate text-fg">{{ it.name }}</p></td>
+        <td class="text-fg-2">{{ it.unit or "–" }}</td>
+        <td>{{ ui.badge(_(kinds[it.kind]), {"service": "blue", "goods": "brand", "material": "violet", "tool": "amber", "product": "green"}.get(it.kind, "gray")) }}</td>
+        <td class="tabular-nums">{{ vat_rates.get(it.vat_rate, it.vat_rate) }}</td>
+        <td class="num max-lg:hidden">{{ it.sale_price|qty(2) or "–" }}</td>
+        <td class="num max-lg:hidden">{{ it.purchase_price|qty(2) or "–" }}</td>
+        <td class="max-xl:hidden text-xs text-fg-3 tabular-nums">{% if it.stock_account %}{{ _("Kho") }} {{ it.stock_account }} · {% endif %}{{ _("DT") }} {{ it.revenue_account or "–" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<ul class="divide-y divide-line md:hidden">
+  {% for it in items %}
+  <li><a href="/items/{{ it.id }}" class="flex items-center gap-3 px-4 py-3 active:bg-surface-2">
+    <div class="min-w-0 flex-1"><p class="truncate text-[14px] font-medium text-fg">{{ it.name }}</p><p class="text-xs text-fg-3">{{ it.code }} · {{ _(kinds[it.kind]) }}{% if it.unit %} · {{ it.unit }}{% endif %}</p></div>
+    <span class="shrink-0 text-[13px] tabular-nums text-fg-2">{{ it.sale_price|qty(2) }}</span>
+  </a></li>
+  {% endfor %}
+</ul>
+<div class="flex items-center justify-between border-t border-line px-4 py-3 text-[13px] sm:px-5">
+  <span class="text-fg-3">{{ _("Trang {page}", page=page) }}</span>
+  <div class="flex gap-1">
+    {% if page > 1 %}{{ ui.link_button(_("Trang trước"), page_url(page - 1), "secondary", size="sm", icon_name="chevron-left") }}{% endif %}
+    {% if has_next %}{{ ui.link_button(_("Trang sau"), page_url(page + 1), "secondary", size="sm", icon_right="chevron-right") }}{% endif %}
+  </div>
+</div>
+{% endif %}

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<HDon><DLHDon><TTChung><KHMSHDon>1</KHMSHDon><KHHDon>C26TXX</KHHDon><SHDon>99</SHDon><NLap>2026-03-01</NLap></TTChung>
+<NDHDon><NBan><Ten>A</Ten><MST>0100000001</MST></NBan><NMua><Ten>B</Ten><MST>0100000002</MST></NMua>
+<DSHHDVu><HHDVu><TChat>1</TChat><THHDVu>X</THHDVu><ThTien>1000</ThTien><TSuat>10%</TSuat></HHDVu></DSHHDVu>
+<TToan><TgTCThue>1000</TgTCThue><TgTThue>100</TgTThue><TgTTTBSo>1100</TgTTTBSo></TToan></NDHDon></DLHDon></HDon>

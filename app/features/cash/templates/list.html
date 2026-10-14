@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Phiếu thu, chi") }}{% endblock %}
+{% block content %}
+{% call ui.page_header(_("Phiếu thu, chi"), _("Quỹ tiền mặt (TK 1111) · tồn hiện tại {v} đ", v=balance|money), breadcrumbs=breadcrumbs, icon_name="wallet") %}
+  {% if can("import.manage") or can("cash.manage") %}
+  {% call ui.dropdown(icon_name="ellipsis", aria_label=_("Thao tác khác"), width="w-60") %}
+    {{ ui.menu_item(_("Sổ quỹ tiền mặt"), "/cash/book", "book-open") }}
+    {{ ui.menu_item(_("Kiểm kê quỹ"), "/cash/counts", "calculator") }}
+    {% if can("cash.manage") %}{{ ui.menu_item(_("Mục đích thu, chi"), "/cash/purposes", "tags") }}{% endif %}
+    {% if can("import.manage") %}{{ ui.menu_sep() }}{{ ui.menu_item(_("Nhập sổ quỹ từ Excel"), "/cash/import", "upload") }}{% endif %}
+  {% endcall %}
+  {% endif %}
+  {% if can("cash.create") %}
+    {{ ui.link_button(_("Phiếu thu"), "/cash/new?kind=PT", "secondary", icon_name="circle-arrow-down", kbd_hint="Alt+T") }}
+    {{ ui.link_button(_("Phiếu chi"), "/cash/new?kind=PC", "primary", icon_name="circle-arrow-up", kbd_hint="Alt+C") }}
+  {% endif %}
+{% endcall %}
+
+<div class="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+  {{ ui.stat_card(_("Tồn quỹ hiện tại"), balance, icon_name="wallet", hint=_("Đến hết hôm nay"), href="/cash/book") }}
+  {{ ui.stat_card(_("Đã thu (theo bộ lọc)"), sums.get("PT", 0), icon_name="circle-arrow-down", hint=_("Phiếu thu đã ghi sổ")) }}
+  {{ ui.stat_card(_("Đã chi (theo bộ lọc)"), sums.get("PC", 0), icon_name="circle-arrow-up", hint=_("Phiếu chi đã ghi sổ")) }}
+</div>
+
+{% set qbase = "/cash?" ~ base_q ~ ("&" if base_q else "") %}
+{{ ui.tabs([
+  {"key": "", "label": _("Tất cả"), "href": "/cash?" ~ base_q, "count": counts.get("all", 0)},
+  {"key": "draft", "label": _("Nháp"), "href": qbase ~ "status=draft", "count": counts.get("draft", 0)},
+  {"key": "posted", "label": _("Đã ghi sổ"), "href": qbase ~ "status=posted", "count": counts.get("posted", 0)},
+  {"key": "cancelled", "label": _("Đã hủy"), "href": qbase ~ "status=cancelled", "count": counts.get("cancelled", 0)},
+], filters.status, cls="mb-4") }}
+
+<div class="card">
+  <div class="border-b border-line p-3 sm:px-5">
+    {% call ui.filter_bar("/cash", reset_href="/cash", hx_target="#cash-results") %}
+      <input type="hidden" name="status" value="{{ filters.status }}">
+      <div class="w-full sm:w-64">
+        <label class="sr-only" for="f-q">{{ _("Tìm") }}</label>
+        {{ ui.input("q", None, filters.q, "search", placeholder=_("Số phiếu, lý do, người nộp/nhận…"), prefix=ui.icon("search"), input_cls="input-sm") }}
+      </div>
+      {{ ui.select("kind", None, [("PT", _("Phiếu thu")), ("PC", _("Phiếu chi"))], filters.kind, placeholder=_("Thu và chi"), input_cls="input-sm w-36") }}
+      <div class="flex items-center gap-1.5">
+        <input type="date" name="start" value="{{ filters.start }}" class="input input-sm w-36 tabular-nums" aria-label="{{ _('Từ ngày') }}">
+        <span class="text-fg-3">–</span>
+        <input type="date" name="end" value="{{ filters.end }}" class="input input-sm w-36 tabular-nums" aria-label="{{ _('Đến ngày') }}">
+      </div>
+      <input type="text" name="account" value="{{ filters.account }}" class="input input-sm w-28 tabular-nums" placeholder="{{ _('TK đối ứng') }}" aria-label="{{ _('TK đối ứng') }}">
+    {% endcall %}
+  </div>
+  <div id="cash-results">{% include "cash/_results.html" %}</div>
+</div>
+{% endblock %}

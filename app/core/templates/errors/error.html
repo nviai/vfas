@@ -1,0 +1,19 @@
+{% extends "base.html" if (user is defined and user) else "auth_base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+{%- set code = status|default(500)|int -%}
+{%- set ic = {404: "search", 403: "lock", 401: "lock", 422: "triangle-alert", 429: "clock"}.get(code, "circle-alert") -%}
+<div class="mx-auto flex max-w-md flex-col items-center py-16 text-center sm:py-24">
+  <span class="relative mb-6 flex size-14 items-center justify-center rounded-2xl border border-line bg-surface text-fg-2 shadow-card dark:shadow-none">
+    {{ ui.icon(ic, "size-6") }}
+  </span>
+  <p class="text-sm font-semibold tracking-wide text-primary tabular-nums dark:text-brand-400">{{ _("Lỗi") }} {{ code }}</p>
+  <h1 class="mt-2 text-2xl font-semibold tracking-tight text-fg">{{ title }}</h1>
+  {% if message %}<p class="mt-2.5 text-[14px] leading-relaxed text-fg-3">{{ message }}</p>{% endif %}
+  <div class="mt-8 flex flex-wrap justify-center gap-2">
+    <button type="button" class="btn-secondary" x-data @click="history.length > 1 ? history.back() : (window.location.href = '/')">{{ ui.icon("arrow-left") }}{{ _("Quay lại") }}</button>
+    <a href="/" class="btn-primary">{{ ui.icon("house") }}{{ _("Về trang chủ") }}</a>
+  </div>
+</div>
+{% endblock %}

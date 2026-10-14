@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ entry.display_number }}{% endblock %}
+{% block content %}
+{% set crumbs = [] %}{% for b in breadcrumbs %}{% do crumbs.append((_(b[0]), b[1])) %}{% endfor %}
+{% set is_sale = cfg.module == "sales" %}
+{% set title = _("Giảm giá, trả lại hàng bán") if entry.doc_type == "TL" else _("Trả lại hàng mua") if entry.doc_type == "TM" else _("Bán hàng") if is_sale else _("Mua hàng") %}
+{% call ui.page_header(title ~ " " ~ entry.display_number, entry.description, breadcrumbs=crumbs,
+                       back=cfg.kind_path(kind), badge=ui.status_badge(entry.status)) %}
+  {% if entry.is_draft %}
+    {% if can(cfg.perm ~ ".create") and doc %}{{ ui.link_button(_("Sửa"), cfg.base ~ "/" ~ entry.id ~ "/edit", "secondary", icon_name="pencil") }}{% endif %}
+    {% if can(cfg.perm ~ ".post") %}
+    <form method="post" action="/entries/{{ entry.id }}/post">{{ ui.csrf_field() }}{{ ui.button(_("Ghi sổ"), "primary", icon_name="check") }}</form>
+    {% endif %}
+  {% endif %}
+  {% if entry.is_posted and doc and doc.kind == cfg.main_kind and can(cfg.perm ~ ".create") %}
+    {{ ui.link_button(_("Lập trả lại / giảm giá") if is_sale else _("Lập trả lại hàng"), cfg.base ~ "/new?source=" ~ entry.id, "secondary", icon_name="undo-2", cls="max-sm:hidden") }}
+  {% endif %}
+  {% call ui.dropdown(icon_name="ellipsis", aria_label=_("Thao tác khác"), width="w-64") %}
+    {% if entry.is_draft and can(cfg.perm ~ ".create") %}
+      {{ ui.menu_post(_("Xóa chứng từ nháp"), "/entries/" ~ entry.id ~ "/delete", "trash", danger=True, confirm=_("Xóa chứng từ nháp này?"), fields={"next": cfg.kind_path(kind)}) }}
+    {% endif %}
+    {% if entry.is_posted and can(cfg.perm ~ ".cancel") %}
+      {{ ui.menu_item(_("Hủy chứng từ…"), None, "ban", danger=True, attrs="@click=\"$dispatch('modal-open', 'cancel-entry')\"") }}
+      {{ ui.menu_item(_("Lập chứng từ điều chỉnh (kỳ đã khóa)…"), None, "rotate-ccw", attrs="@click=\"$dispatch('modal-open', 'reverse-entry')\"") }}
+    {% endif %}
+    {{ ui.menu_item(_("Xem trong danh sách chứng từ"), "/entries?q=" ~ (entry.number or ""), "list") }}
+  {% endcall %}
+{% endcall %}
+
+{% if entry.is_posted %}
+<div class="mb-5 flex flex-wrap items-center gap-x-5 gap-y-1 rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-2.5 text-[13px] text-emerald-900 dark:border-emerald-500/20 dark:bg-emerald-500/5 dark:text-emerald-200">
+  <span class="inline-flex items-center gap-1.5 font-medium">{{ ui.icon("lock", "size-3.5") }}{{ _("Đã ghi sổ – không thể sửa số liệu") }}</span>
+  <span class="text-emerald-800/80 dark:text-emerald-300/80">{{ entry.posted_at|datetime }}</span>
+</div>
+{% elif entry.is_cancelled %}
+{{ ui.alert(_("Chứng từ đã hủy: {r}", r=entry.cancel_reason or ""), "warning", cls="mb-5") }}
+{% else %}
+{{ ui.alert(_("Chứng từ nháp chưa vào sổ. Kiểm tra rồi bấm Ghi sổ."), "info", cls="mb-5") }}
+{% endif %}
+
+<div class="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
+  <div class="min-w-0 space-y-5">
+    {% call ui.card(_("Thông tin chứng từ")) %}
+      {% if doc %}
+      {% set pname = doc.partner_name if is_sale else doc.seller_name %}
+      {% set ptax = doc.buyer_tax_code if is_sale else doc.seller_tax_code %}
+      {% set paddr = doc.buyer_address if is_sale else doc.seller_address %}
+      {{ ui.desc_list([
+        (_(cfg.partner_label), pname or _("Khách lẻ")), (_("Mã số thuế"), ptax), (_("Địa chỉ"), paddr),
+        (_("Ngày hạch toán"), entry.date|date), (_("Ngày hóa đơn"), doc.invoice_date|date),
+        (_("Hóa đơn"), ((doc.invoice_series ~ "-" ~ doc.invoice_no ~ (" (" ~ _("mẫu") ~ " " ~ doc.invoice_template ~ ")" if doc.invoice_template else "")) if doc.invoice_no else "")),
+        (_("Thanh toán"), _(cfg.payment_labels[doc.payment_method]) ~ (" · " ~ bank.label if bank else "")),
+        (_("Hạn thanh toán"), doc.due_date|date), (_("Người mua hàng") if is_sale else _("Người giao hàng"), entry.contact_name),
+      ]) }}
+      {% if original %}<p class="mt-4 text-[13px] text-fg-3">{{ _("Chứng từ gốc") }}: <a class="doc-no hover:underline" href="{{ original.url }}">{{ original.display_number }}</a></p>{% endif %}
+      {% if doc.note %}<p class="mt-3 text-[13px] text-fg-2">{{ doc.note }}</p>{% endif %}
+      {% else %}
+      {{ ui.desc_list([(_("Ngày hạch toán"), entry.date|date), (_("Đối tượng"), entry.contact_name), (_("Số tham chiếu"), entry.ref_no)]) }}
+      {% endif %}
+    {% endcall %}
+
+    {% if doc %}
+    {% call ui.card(_("Hàng hóa, dịch vụ"), flush=True) %}
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr>
+          <th class="w-10 text-center">#</th><th class="min-w-56">{{ _("Diễn giải") }}</th><th class="w-16">{{ _("TK") }}</th>
+          <th class="num w-20 max-md:hidden">{{ _("Số lượng") }}</th><th class="num w-28 max-lg:hidden">{{ _("Đơn giá") }}</th>
+          <th class="num w-32">{{ _("Thành tiền") }}</th><th class="w-16">{{ _("Thuế suất") }}</th><th class="num w-28">{{ _("Tiền thuế") }}</th>
+        </tr></thead>
+        <tbody>
+          {% for ln in doc.lines %}
+          <tr>
+            <td class="text-center text-xs text-fg-3">{{ ln.line_no }}</td>
+            <td><p class="text-fg">{{ ln.description }}</p>{% if ln.item %}<p class="text-xs text-fg-3">{{ ln.item.code }}{% if ln.unit %} · {{ ln.unit }}{% endif %}</p>{% endif %}
+              {% if not is_sale and not ln.deductible %}<p class="text-xs text-amber-700 dark:text-amber-400">{{ _("Thuế không được khấu trừ – tính vào chi phí") }}</p>{% endif %}
+              {% if is_sale and ln.discount_amount %}<p class="text-xs text-fg-3">{{ _("Chiết khấu") }} {{ ln.discount_amount|money }}</p>{% endif %}</td>
+            <td class="tabular-nums text-fg-2">{{ ln.revenue_account if is_sale else ln.debit_account }}</td>
+            <td class="num max-md:hidden">{{ ln.quantity|qty }}</td>
+            <td class="num max-lg:hidden">{{ ln.unit_price|qty(2) }}</td>
+            <td class="num">{{ ln.amount|money }}</td>
+            <td>{{ vat_labels.get(ln.vat_rate, ln.vat_rate) }}</td>
+            <td class="num">{{ ln.vat_amount|money0 }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endcall %}
+    {% endif %}
+
+    {% call ui.card(_("Định khoản"), flush=True) %}
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th class="w-24">{{ _("TK Nợ") }}</th><th class="w-24">{{ _("TK Có") }}</th><th>{{ _("Diễn giải") }}</th><th class="num w-36">{{ _("Số tiền") }}</th></tr></thead>
+        <tbody>
+          {% for l in acc_lines %}
+          <tr>
+            <td class="font-medium tabular-nums" title="{{ l.debit_name }}">{{ l.debit }}</td>
+            <td class="font-medium tabular-nums" title="{{ l.credit_name }}">{{ l.credit }}</td>
+            <td class="text-fg-2">{{ l.description }}</td>
+            <td class="num">{{ l.amount|money }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot><tr class="row-total"><td colspan="3">{{ _("Cộng") }}</td><td class="num">{{ acc_lines|sum(attribute="amount")|money }}</td></tr></tfoot>
+      </table>
+    </div>
+    {% endcall %}
+
+    {% if entry.vat_records %}
+    {% call ui.card(_("Hóa đơn GTGT") ~ (" " ~ _("đầu ra") if is_sale else " " ~ _("đầu vào")), flush=True, icon_name="receipt") %}
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>{{ _("Hóa đơn") }}</th><th class="w-24">{{ _("Thuế suất") }}</th><th class="num w-36">{{ _("Giá trị chưa thuế") }}</th><th class="num w-32">{{ _("Thuế GTGT") }}</th>{% if not is_sale %}<th class="w-28">{{ _("Khấu trừ") }}</th>{% endif %}</tr></thead>
+        <tbody>
+          {% for v in entry.vat_records %}
+          <tr>
+            <td class="tabular-nums">{{ (v.invoice_series ~ "-" ~ v.invoice_no) if v.invoice_no else "–" }}{% if v.group == "adjust_down" %} {{ ui.badge(_("Điều chỉnh giảm"), "amber") }}{% endif %}</td>
+            <td>{{ vat_labels.get(v.vat_rate, v.vat_rate) }}</td>
+            <td class="num">{{ v.goods_amount|money }}</td>
+            <td class="num">{{ v.vat_amount|money0 }}</td>
+            {% if not is_sale %}<td>{{ ui.badge(_("Có") if v.deductible else _("Không"), "green" if v.deductible else "gray") }}</td>{% endif %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endcall %}
+    {% endif %}
+  </div>
+
+  <aside class="space-y-5">
+    <section class="card p-5">
+      <p class="text-[13px] font-medium text-fg-3">{{ _("Tổng thanh toán") }}</p>
+      <p class="mt-1 text-3xl font-semibold tracking-tight tabular-nums">{{ (doc.total_amount if doc else entry.total)|money }} <span class="text-base font-normal text-fg-3">đ</span></p>
+      {% if doc %}
+      <dl class="mt-4 space-y-1.5 border-t border-line pt-4 text-[13.5px]">
+        <div class="flex justify-between"><dt class="text-fg-3">{{ _("Tiền hàng") }}</dt><dd class="tabular-nums">{{ doc.goods_amount|money }}</dd></div>
+        {% if is_sale and doc.discount_amount %}<div class="flex justify-between"><dt class="text-fg-3">{{ _("Chiết khấu") }}</dt><dd class="tabular-nums">−{{ doc.discount_amount|money }}</dd></div>{% endif %}
+        {% for rate, g in vat_groups %}{% if g.vat %}<div class="flex justify-between"><dt class="text-fg-3">{{ _("Thuế GTGT") }} {{ vat_labels.get(rate, rate) }}</dt><dd class="tabular-nums">{{ g.vat|money }}</dd></div>{% endif %}{% endfor %}
+      </dl>
+      <p class="mt-3 text-[13px] italic text-fg-2">{{ doc.total_amount|words }}</p>
+      {% endif %}
+    </section>
+
+    {% set upload %}{% if not entry.is_cancelled and can(cfg.perm ~ ".create") %}<button type="button" class="btn-ghost btn-xs" @click="$dispatch('modal-open', 'upload')">{{ ui.icon("upload", "size-3.5") }}{{ _("Tải lên") }}</button>{% endif %}{% endset %}
+    {% call ui.card(_("Đính kèm"), actions=upload) %}
+      {% if attachments %}
+        {% set files = [] %}
+        {% for a in attachments %}{% do files.append({"name": a.filename, "size": (a.size // 1024)|string ~ " KB", "href": "/attachments/" ~ a.id,
+            "kind": "pdf" if a.content_type == "application/pdf" else "xml" if "xml" in a.content_type else "image",
+            "delete_action": "/attachments/" ~ a.id ~ "/delete"}) %}{% endfor %}
+        {{ ui.attachment_list(files, can_delete=entry.is_draft and can(cfg.perm ~ ".create")) }}
+      {% else %}<p class="text-[13px] text-fg-3">{{ _("Chưa có file đính kèm (hóa đơn PDF, XML, ảnh).") }}</p>{% endif %}
+    {% endcall %}
+    {% call ui.card(_("Lịch sử")) %}
+      {% set tl = [] %}
+      {% for h in history %}{% do tl.append({"at": h.at|datetime, "actor": h.actor, "action": h.action, "detail": h.detail, "icon": h.icon, "tone": h.tone}) %}{% endfor %}
+      {{ ui.timeline(tl) }}
+    {% endcall %}
+  </aside>
+</div>
+
+{% call ui.modal("upload", _("Đính kèm file"), description=_("Ảnh, PDF hoặc XML hóa đơn – tối đa 10 MB.")) %}
+<form method="post" action="/entries/{{ entry.id }}/attachments" enctype="multipart/form-data">
+  {{ ui.csrf_field() }}
+  <div class="px-5 pb-5"><input type="file" name="file" required class="input" accept=".pdf,.xml,image/*"></div>
+  <div class="modal-footer">{{ ui.button(_("Đóng"), "secondary", type="button", attrs="@click=\"$dispatch('modal-close')\"") }}{{ ui.button(_("Tải lên"), "primary", icon_name="upload") }}</div>
+</form>
+{% endcall %}
+
+{% call ui.modal("cancel-entry", _("Hủy chứng từ") ~ " " ~ (entry.number or ""), description=_("Chỉ hủy được khi kỳ còn mở. Chứng từ vẫn được lưu kèm lý do hủy.")) %}
+<form method="post" action="/entries/{{ entry.id }}/cancel">
+  {{ ui.csrf_field() }}
+  <div class="px-5 pb-5">{{ ui.textarea("reason", _("Lý do hủy"), rows=3, required=True) }}</div>
+  <div class="modal-footer">{{ ui.button(_("Đóng"), "secondary", type="button", attrs="@click=\"$dispatch('modal-close')\"") }}{{ ui.button(_("Hủy chứng từ"), "danger", icon_name="ban") }}</div>
+</form>
+{% endcall %}
+
+{% call ui.modal("reverse-entry", _("Lập chứng từ điều chỉnh"), description=_("Tạo chứng từ nháp đảo ngược toàn bộ định khoản vào ngày được chọn (dùng khi kỳ gốc đã khóa sổ).")) %}
+<form method="post" action="/entries/{{ entry.id }}/reverse">
+  {{ ui.csrf_field() }}
+  <div class="space-y-4 px-5 pb-5">
+    {{ ui.date_input("date", _("Ngày điều chỉnh"), today, required=True) }}
+    {{ ui.input("reason", _("Lý do"), "") }}
+  </div>
+  <div class="modal-footer">{{ ui.button(_("Đóng"), "secondary", type="button", attrs="@click=\"$dispatch('modal-close')\"") }}{{ ui.button(_("Lập điều chỉnh"), "primary", icon_name="rotate-ccw") }}</div>
+</form>
+{% endcall %}
+{% endblock %}

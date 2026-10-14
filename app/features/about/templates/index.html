@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Giới thiệu") }}{% endblock %}
+{% block content %}
+{{ ui.page_header(_("Giới thiệu"), product ~ " · " ~ _("phiên bản {v}", v=version), icon_name="info") }}
+
+{% call ui.alert(_("Phần mềm hỗ trợ lập chứng từ, sổ kế toán, báo cáo tài chính và tờ khai thuế theo chế độ kế toán doanh nghiệp nhỏ và vừa (Thông tư 133/2016/TT-BTC). Người quản lý, kế toán trưởng/người phụ trách kế toán chịu trách nhiệm về tính chính xác, trung thực của số liệu lấy từ phần mềm (Điều 28 Thông tư 99/2025/TT-BTC). Tờ khai XML cần kiểm tra lại bằng ứng dụng HTKK trước khi nộp."), "warning", title=_("Lưu ý pháp lý"), cls="mb-6") %}{% endcall %}
+
+<div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
+  {% call ui.card(_("Chế độ kế toán"), icon_name="book-open") %}
+    {{ ui.desc_list([
+      (_("Chế độ áp dụng"), _("Thông tư 133/2016/TT-BTC – doanh nghiệp nhỏ và vừa")),
+      (_("Hệ thống tài khoản"), _("Cấp 1, cấp 2 theo Phụ lục 1 TT133; thêm được tài khoản chi tiết")),
+      (_("Hình thức sổ"), _("Nhật ký chung")),
+      (_("Đơn vị tiền tệ"), "VND"),
+    ], cols="sm:grid-cols-1") }}
+    <p class="mt-4 text-[13px] text-fg-3">{{ issued }}</p>
+  {% endcall %}
+
+  {% call ui.card(_("Nguyên tắc dữ liệu"), icon_name="shield") %}
+    <ul class="space-y-3 text-[13.5px]">
+      <li class="flex gap-3">{{ ui.icon("lock", "mt-0.5 size-4 shrink-0 text-primary") }}<span><span class="font-medium">{{ _("Không sửa lén số liệu.") }}</span> {{ _("Chứng từ đã ghi sổ không xóa, không sửa số liệu – kể cả ở tầng cơ sở dữ liệu. Sửa sai bằng hủy (kỳ đang mở, có lý do) hoặc chứng từ điều chỉnh (kỳ đã khóa).") }}</span></li>
+      <li class="flex gap-3">{{ ui.icon("history", "mt-0.5 size-4 shrink-0 text-primary") }}<span><span class="font-medium">{{ _("Lưu vết theo thời gian.") }}</span> {{ _("Mọi thao tác ghi vào nhật ký chỉ-thêm: ai, lúc nào, qua kênh nào (web, API, trợ lý AI).") }}</span></li>
+      <li class="flex gap-3">{{ ui.icon("wallet", "mt-0.5 size-4 shrink-0 text-primary") }}<span><span class="font-medium">{{ _("Không âm tiền.") }}</span> {{ _("Tiền mặt và từng tài khoản ngân hàng không được âm tại bất kỳ thời điểm nào, kể cả khi ghi lùi ngày.") }}</span></li>
+      <li class="flex gap-3">{{ ui.icon("sparkles", "mt-0.5 size-4 shrink-0 text-primary") }}<span><span class="font-medium">{{ _("AI chỉ lập nháp.") }}</span> {{ _("Trợ lý AI đọc số liệu và lập chứng từ nháp; người có quyền mới ghi sổ.") }}</span></li>
+      <li class="flex gap-3">{{ ui.icon("download", "mt-0.5 size-4 shrink-0 text-primary") }}<span><span class="font-medium">{{ _("Dữ liệu là của bạn.") }}</span> {{ _("Xuất toàn bộ sổ sách ra Excel, PDF hoặc bản sao lưu bất cứ lúc nào.") }}</span></li>
+    </ul>
+  {% endcall %}
+</div>
+{% endblock %}

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Nhập sổ quỹ từ Excel") }}{% endblock %}
+{% block content %}
+{{ ui.page_header(_("Nhập sổ quỹ từ Excel"), _("Chuyển sổ quỹ đang ghi bằng Excel sang phần mềm – giữ nguyên số phiếu gốc."), breadcrumbs=breadcrumbs, back="/cash", icon_name="upload") }}
+<div class="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
+  {% call ui.card(_("Tải file lên")) %}
+  <form method="post" action="/cash/import" enctype="multipart/form-data" class="space-y-4" x-data="{ name: '' }">
+    {{ ui.csrf_field() }}
+    <label class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-line-strong bg-surface-2 px-6 py-10 text-center hover:border-primary">
+      {{ ui.icon("file-spreadsheet", "size-8 text-emerald-600") }}
+      <span class="text-[14px] font-medium" data-empty="{{ _('Chọn file .xlsx') }}" x-text="name || $el.dataset.empty"></span>
+      <span class="text-xs text-fg-3">{{ _("Sheet S04a-DNN (bắt buộc), S04b-DNN (để lấy TK đối ứng)") }}</span>
+      <input type="file" name="file" accept=".xlsx" required class="sr-only" @change="name = $event.target.files[0] ? $event.target.files[0].name : ''">
+    </label>
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      {{ ui.link_button(_("Tải file mẫu"), "/cash/import/template.xlsx", "ghost", icon_name="download") }}
+      {{ ui.button(_("Đọc và kiểm tra"), icon_name="arrow-right") }}
+    </div>
+  </form>
+  {% endcall %}
+  {% call ui.card(_("Định dạng file"), icon_name="info") %}
+    <ul class="list-disc space-y-1.5 pl-4 text-[13px] text-fg-2">
+      <li>{{ _("Sheet S04a-DNN: tồn đầu kỳ ở ô H12, dữ liệu từ dòng 13: A ngày ghi sổ, B ngày chứng từ, C số phiếu thu, D số phiếu chi, E diễn giải, F thu, G chi, H tồn, I ghi chú.") }}</li>
+      <li>{{ _("Sheet S04b-DNN (tùy chọn): cột F là TK đối ứng theo số phiếu. Không có thì chọn TK mặc định ở bước sau.") }}</li>
+      <li>{{ _("Dòng có ghi chú \"Dòng ví dụ\" được bỏ qua. Đọc đến dòng \"Cộng phát sinh\" / \"Số tồn cuối kỳ\".") }}</li>
+      <li>{{ _("Xuất Excel từ màn hình Sổ quỹ tiền mặt cũng đúng định dạng này.") }}</li>
+      <li>{{ _("Tất cả được ghi trong một lần: lỗi giữa chừng thì không có dòng nào được nhập.") }}</li>
+    </ul>
+  {% endcall %}
+</div>
+{% endblock %}

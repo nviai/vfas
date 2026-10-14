@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Bảng lương") }}{% endblock %}
+{% block content %}
+{% call ui.page_header(_("Bảng lương"), _("Lương theo ngày công, bảo hiểm bắt buộc, thuế TNCN; ghi sổ chứng từ hạch toán lương"), breadcrumbs=breadcrumbs, icon_name="banknote") %}
+  {{ ui.link_button(_("Nhân viên"), "/payroll/employees", "secondary", icon_name="users") }}
+  {% if can("payroll.create") %}{{ ui.button(_("Lập bảng lương"), "primary", icon_name="plus", type="button", attrs="@click=\"$dispatch('modal-open', 'new-run')\"") }}{% endif %}
+{% endcall %}
+
+{% if employee_count == 0 %}
+  {% call ui.alert(_("Chưa có nhân viên nào đang làm việc. Thêm hồ sơ nhân viên trước khi lập bảng lương."), "info", cls="mb-5") %}
+    {% if can("payroll.manage") %}{{ ui.link_button(_("Thêm nhân viên"), "/payroll/employees/new", "secondary", size="sm", icon_name="user-plus") }}{% endif %}
+  {% endcall %}
+{% endif %}
+
+<div class="card">
+  {% if not runs %}
+    {% call ui.empty_state(_("Chưa có bảng lương"), "banknote", _("Mỗi tháng lập một bảng lương; số liệu lấy từ hồ sơ nhân viên và tham số lương, thuế hiện hành.")) %}
+      {% if can("payroll.create") %}{{ ui.button(_("Lập bảng lương"), "primary", icon_name="plus", type="button", attrs="@click=\"$dispatch('modal-open', 'new-run')\"") }}{% endif %}
+    {% endcall %}
+  {% else %}
+  <div class="table-wrap">
+    <table class="table table-hover">
+      <thead><tr><th class="w-28">{{ _("Kỳ lương") }}</th><th class="num w-20 max-sm:hidden">{{ _("Số NV") }}</th><th class="num">{{ _("Tổng thu nhập") }}</th><th class="num max-md:hidden">{{ _("Bảo hiểm NLĐ") }}</th><th class="num max-md:hidden">{{ _("Thuế TNCN") }}</th><th class="num">{{ _("Thực lĩnh") }}</th><th class="w-36 max-lg:hidden">{{ _("Chứng từ") }}</th><th class="w-32">{{ _("Trạng thái") }}</th></tr></thead>
+      <tbody>
+        {% for r in runs %}{% set t = totals[r.id] %}
+        <tr class="is-link">
+          <td><a href="/payroll/runs/{{ r.id }}" class="doc-no whitespace-nowrap hover:underline">{{ _("Tháng") }} {{ r.period_label }}</a></td>
+          <td class="num max-sm:hidden">{{ r.lines|length }}</td>
+          <td class="num">{{ t.gross|money }}</td>
+          <td class="num max-md:hidden text-fg-2">{{ t.emp_insurance|money0 }}</td>
+          <td class="num max-md:hidden text-fg-2">{{ t.pit|money0 }}</td>
+          <td class="num font-medium">{{ t.net_pay|money }}</td>
+          <td class="max-lg:hidden">{% if r.entry and r.entry.number %}<span class="doc-no whitespace-nowrap text-[13px]">{{ r.entry.number }}</span>{% else %}<span class="text-fg-3">–</span>{% endif %}</td>
+          <td>{{ ui.status_badge(r.status) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+
+{% if can("payroll.create") %}
+{% call ui.modal("new-run", _("Lập bảng lương"), description=_("Lấy danh sách nhân viên đang làm việc trong tháng; ngày công mặc định bằng công chuẩn.")) %}
+<form method="post" action="/payroll/runs">
+  {{ ui.csrf_field() }}
+  <div class="grid grid-cols-3 gap-4 px-5 pb-5">
+    {{ ui.select("month", _("Tháng"), range(1, 13)|map("string")|list, suggest[1]|string) }}
+    {{ ui.input("year", _("Năm"), suggest[0], type="number", input_cls="tabular-nums") }}
+    {{ ui.input("standard_days", _("Công chuẩn"), 26, type="number", input_cls="tabular-nums", attrs="step=0.5") }}
+  </div>
+  <div class="flex justify-end gap-2 border-t border-line bg-surface-2 px-5 py-3">
+    {{ ui.button(_("Đóng"), "secondary", type="button", attrs="@click=\"$dispatch('modal-close')\"") }}
+    {{ ui.button(_("Lập bảng lương"), "primary", icon_name="plus") }}
+  </div>
+</form>
+{% endcall %}
+{% endif %}
+{% endblock %}

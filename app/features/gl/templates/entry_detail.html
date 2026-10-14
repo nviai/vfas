@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ doc_label }} {{ entry.display_number }}{% endblock %}
+{% block content %}
+{% call ui.page_header(_(doc_label) ~ " " ~ entry.display_number, entry.description, breadcrumbs=breadcrumbs, back="/entries", badge=ui.status_badge(entry.status)) %}
+  {% with edit_url=("/entries/" ~ entry.id ~ "/edit" if editable else None), print_url="/entries/" ~ entry.id ~ "/print.pdf",
+          copy_url=("/entries/new?copy=" ~ entry.id if entry.doc_type == "PK" else None) %}
+    {% include "gl/_entry_actions.html" %}
+  {% endwith %}
+{% endcall %}
+
+{% if entry.is_posted %}
+<div class="mb-5 flex flex-wrap items-center gap-x-5 gap-y-1 rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-2.5 text-[13px] text-emerald-900 dark:border-emerald-500/20 dark:bg-emerald-500/5 dark:text-emerald-200">
+  <span class="inline-flex items-center gap-1.5 font-medium">{{ ui.icon("lock", "size-3.5") }}{{ _("Đã ghi sổ – không thể sửa số liệu") }}</span>
+  <span class="text-emerald-800/80 dark:text-emerald-300/80">{{ entry.posted_at|datetime }}{% if not period_open %} · {{ _("kỳ đã khóa sổ") }}{% endif %}</span>
+</div>
+{% elif entry.is_cancelled %}
+{{ ui.alert(entry.cancel_reason or "", "warning", title=_("Chứng từ đã hủy lúc {t}", t=entry.cancelled_at|datetime), cls="mb-5") }}
+{% else %}
+{{ ui.alert(_("Chứng từ nháp chưa vào sổ. Số chứng từ được cấp khi ghi sổ."), "info", cls="mb-5") }}
+{% endif %}
+{% if reverses %}{{ ui.alert(_("Chứng từ điều chỉnh cho {n}", n=reverses.display_number), "info", cls="mb-5") }}{% endif %}
+{% for r in reversed_by %}{% call ui.alert(_("Đã có chứng từ điều chỉnh {n} ({s})", n=r.display_number, s=_(r.status_label)), "info", cls="mb-5") %}{{ ui.link_button(_("Xem"), r.url, "secondary", size="sm") }}{% endcall %}{% endfor %}
+
+<div class="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
+  <div class="min-w-0 space-y-5">
+    {% call ui.card(_("Thông tin chứng từ")) %}
+      {{ ui.desc_list([
+        (_("Loại chứng từ"), _(doc_label)), (_("Ngày hạch toán"), entry.date|date), (_("Ngày chứng từ"), (entry.doc_date or entry.date)|date),
+        (_("Số tham chiếu"), entry.ref_no), (_("Đối tượng"), names.partner(entry.partner_id)), (_("Người nộp / nhận"), entry.contact_name),
+        (_("Kèm theo"), (_("{n} chứng từ gốc", n=entry.attached_docs) if entry.attached_docs else "")), (_("Nguồn"), entry.source),
+      ]) }}
+    {% endcall %}
+    {% include "gl/_entry_lines.html" %}
+  </div>
+  <aside class="space-y-5">
+    <section class="card p-5">
+      <p class="text-[13px] font-medium text-fg-3">{{ _("Tổng tiền") }}</p>
+      <p class="mt-1 text-3xl font-semibold tracking-tight tabular-nums">{{ entry.total|money }} <span class="text-base font-normal text-fg-3">đ</span></p>
+      <p class="mt-2 text-[13px] text-fg-2 italic">{{ entry.total|words }}</p>
+    </section>
+    {% include "gl/_attachments.html" %}
+    {% include "gl/_history.html" %}
+  </aside>
+</div>
+{% endblock %}

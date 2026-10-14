@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Thông tin công ty") }}{% endblock %}
+{% block content %}
+{{ ui.page_header(_("Thông tin công ty"), c.name, breadcrumbs=breadcrumbs, icon_name="building") }}
+
+{{ ui.tabs([
+  {"key": "general", "label": _("Thông tin chung"), "href": "/settings?tab=general", "icon": "building"},
+  {"key": "signers", "label": _("Người ký"), "href": "/settings?tab=signers", "icon": "pencil"},
+  {"key": "accounting", "label": _("Kế toán & thuế"), "href": "/settings?tab=accounting", "icon": "book-open"},
+  {"key": "numbering", "label": _("Đánh số chứng từ"), "href": "/settings?tab=numbering", "icon": "hash"},
+], tab, cls="mb-5") }}
+
+<form method="post" action="/settings" class="card">
+  {{ ui.csrf_field() }}
+  <input type="hidden" name="tab" value="{{ tab }}">
+  <div class="card-body divide-y divide-line">
+  {% if tab == "general" %}
+    {% call ui.form_section(_("Doanh nghiệp"), _("Hiển thị trên chứng từ, sổ sách và báo cáo.")) %}
+      {{ ui.input("name", _("Tên doanh nghiệp"), c.name, required=True) }}
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {{ ui.input("short_name", _("Tên viết tắt"), c.short_name, hint=_("Hiển thị ở thanh điều hướng")) }}
+        {{ ui.input("tax_code", _("Mã số thuế"), c.tax_code, input_cls="tabular-nums") }}
+      </div>
+      {{ ui.input("address", _("Địa chỉ"), c.address) }}
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {{ ui.input("phone", _("Điện thoại"), c.phone, type="tel") }}
+        {{ ui.input("email", _("Email"), c.email, type="email") }}
+      </div>
+    {% endcall %}
+  {% elif tab == "signers" %}
+    {% call ui.form_section(_("Người ký"), _("Tên in sẵn ở phần chữ ký của phiếu thu, chi, sổ và báo cáo tài chính.")) %}
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {{ ui.input("legal_rep", _("Người đại diện theo pháp luật"), c.legal_rep) }}
+        {{ ui.input("legal_rep_title", _("Chức danh"), c.legal_rep_title) }}
+        {{ ui.input("chief_accountant", _("Kế toán trưởng"), c.chief_accountant) }}
+        {{ ui.input("preparer", _("Người lập biểu / ghi sổ"), c.preparer) }}
+        {{ ui.input("cashier", _("Thủ quỹ"), c.cashier) }}
+        {{ ui.input("storekeeper", _("Thủ kho"), c.storekeeper) }}
+      </div>
+    {% endcall %}
+  {% elif tab == "accounting" %}
+    {% call ui.form_section(_("Chế độ kế toán"), _("Thông tư 133/2016/TT-BTC, hình thức Nhật ký chung, đơn vị tiền tệ VND.")) %}
+      {{ ui.date_input("start_date", _("Ngày bắt đầu hạch toán trên phần mềm"), c.start_date,
+                       hint=(_("Số liệu trước ngày này nhập vào Số dư đầu kỳ.") if can_change_start else _("Đã có chứng từ ghi sổ – không đổi được.")),
+                       attrs=("" if can_change_start else "disabled")) }}
+      {{ ui.select("business_type", _("Lĩnh vực chính"), [("service", _("Dịch vụ")), ("trade", _("Thương mại")), ("production", _("Sản xuất")), ("construction", _("Xây lắp"))], c.business_type) }}
+    {% endcall %}
+    {% call ui.form_section(_("Thuế"), _("Dùng để lập tờ khai và nhắc hạn nộp.")) %}
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {{ ui.select("vat_method", _("Phương pháp tính thuế GTGT"), [("khau_tru", _("Khấu trừ")), ("truc_tiep", _("Trực tiếp"))], c.vat_method) }}
+        {{ ui.select("vat_period", _("Kỳ khai thuế GTGT"), [("month", _("Theo tháng")), ("quarter", _("Theo quý"))], c.vat_period) }}
+        {{ ui.input("tax_office", _("Cơ quan thuế quản lý"), c.tax_office) }}
+        {{ ui.input("province", _("Tỉnh/thành phố"), c.province) }}
+        {{ ui.select("wage_region", _("Vùng lương tối thiểu"), [("I", _("Vùng I")), ("II", _("Vùng II")), ("III", _("Vùng III")), ("IV", _("Vùng IV"))], c.wage_region) }}
+      </div>
+    {% endcall %}
+  {% elif tab == "numbering" %}
+    {% call ui.form_section(_("Định dạng số chứng từ"), _("Số cấp khi ghi sổ, liên tục theo loại chứng từ và năm. Dùng {prefix}, {year}, {yy}, {month}, {seq:04d}.")) %}
+      {{ ui.input("number_format", _("Định dạng"), c.number_format, input_cls="font-mono", hint=_("Ví dụ: {prefix}{year}-{seq:04d} → PT2026-0001")) }}
+    {% endcall %}
+    {% call ui.form_section(_("Tiền tố theo loại chứng từ"), _("Để trống dùng mã mặc định.")) %}
+      <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        {% for code, label in [("PT", _("Phiếu thu")), ("PC", _("Phiếu chi")), ("BC", _("Thu tiền gửi")), ("BN", _("Chi tiền gửi")), ("PK", _("Phiếu kế toán")), ("BH", _("Bán hàng")), ("MH", _("Mua hàng")), ("NK", _("Nhập kho")), ("XK", _("Xuất kho"))] %}
+          {{ ui.input("prefix_" ~ code, label, prefixes.get(code, ""), placeholder=code, input_cls="font-mono uppercase") }}
+        {% endfor %}
+      </div>
+    {% endcall %}
+  {% endif %}
+  </div>
+  <div class="card-footer flex justify-end">
+    {{ ui.button(_("Lưu"), "primary", icon_name="check", hotkey="save", kbd_hint="Ctrl+S") }}
+  </div>
+</form>
+{% endblock %}

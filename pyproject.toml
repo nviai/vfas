@@ -1,0 +1,71 @@
+[project]
+name = "vfas"
+version = "2.0.0"
+description = "VFAS – Vietnam Free Accounting Software: free, open-source accounting for Vietnamese SMEs (Circular 133/2016/TT-BTC)"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+keywords = ["accounting", "ke-toan", "vietnam", "tt133", "erp", "fastapi"]
+authors = [{ name = "NVIAI CO., LTD." }]
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "sqlalchemy>=2.0.36",
+    "alembic>=1.14",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "jinja2>=3.1.4",
+    "python-multipart>=0.0.17",
+    "argon2-cffi>=23.1",
+    "itsdangerous>=2.2",
+    "openpyxl>=3.1.5",
+    "weasyprint>=63",
+    "httpx>=0.27",
+    "cryptography>=43",
+    "defusedxml>=0.7.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/nviai/vfas"
+Repository = "https://github.com/nviai/vfas"
+Issues = "https://github.com/nviai/vfas/issues"
+Changelog = "https://github.com/nviai/vfas/blob/main/CHANGELOG.md"
+
+[project.optional-dependencies]
+postgres = ["psycopg[binary]>=3.2"]
+dev = ["pytest>=8.3", "pypdf>=5.1", "playwright>=1.48", "ruff==0.17.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = ["ignore::DeprecationWarning"]
+markers = [
+    "e2e: end-to-end test in a real browser (Playwright); run with E2E=1",
+    "allow_console_errors: E2E test that tolerates console/JS errors (e.g. an intentional 403 page)",
+]
+
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+# PEP 8: 79-character lines, comments/docstrings wrapped at 72.
+[tool.ruff]
+line-length = 79
+target-version = "py312"
+
+[tool.ruff.lint]
+# pycodestyle errors/warnings, pyflakes, import order, pep8-naming
+select = ["E", "W", "F", "I", "N"]
+
+[tool.ruff.lint.pycodestyle]
+max-doc-length = 72
+
+[tool.ruff.lint.pep8-naming]
+classmethod-decorators = ["declared_attr"]
+
+[tool.ruff.format]
+quote-style = "double"

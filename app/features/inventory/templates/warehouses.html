@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Kho") }}{% endblock %}
+{% block content %}
+<div x-data="{ f: {id: '', code: '', name: '', address: '', keeper: '', note: '', is_default: false, is_active: true},
+               edit(w) { this.f = Object.assign({}, w); $dispatch('modal-open', 'wh-form') },
+               create() { this.f = {id: '', code: '', name: '', address: '', keeper: '', note: '', is_default: false, is_active: true}; $dispatch('modal-open', 'wh-form') } }">
+{% call ui.page_header(_("Kho"), _("Danh mục kho hàng. Kho mặc định dùng cho hàng mua, bán khi chứng từ không chọn kho."), breadcrumbs=breadcrumbs, icon_name="warehouse") %}
+  {% if can("inventory.manage") %}{{ ui.button(_("Thêm kho"), "primary", icon_name="plus", type="button", attrs="@click=\"create()\"") }}{% endif %}
+{% endcall %}
+
+<div class="card">
+  {% if not warehouses %}
+    {% call ui.empty_state(_("Chưa có kho nào"), "warehouse", _("Kho chính được tạo tự động khi lập chứng từ kho đầu tiên.")) %}{% endcall %}
+  {% else %}
+  <div class="table-wrap">
+    <table class="table table-hover">
+      <thead><tr><th class="w-28">{{ _("Mã") }}</th><th>{{ _("Tên kho") }}</th><th class="max-md:hidden">{{ _("Địa chỉ") }}</th><th class="w-40 max-lg:hidden">{{ _("Thủ kho") }}</th><th class="w-36">{{ _("Trạng thái") }}</th>{% if can("inventory.manage") %}<th class="w-10"></th>{% endif %}</tr></thead>
+      <tbody>
+        {% for w in warehouses %}
+        <tr class="{{ 'is-muted' if not w.is_active }}">
+          <td class="doc-no">{{ w.code }}</td>
+          <td class="font-medium text-fg">{{ w.name }} {% if w.is_default %}{{ ui.badge(_("Mặc định"), "brand", cls="ml-1") }}{% endif %}</td>
+          <td class="max-md:hidden text-fg-2">{{ w.address or "–" }}</td>
+          <td class="max-lg:hidden text-fg-2">{{ w.keeper or "–" }}</td>
+          <td>{{ ui.status_badge("active" if w.is_active else "inactive") }}</td>
+          {% if can("inventory.manage") %}
+          {#- User data only goes through single-quoted data-* attributes (tojson escapes ' < > &), never concatenated into @click. -#}
+          <td class="!pr-3 text-right"><button type="button" class="btn-ghost btn-sm btn-icon" aria-label="{{ _('Sửa') }}" data-tooltip="{{ _('Sửa') }}"
+            data-wh='{{ {"id": w.id, "code": w.code, "name": w.name, "address": w.address, "keeper": w.keeper, "note": w.note, "is_default": w.is_default, "is_active": w.is_active}|tojson }}'
+            @click="edit(JSON.parse($el.dataset.wh))">{{ ui.icon("pencil") }}</button></td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+
+{% if can("inventory.manage") %}
+<form method="post" action="/inventory/settings" class="card mt-5">
+  {{ ui.csrf_field() }}
+  <div class="card-body">
+    {{ ui.switch("allow_negative_stock", _("Cho phép xuất âm kho"), allow_negative,
+                 hint=_("Chỉ bật khi doanh nghiệp chưa theo dõi tồn kho trên phần mềm (mua hàng hạch toán thẳng vào chi phí). Khi tắt, mọi chứng từ làm tồn kho âm tại bất kỳ ngày nào đều bị chặn.")) }}
+  </div>
+  <div class="card-footer flex justify-end">{{ ui.button(_("Lưu thiết lập"), "secondary", size="sm", icon_name="check") }}</div>
+</form>
+
+{% call ui.modal("wh-form", _("Kho")) %}
+<form method="post" action="/inventory/warehouses" class="space-y-4 px-5 pb-5">
+  {{ ui.csrf_field() }}
+  <input type="hidden" name="id" :value="f.id">
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-[8rem_1fr]">
+    <div><label class="label" for="wh-code">{{ _("Mã kho") }}</label><input id="wh-code" name="code" class="input uppercase" x-model="f.code" required></div>
+    <div><label class="label" for="wh-name">{{ _("Tên kho") }}</label><input id="wh-name" name="name" class="input" x-model="f.name" required></div>
+  </div>
+  <div><label class="label" for="wh-address">{{ _("Địa chỉ") }}</label><input id="wh-address" name="address" class="input" x-model="f.address"></div>
+  <div><label class="label" for="wh-keeper">{{ _("Thủ kho") }}</label><input id="wh-keeper" name="keeper" class="input" x-model="f.keeper"></div>
+  <div class="flex flex-wrap gap-x-6 gap-y-2">
+    <label class="flex items-center gap-2 text-[13.5px]"><input type="checkbox" class="checkbox" name="is_default" value="1" x-model="f.is_default">{{ _("Kho mặc định") }}</label>
+    <input type="hidden" name="is_active" :value="f.is_active ? '1' : '0'">
+    <label class="flex items-center gap-2 text-[13.5px]"><input type="checkbox" class="checkbox" x-model="f.is_active">{{ _("Đang sử dụng") }}</label>
+  </div>
+  <div class="modal-footer -mx-5 -mb-5">
+    {{ ui.button(_("Hủy"), "secondary", type="button", attrs="@click=\"$dispatch('modal-close')\"") }}
+    {{ ui.button(_("Lưu"), "primary", icon_name="check") }}
+  </div>
+</form>
+{% endcall %}
+{% endif %}
+</div>
+{% endblock %}

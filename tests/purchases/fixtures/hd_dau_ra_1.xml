@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TDiep>
+  <TTChung><PBan>2.0.0</PBan><MNGui>K0101</MNGui></TTChung>
+  <DLieu>
+    <HDon>
+      <DLHDon>
+        <TTChung><KHMSHDon>1</KHMSHDon><KHHDon>C26TNV</KHHDon><SHDon>12</SHDon><NLap>2026-03-15</NLap><DVTTe>VND</DVTTe></TTChung>
+        <NDHDon>
+          <NBan><Ten>CÔNG TY TNHH CÔNG NGHỆ THÔNG MINH NVIAI</Ten><MST>0000000001</MST><DChi>TP. Hồ Chí Minh</DChi></NBan>
+          <NMua><Ten>CÔNG TY CỔ PHẦN KHÁCH HÀNG LỚN</Ten><MST>0109876543</MST><DChi>Hà Nội</DChi><HVTNMHang>Nguyễn Thị Mua</HVTNMHang></NMua>
+          <DSHHDVu>
+            <HHDVu><TChat>1</TChat><STT>1</STT><THHDVu>Phí triển khai phần mềm tháng 3</THHDVu><DVTinh>Gói</DVTinh><SLuong>1</SLuong><DGia>25000000</DGia><ThTien>25000000</ThTien><TSuat>10%</TSuat></HHDVu>
+          </DSHHDVu>
+          <TToan><THTTLTSuat><LTSuat><TSuat>10%</TSuat><ThTien>25000000</ThTien><TThue>2500000</TThue></LTSuat></THTTLTSuat><TgTCThue>25000000</TgTCThue><TgTThue>2500000</TgTThue><TgTTTBSo>27500000</TgTTTBSo></TToan>
+        </NDHDon>
+      </DLHDon>
+    </HDon>
+  </DLieu>
+</TDiep>

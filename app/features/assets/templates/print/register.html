@@ -1,0 +1,37 @@
+{% extends "assets/print/_layout.html" %}
+{% import "assets/print/_parts.html" as parts %}
+{% block title %}Sổ tài sản cố định{% endblock %}
+{% block body %}
+{{ parts.doc_header(company, "S09-DNN") }}
+<p class="title">SỔ TÀI SẢN CỐ ĐỊNH</p>
+<p class="subtitle i">Đến ngày {{ on|date }}</p>
+<p class="r i small">Đơn vị tính: Đồng</p>
+<table class="book">
+  <colgroup><col style="width:5%"><col style="width:9%"><col style="width:24%"><col style="width:9%"><col style="width:7%"><col style="width:12%"><col style="width:12%"><col style="width:12%"><col style="width:10%"></colgroup>
+  <thead>
+    <tr><th>STT</th><th>Mã TSCĐ</th><th>Tên, đặc điểm, ký hiệu TSCĐ</th><th>Ngày ghi tăng</th><th>Số tháng sử dụng</th><th>Nguyên giá</th><th>Hao mòn lũy kế</th><th>Giá trị còn lại</th><th>Bộ phận sử dụng</th></tr>
+    <tr class="letters"><th>A</th><th>B</th><th>C</th><th>D</th><th>1</th><th>2</th><th>3</th><th>4</th><th>E</th></tr>
+  </thead>
+  <tbody>
+    {% set n = namespace(i=0) %}
+    {% for group_label, rows in groups %}
+    <tr class="summary"><td></td><td colspan="8" class="label">{{ group_label }}</td></tr>
+    {% for r in rows %}{% set n.i = n.i + 1 %}
+    <tr>
+      <td class="code">{{ n.i }}</td><td class="code">{{ r.asset.code }}</td>
+      <td>{{ r.asset.name }}{% if r.asset.serial_no %} – {{ r.asset.serial_no }}{% endif %}</td>
+      <td class="date">{{ r.asset.acquired_date|date }}</td><td class="code">{{ r.asset.useful_life_months }}</td>
+      <td class="num">{{ r.cost|money }}</td><td class="num">{{ r.accumulated|money0 }}</td><td class="num">{{ r.remaining|money }}</td>
+      <td>{{ r.asset.department }}</td>
+    </tr>
+    {% endfor %}
+    {% endfor %}
+    <tr class="summary"><td></td><td colspan="4" class="label c">Cộng</td>
+      <td class="num">{{ total_cost|money }}</td><td class="num">{{ total_acc|money }}</td><td class="num">{{ (total_cost - total_acc)|money }}</td><td></td></tr>
+  </tbody>
+</table>
+<div class="after-table">
+  <p>- Sổ này có {{ "%02d"|format(total_pages) if total_pages else ".." }} trang, đánh số từ trang 01 đến trang {{ "%02d"|format(total_pages) if total_pages else ".." }}</p>
+  {{ parts.signatures(company, left="Người ghi sổ") }}
+</div>
+{% endblock %}

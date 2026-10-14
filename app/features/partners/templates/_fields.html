@@ -1,0 +1,36 @@
+{% import "macros.html" as ui with context %}
+{#- Partner form fields. Variables: form (dict or Partner), errors -#}
+{% set f = form %}
+{% macro val(name) %}{{ (f[name] if f is mapping else f|attr(name)) if f else "" }}{% endmacro %}
+{% set flags = {} %}
+{% for k in ("is_customer", "is_supplier", "is_employee") %}{% do flags.update({k: ((f.get(k) if f is mapping else f|attr(k)) if f else False)}) %}{% endfor %}
+{% call ui.form_section(_("Thông tin chung"), _("Mã để trống sẽ tự cấp (KH0001, NCC0001, NV0001…).")) %}
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-[10rem_1fr]">
+    {{ ui.input("code", _("Mã"), val("code"), errors=errors, input_cls="tabular-nums") }}
+    {{ ui.input("name", _("Tên"), val("name"), errors=errors, required=True, autofocus=not f) }}
+  </div>
+  <div class="flex flex-wrap gap-x-6 gap-y-2">
+    {{ ui.checkbox("is_customer", _("Khách hàng"), flags.is_customer) }}
+    {{ ui.checkbox("is_supplier", _("Nhà cung cấp"), flags.is_supplier) }}
+    {{ ui.checkbox("is_employee", _("Nhân viên"), flags.is_employee) }}
+  </div>
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    {{ ui.input("tax_code", _("Mã số thuế"), val("tax_code"), errors=errors, input_cls="tabular-nums", hint=_("10 số hoặc 0123456789-001")) }}
+    {{ ui.input("id_number", _("Số CCCD (cá nhân)"), val("id_number"), errors=errors, input_cls="tabular-nums") }}
+  </div>
+  {{ ui.input("address", _("Địa chỉ"), val("address"), errors=errors) }}
+{% endcall %}
+{% call ui.form_section(_("Liên hệ, thanh toán")) %}
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    {{ ui.input("phone", _("Điện thoại"), val("phone"), errors=errors, type="tel") }}
+    {{ ui.input("email", _("Email"), val("email"), errors=errors, type="email") }}
+    {{ ui.input("contact_person", _("Người liên hệ"), val("contact_person"), errors=errors) }}
+    {{ ui.input("payment_terms_days", _("Hạn thanh toán (ngày)"), val("payment_terms_days") or 0, type="number", errors=errors, input_cls="tabular-nums") }}
+    {{ ui.input("bank_account", _("Số tài khoản ngân hàng"), val("bank_account"), errors=errors, input_cls="tabular-nums") }}
+    {{ ui.input("bank_name", _("Ngân hàng"), val("bank_name"), errors=errors) }}
+  </div>
+  {{ ui.textarea("note", _("Ghi chú"), val("note"), rows=2) }}
+  {% if f and f is not mapping %}
+    {{ ui.select("is_active", _("Trạng thái"), [("1", _("Đang dùng")), ("0", _("Ngừng dùng"))], "1" if f.is_active else "0", cls="sm:w-56") }}
+  {% endif %}
+{% endcall %}

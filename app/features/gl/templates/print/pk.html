@@ -1,0 +1,42 @@
+{% extends "gl/print/_base.html" %}
+{% import "gl/print/_base.html" as p %}
+{% block title %}Phiếu kế toán {{ entry.display_number }}{% endblock %}
+{% block page_size %}size: A5 landscape; margin: 9mm 10mm 10mm 12mm;{% endblock %}
+{% block css %}
+  html { font-size: 10pt; }
+  .meta { width: 100%; border-collapse: collapse; margin-top: 2mm; }
+  .meta td { padding: .5mm 0; vertical-align: top; }
+  .signatures .name { padding-top: 13mm; }
+{% endblock %}
+{% block body %}
+{% if not entry.is_posted %}<div class="watermark">{{ "ĐÃ HỦY" if entry.is_cancelled else "NHÁP" }}</div>{% endif %}
+{{ p.head(company, None, "") }}
+<p class="title">PHIẾU KẾ TOÁN</p>
+<p class="subtitle">Ngày {{ entry.date.day }} tháng {{ entry.date.month }} năm {{ entry.date.year }} – Số: {{ entry.number or "......" }}</p>
+<table class="meta">
+  <tr><td style="width:22%">Diễn giải:</td><td><b>{{ entry.description }}</b></td></tr>
+  {% if entry.ref_no %}<tr><td>Số tham chiếu:</td><td>{{ entry.ref_no }}</td></tr>{% endif %}
+  {% if entry.attached_docs %}<tr><td>Kèm theo:</td><td>{{ entry.attached_docs }} chứng từ gốc</td></tr>{% endif %}
+</table>
+<table class="book">
+  <colgroup><col style="width:42%"><col style="width:11%"><col style="width:11%"><col style="width:18%"><col style="width:18%"></colgroup>
+  <thead><tr><th>Diễn giải</th><th>TK Nợ</th><th>TK Có</th><th>Đối tượng</th><th>Số tiền</th></tr></thead>
+  <tbody>
+    {% for ln in entry.lines %}
+    <tr>
+      <td>{{ ln.description }}</td><td class="c">{{ ln.debit_account }}</td><td class="c">{{ ln.credit_account }}</td>
+      <td>{{ names.partner(ln.debit_partner_id) or names.partner(ln.credit_partner_id) or names.bank(ln.debit_bank_account_id) or names.bank(ln.credit_bank_account_id) }}</td>
+      <td class="num">{{ ln.amount|money }}</td>
+    </tr>
+    {% endfor %}
+    <tr class="b"><td colspan="4" class="c">Cộng</td><td class="num">{{ entry.total|money }}</td></tr>
+  </tbody>
+</table>
+<p style="margin-top:2mm">Số tiền viết bằng chữ: <i>{{ entry.total|words }}</i></p>
+<div class="after-table">
+  <table class="signatures"><tr>
+    <td><p class="role">Người lập</p><p class="hint">(Ký, họ tên)</p><p class="name">{{ creator or "" }}</p></td>
+    <td><p class="role">Kế toán trưởng</p><p class="hint">(Ký, họ tên)</p><p class="name">{{ company.chief_accountant or "" }}</p></td>
+  </tr></table>
+</div>
+{% endblock %}

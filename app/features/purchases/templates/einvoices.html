@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Nhập hóa đơn điện tử") }}{% endblock %}
+{% block content %}
+{% set crumbs = [] %}{% for b in breadcrumbs %}{% do crumbs.append((_(b[0]), b[1])) %}{% endfor %}
+{{ ui.page_header(_("Nhập hóa đơn điện tử"), _("Tải file XML hóa đơn (tải từ cổng hoadondientu.gdt.gov.vn hoặc email người bán) để tạo chứng từ nháp."),
+                  breadcrumbs=crumbs, icon_name="file-up") }}
+<div class="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
+  <form method="post" action="/einvoices" enctype="multipart/form-data" class="card self-start" x-data="{ names: [] }">
+    {{ ui.csrf_field() }}
+    <div class="card-body">
+      <label class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-line bg-surface-2 px-6 py-12 text-center transition hover:border-primary/60">
+        <span class="flex size-12 items-center justify-center rounded-xl bg-surface text-primary shadow-card">{{ ui.icon("file-up", "size-6") }}</span>
+        <span class="text-[15px] font-medium text-fg">{{ _("Chọn file XML hoặc ZIP") }}</span>
+        <span class="text-[13px] text-fg-3">{{ _("Chọn nhiều file cùng lúc – tối đa 200 hóa đơn, 20 MB") }}</span>
+        <input type="file" name="files" multiple accept=".xml,.zip" required class="sr-only" @change="names = Array.from($event.target.files).map(f => f.name)">
+        <template x-if="names.length"><span class="mt-2 rounded-full bg-primary-soft px-3 py-1 text-xs font-medium text-primary" x-text="names.length + ' file: ' + names.slice(0, 3).join(', ') + (names.length > 3 ? '…' : '')"></span></template>
+      </label>
+    </div>
+    <div class="card-footer flex justify-end">{{ ui.button(_("Đọc hóa đơn"), "primary", icon_name="arrow-right") }}</div>
+  </form>
+  <div class="space-y-5">
+    {% call ui.card(_("Phần mềm sẽ làm gì?")) %}
+      <ul class="space-y-2.5 text-[13.5px] text-fg-2">
+        <li class="flex gap-2.5">{{ ui.icon("arrow-down-circle", "mt-0.5 size-4 shrink-0 text-primary") }}<span>{{ _("Hóa đơn mua vào (MST người mua là của công ty) → chứng từ mua hàng nháp.") }}</span></li>
+        <li class="flex gap-2.5">{{ ui.icon("arrow-up-circle", "mt-0.5 size-4 shrink-0 text-primary") }}<span>{{ _("Hóa đơn bán ra (MST người bán là của công ty) → chứng từ bán hàng nháp.") }}</span></li>
+        <li class="flex gap-2.5">{{ ui.icon("users", "mt-0.5 size-4 shrink-0 text-primary") }}<span>{{ _("Tìm đối tượng theo MST, chưa có thì tự thêm.") }}</span></li>
+        <li class="flex gap-2.5">{{ ui.icon("package", "mt-0.5 size-4 shrink-0 text-primary") }}<span>{{ _("Khớp hàng hóa theo mã hoặc tên; dòng chưa khớp dùng TK mặc định bạn chọn.") }}</span></li>
+        <li class="flex gap-2.5">{{ ui.icon("file-x", "mt-0.5 size-4 shrink-0 text-primary") }}<span>{{ _("Bỏ qua hóa đơn đã nhập (MST người bán + ký hiệu + số).") }}</span></li>
+        <li class="flex gap-2.5">{{ ui.icon("paperclip", "mt-0.5 size-4 shrink-0 text-primary") }}<span>{{ _("Lưu file XML làm đính kèm của chứng từ.") }}</span></li>
+      </ul>
+    {% endcall %}
+    {{ ui.alert(_("Phần mềm đọc nội dung hóa đơn, chưa kiểm tra chữ ký số. Hãy tra cứu hóa đơn trên cổng của Cục Thuế khi cần."), "info") }}
+  </div>
+</div>
+{% endblock %}

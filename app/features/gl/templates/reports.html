@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% import "gl/_macros.html" as gm with context %}
+{% block title %}{{ _("Báo cáo tài chính") }}{% endblock %}
+{% block content %}
+{{ ui.page_header(_("Báo cáo tài chính"), _("Bộ báo cáo tài chính doanh nghiệp nhỏ và vừa theo Thông tư 133/2016/TT-BTC – {p}", p=gm.plabel(period)), breadcrumbs=breadcrumbs, icon_name="chart-column") }}
+
+<div class="card mb-5 p-3 sm:px-5">{{ ui.period_selector(period, years=years, action="/reports") }}</div>
+
+{% set total_assets = b01a.value("200") %}
+<div class="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+  {{ ui.stat_card(_("Tổng tài sản"), total_assets, icon_name="building", href="/reports/b01a?" ~ period.query()) }}
+  {{ ui.stat_card(_("Vốn chủ sở hữu"), b01a.value("400"), icon_name="landmark", href="/reports/b01a?" ~ period.query()) }}
+  {{ ui.stat_card(_("Doanh thu thuần"), b02.value("10"), icon_name="trending-up", href="/reports/b02?" ~ period.query()) }}
+  {{ ui.stat_card(_("Lợi nhuận sau thuế"), b02.value("60"), icon_name="sigma", href="/reports/b02?" ~ period.query()) }}
+</div>
+
+{% set checks = [
+  (b01a.value("200") == b01a.value("500"), _("Tổng tài sản = tổng nguồn vốn")),
+  (tb.balanced, _("Bảng cân đối tài khoản cân")),
+  (not unclosed, _("Đã kết chuyển doanh thu, chi phí")),
+] %}
+<div class="mb-6 flex flex-wrap gap-x-6 gap-y-2 text-[13px]">
+  {% for ok, label in checks %}
+  <span class="inline-flex items-center gap-1.5 {{ 'text-emerald-700 dark:text-emerald-400' if ok else 'text-amber-700 dark:text-amber-400' }}">{{ ui.icon("circle-check" if ok else "triangle-alert") }}{{ label }}</span>
+  {% endfor %}
+  {% if can("closing.run") %}<a href="/closing" class="text-primary hover:underline">{{ _("Kết chuyển cuối kỳ") }} →</a>{% endif %}
+</div>
+
+<div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+  {% for key, code, title, desc, ic in [
+    ("b01a", "B01a-DNN", _("Báo cáo tình hình tài chính"), _("Tài sản, nợ phải trả và vốn chủ sở hữu tại ngày cuối kỳ"), "scale"),
+    ("b02", "B02-DNN", _("Báo cáo kết quả hoạt động kinh doanh"), _("Doanh thu, chi phí và lợi nhuận trong kỳ"), "trending-up"),
+    ("b03", "B03-DNN", _("Báo cáo lưu chuyển tiền tệ"), _("Dòng tiền theo phương pháp trực tiếp"), "arrow-left-right"),
+    ("b09", "B09-DNN", _("Bản thuyết minh báo cáo tài chính"), _("Chính sách kế toán và chi tiết các khoản mục"), "file-text"),
+    ("f01", "F01-DNN", _("Bảng cân đối tài khoản"), _("Phụ biểu gửi cơ quan thuế cùng báo cáo tài chính"), "table"),
+  ] %}
+  <div class="card flex items-start gap-4 p-4">
+    <span class="flex size-10 shrink-0 items-center justify-center rounded-lg border border-line bg-surface-2 text-fg-2">{{ ui.icon(ic, "size-5") }}</span>
+    <div class="min-w-0 flex-1">
+      <a href="/reports/{{ key }}?{{ period.query() }}" class="text-[14.5px] font-medium text-fg hover:underline">{{ title }}</a>
+      <p class="text-xs text-fg-3">{{ _("Mẫu số") }} {{ code }}</p>
+      <p class="mt-1 text-[13px] text-fg-2">{{ desc }}</p>
+    </div>
+    {% if can("reports.export") %}
+    <div class="flex shrink-0 gap-1">
+      {{ ui.icon_button("file-text", _("Tải PDF"), href="/reports/" ~ key ~ ".pdf?" ~ period.query(), attrs='target="_blank" rel="noopener"') }}
+      {{ ui.icon_button("file-spreadsheet", _("Tải Excel"), href="/reports/" ~ key ~ ".xlsx?" ~ period.query()) }}
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

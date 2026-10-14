@@ -1,0 +1,32 @@
+{% import "macros.html" as ui with context %}
+<div class="card-body divide-y divide-line" x-data="{ opening: {{ 'true' if form.get('is_opening') else 'false' }} }">
+  {% call ui.form_section(_("Thông tin"), _("Mã để trống sẽ tự cấp (CC0001 cho CCDC, TT0001 cho chi phí trả trước).")) %}
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-[10rem_minmax(0,1fr)]">
+      {{ ui.input("code", _("Mã"), form.get("code", ""), input_cls="tabular-nums") }}
+      {{ ui.input("name", _("Tên"), form.get("name", ""), required=True) }}
+    </div>
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      {{ ui.select("kind", _("Loại"), kinds, form.get("kind")) }}
+      {{ ui.input("quantity", _("Số lượng"), form.get("quantity", 1), type="number", input_cls="tabular-nums") }}
+      {{ ui.input("department", _("Bộ phận sử dụng"), form.get("department", "")) }}
+    </div>
+  {% endcall %}
+  {% call ui.form_section(_("Phân bổ"), _("Định khoản hàng tháng: Nợ TK chi phí / Có TK 242.")) %}
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      {{ ui.money_input("amount", _("Giá trị phân bổ"), form.get("amount") or none, required=True) }}
+      {{ ui.input("months", _("Số tháng phân bổ"), form.get("months", ""), type="number", required=True, input_cls="tabular-nums") }}
+      {{ ui.input("start_month", _("Tháng bắt đầu"), form.get("start_month", ""), type="month", required=True, input_cls="tabular-nums") }}
+    </div>
+    {{ ui.select("expense_account", _("TK chi phí"), expense_accounts, form.get("expense_account")) }}
+    <input type="hidden" name="prepaid_account" value="{{ form.get('prepaid_account') or '242' }}">
+    <label class="flex cursor-pointer items-start gap-2.5">
+      <input type="checkbox" name="is_opening" value="1" class="checkbox mt-0.5" x-model="opening">
+      <span><span class="block text-[13.5px] text-fg">{{ _("Đã phân bổ một phần trước khi dùng phần mềm") }}</span></span>
+    </label>
+    <div x-show="opening" x-cloak class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {{ ui.money_input("opening_allocated", _("Số đã phân bổ"), form.get("opening_allocated") or none) }}
+      {{ ui.input("opening_months_used", _("Số tháng đã phân bổ"), form.get("opening_months_used") or "", type="number", input_cls="tabular-nums") }}
+    </div>
+    {{ ui.textarea("note", _("Ghi chú"), form.get("note", ""), rows=2) }}
+  {% endcall %}
+</div>

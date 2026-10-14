@@ -1,0 +1,36 @@
+{% extends "gl/print/_base.html" %}
+{% import "gl/print/_base.html" as p %}
+{% block title %}Bảng cân đối tài khoản{% endblock %}
+{% block page_size %}size: A4 landscape; margin: 12mm 10mm 14mm 12mm;{% endblock %}
+{% block body %}
+{{ p.head(company, "F01-DNN", issued) }}
+<p class="title">BẢNG CÂN ĐỐI TÀI KHOẢN</p>
+<p class="subtitle">{{ subtitle }}</p>
+<p class="unit">Đơn vị tính: Đồng Việt Nam</p>
+<table class="book">
+  <colgroup><col style="width:8%"><col style="width:26%"><col span="6" style="width:11%"></colgroup>
+  <thead>
+    <tr><th rowspan="2">Số hiệu tài khoản</th><th rowspan="2">Tên tài khoản</th><th colspan="2">Số dư đầu kỳ</th><th colspan="2">Số phát sinh trong kỳ</th><th colspan="2">Số dư cuối kỳ</th></tr>
+    <tr><th>Nợ</th><th>Có</th><th>Nợ</th><th>Có</th><th>Nợ</th><th>Có</th></tr>
+    <tr class="letters"><th>A</th><th>B</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr>
+  </thead>
+  <tbody>
+    {% for r in tb.rows %}
+    <tr class="{{ 'b' if r.level == 1 }}">
+      <td class="c">{{ r.code }}</td>
+      <td class="{{ 'ind2' if r.level > 1 }}">{{ r.name }}</td>
+      <td class="num">{{ r.open_d|money0 }}</td><td class="num">{{ r.open_c|money0 }}</td>
+      <td class="num">{{ r.per_d|money0 }}</td><td class="num">{{ r.per_c|money0 }}</td>
+      <td class="num">{{ r.close_d|money0 }}</td><td class="num">{{ r.close_c|money0 }}</td>
+    </tr>
+    {% endfor %}
+    <tr class="b">
+      <td></td><td class="c">Tổng cộng</td>
+      <td class="num">{{ tb.total.open_d|money }}</td><td class="num">{{ tb.total.open_c|money }}</td>
+      <td class="num">{{ tb.total.per_d|money }}</td><td class="num">{{ tb.total.per_c|money }}</td>
+      <td class="num">{{ tb.total.close_d|money }}</td><td class="num">{{ tb.total.close_c|money }}</td>
+    </tr>
+  </tbody>
+</table>
+{{ p.signatures(company, date_label=date_label) }}
+{% endblock %}

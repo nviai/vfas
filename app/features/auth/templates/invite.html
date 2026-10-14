@@ -1,0 +1,23 @@
+{% extends "auth_base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Lời mời tham gia") }}{% endblock %}
+{% block content %}
+<div class="mb-6">
+  <span class="mb-4 flex size-11 items-center justify-center rounded-xl bg-primary-soft text-primary-soft-fg">{{ ui.icon("mail", "size-5") }}</span>
+  <h1 class="text-2xl font-semibold tracking-tight">{{ _("Bạn được mời tham gia") }}</h1>
+  <p class="mt-1.5 text-[14px] text-fg-3">{{ _("Chấp nhận lời mời để bắt đầu làm việc cùng doanh nghiệp.") }}</p>
+</div>
+<div class="mb-6 rounded-xl border border-line bg-surface-2 p-4">
+  {{ ui.desc_list([(_("Doanh nghiệp"), invitation.company_name), (_("Vai trò"), _(invitation.role_label)), (_("Email"), invitation.email)], cols="") }}
+</div>
+<form method="post" action="" class="space-y-4">
+  {{ ui.csrf_field() }}
+  {% if has_account %}
+    <p class="text-[13.5px] text-fg-2">{{ _("Email này đã có tài khoản. Nhấn chấp nhận để thêm doanh nghiệp vào danh sách công ty của bạn.") }}</p>
+  {% else %}
+    {{ ui.input("full_name", _("Họ và tên"), (form.full_name if form is defined and form else ""), errors=errors, required=True, attrs='autocomplete="name"', autofocus=True) }}
+    {{ ui.password_input("password", _("Đặt mật khẩu"), errors=errors, autocomplete="new-password", hint=_("Ít nhất 8 ký tự."), minlength=8) }}
+  {% endif %}
+  {{ ui.button(_("Chấp nhận lời mời"), size="lg", cls="btn-block", icon_name="check") }}
+</form>
+{% endblock %}

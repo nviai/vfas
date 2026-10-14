@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _(title) }}{% endblock %}
+{% block content %}
+{% set crumbs = [] %}{% for b in breadcrumbs %}{% do crumbs.append((_(b[0]), b[1])) %}{% endfor %}
+{% set t = sm.totals %}
+{% set qs = "mode=custom&start=" ~ period.start.isoformat() ~ "&end=" ~ period.end.isoformat() ~ "&q=" ~ (q|urlencode) %}
+{% call ui.page_header(_(title), _(subtitle) ~ " · " ~ _(period.label), breadcrumbs=crumbs, icon_name="hand-coins" if kind == "receivable" else "coins") %}
+  {{ ui.link_button(_("Tuổi nợ"), "/debts/" ~ path ~ "/aging", "secondary", icon_name="clock") }}
+  {% if can("debts.export") %}{{ ui.report_toolbar(xlsx_href="/debts/" ~ path ~ ".xlsx?" ~ qs) }}{% endif %}
+{% endcall %}
+
+<div class="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+  {% if kind == "receivable" %}
+    {{ ui.stat_card(_("Khách hàng còn nợ"), t.closing_debit, icon_name="hand-coins", hint=_("Dư Nợ TK 131 cuối kỳ")) }}
+    {{ ui.stat_card(_("Khách hàng trả trước"), t.closing_credit, icon_name="wallet", hint=_("Dư Có TK 131 cuối kỳ")) }}
+  {% else %}
+    {{ ui.stat_card(_("Còn phải trả người bán"), t.closing_credit, icon_name="coins", hint=_("Dư Có TK 331 cuối kỳ")) }}
+    {{ ui.stat_card(_("Đã ứng trước người bán"), t.closing_debit, icon_name="wallet", hint=_("Dư Nợ TK 331 cuối kỳ")) }}
+  {% endif %}
+  {{ ui.stat_card(_("Số đối tượng"), sm.rows|length, unit="", money_value=False, icon_name="users") }}
+</div>
+
+<div class="card">
+  <div class="flex flex-wrap items-end justify-between gap-3 border-b border-line p-3 sm:px-5">
+    {{ ui.period_selector(period, action="/debts/" ~ path, extra_hidden={"q": q}) }}
+    <form method="get" action="/debts/{{ path }}" class="w-full sm:w-64">
+      <input type="hidden" name="mode" value="custom"><input type="hidden" name="start" value="{{ period.start.isoformat() }}"><input type="hidden" name="end" value="{{ period.end.isoformat() }}">
+      {{ ui.input("q", None, q, "search", placeholder=_("Tìm đối tượng…"), prefix=ui.icon("search"), input_cls="input-sm") }}
+    </form>
+  </div>
+  {% if not sm.rows %}
+    {{ ui.empty_state(_("Không có công nợ trong kỳ"), "hand-coins") }}
+  {% else %}
+  <div class="table-wrap">
+    <table class="table table-hover">
+      <thead>
+        <tr><th rowspan="2">{{ _(info.partner) }}</th><th colspan="2" class="text-center max-lg:hidden">{{ _("Số dư đầu kỳ") }}</th><th colspan="2" class="text-center">{{ _("Phát sinh trong kỳ") }}</th><th colspan="2" class="text-center">{{ _("Số dư cuối kỳ") }}</th></tr>
+        <tr><th class="num w-32 max-lg:hidden">{{ _("Nợ") }}</th><th class="num w-32 max-lg:hidden">{{ _("Có") }}</th><th class="num w-32">{{ _("Nợ") }}</th><th class="num w-32">{{ _("Có") }}</th><th class="num w-32">{{ _("Nợ") }}</th><th class="num w-32">{{ _("Có") }}</th></tr>
+      </thead>
+      <tbody>
+        {% for r in sm.rows %}{% set od, oc = r.opening_dc %}{% set cd, cc = r.closing_dc %}
+        <tr class="is-link">
+          <td class="max-w-0">{% if r.partner %}<a href="/debts/partner/{{ r.partner.id }}?kind={{ kind }}&mode=custom&start={{ period.start.isoformat() }}&end={{ period.end.isoformat() }}" class="font-medium text-fg hover:underline">{{ r.partner.name }}</a><p class="text-xs text-fg-3">{{ r.partner.code }}{% if r.partner.tax_code %} · MST {{ r.partner.tax_code }}{% endif %}</p>{% else %}<span class="text-fg-3">{{ _("(không đối tượng)") }}</span>{% endif %}</td>
+          <td class="num max-lg:hidden">{{ od|money0 }}</td><td class="num max-lg:hidden">{{ oc|money0 }}</td>
+          <td class="num">{{ r.debit|money0 }}</td><td class="num">{{ r.credit|money0 }}</td>
+          <td class="num font-medium">{{ cd|money0 }}</td><td class="num font-medium">{{ cc|money0 }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot><tr class="row-total"><td>{{ _("Tổng cộng") }}</td>
+        <td class="num max-lg:hidden">{{ t.opening_debit|money }}</td><td class="num max-lg:hidden">{{ t.opening_credit|money }}</td>
+        <td class="num">{{ t.debit|money }}</td><td class="num">{{ t.credit|money }}</td>
+        <td class="num">{{ t.closing_debit|money }}</td><td class="num">{{ t.closing_credit|money }}</td></tr></tfoot>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,35 @@
+{% extends "auth_base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Chọn công ty") }}{% endblock %}
+{% block width %}max-w-[460px]{% endblock %}
+{% block content %}
+<div class="mb-6">
+  <h1 class="text-2xl font-semibold tracking-tight">{{ _("Chọn công ty") }}</h1>
+  <p class="mt-1.5 text-[14px] text-fg-3">{{ _("Bạn có quyền truy cập nhiều công ty. Chọn công ty để làm việc.") }}</p>
+</div>
+{% if companies %}
+<ul class="space-y-2">
+  {% for c in companies %}
+  <li>
+    <form method="post" action="/switch-company">
+      {{ ui.csrf_field() }}<input type="hidden" name="company_id" value="{{ c.id }}">
+      <button type="submit" class="group flex w-full items-center gap-3 rounded-xl border border-line bg-surface p-3.5 text-left transition hover:border-line-strong hover:bg-surface-2 focus-visible:border-primary">
+        <span class="flex size-10 shrink-0 items-center justify-center rounded-lg border border-line bg-surface-2 text-sm font-semibold text-fg-2">{{ c.name[:1]|upper }}</span>
+        <span class="min-w-0 flex-1">
+          <span class="block truncate text-[14px] font-medium text-fg">{{ c.name }}</span>
+          <span class="block truncate text-xs text-fg-3">{{ c.role_label }}{% if c.tax_code %} · {{ _("MST") }} {{ c.tax_code }}{% endif %}</span>
+        </span>
+        {{ ui.icon("chevron-right", "size-4 text-fg-3 transition group-hover:translate-x-0.5") }}
+      </button>
+    </form>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+{{ ui.empty_state(_("Bạn chưa thuộc công ty nào"), "building-2", _("Tạo công ty mới hoặc nhờ quản trị viên gửi lời mời.")) }}
+{% endif %}
+<div class="mt-6 flex items-center justify-between gap-3">
+  <a href="/companies/new" class="btn-ghost btn-sm -ml-2">{{ ui.icon("circle-plus") }}{{ _("Tạo công ty mới") }}</a>
+  <form method="post" action="/logout">{{ ui.csrf_field() }}<button class="btn-ghost btn-sm -mr-2 text-fg-3">{{ ui.icon("log-out") }}{{ _("Đăng xuất") }}</button></form>
+</div>
+{% endblock %}

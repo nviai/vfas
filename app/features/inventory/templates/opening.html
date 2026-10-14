@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% import "inventory/_grid.html" as grid with context %}
+{% block title %}{{ _("Tồn kho đầu kỳ") }}{% endblock %}
+{% block content %}
+{{ ui.page_header(_("Tồn kho đầu kỳ"), _("Số lượng và giá trị từng hàng tại ngày {d} (trước ngày bắt đầu hạch toán). Tổng giá trị phải khớp số dư đầu kỳ TK 15x.", d=opening_date|date), breadcrumbs=breadcrumbs, icon_name="archive") }}
+
+{% if compare %}
+<div class="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+  {% for c in compare %}
+  <div class="card p-4">
+    <div class="flex items-center justify-between">
+      <p class="text-[13px] font-medium text-fg-3">{{ _("TK {a}", a=c.account) }}</p>
+      {% if c.gl == c.stock %}{{ ui.badge(_("Khớp"), "green", dot=True) }}{% else %}{{ ui.badge(_("Lệch"), "red", dot=True) }}{% endif %}
+    </div>
+    <dl class="mt-2 space-y-1 text-[13px]">
+      <div class="flex justify-between"><dt class="text-fg-3">{{ _("Tồn kho") }}</dt><dd class="tabular-nums font-medium">{{ c.stock|money }}</dd></div>
+      <div class="flex justify-between"><dt class="text-fg-3">{{ _("Số dư đầu kỳ sổ cái") }}</dt><dd class="tabular-nums">{{ c.gl|money }}</dd></div>
+    </dl>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<nav class="tabs mb-4" aria-label="{{ _('Kho') }}">
+  {% for w in warehouses %}<a href="/inventory/opening?warehouse_id={{ w.id }}" class="tab {{ 'tab-active' if w.id == wh.id }}">{{ ui.icon("warehouse") }}{{ w.name }}</a>{% endfor %}
+</nav>
+
+{% if locked %}
+  {{ ui.alert(_("Đã khóa sổ kỳ đầu tiên, không sửa được tồn kho đầu kỳ. Mở khóa toàn bộ trước khi sửa."), "warning", cls="mb-5") }}
+{% endif %}
+
+{% if can("inventory.manage") and not locked %}
+<form method="post" action="/inventory/opening" x-data="docForm()" @keydown="keys($event)">
+  {{ ui.csrf_field() }}
+  <input type="hidden" name="warehouse_id" value="{{ wh.id }}">
+  {% call ui.card(_("Tồn đầu kỳ – {w}", w=wh.name)) %}
+    {{ grid.stock_grid(lines, with_value=True) }}
+  {% endcall %}
+  {% call ui.form_actions() %}
+    {{ ui.button(_("Lưu tồn kho đầu kỳ"), icon_name="check", hotkey="save", kbd_hint="Ctrl+S") }}
+  {% endcall %}
+</form>
+{% else %}
+{% call ui.card(_("Tồn đầu kỳ – {w}", w=wh.name), flush=True) %}
+  {% if rows %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th class="w-28">{{ _("Mã") }}</th><th>{{ _("Tên hàng") }}</th><th class="w-20">{{ _("ĐVT") }}</th><th class="num w-28">{{ _("Số lượng") }}</th><th class="num w-32">{{ _("Đơn giá") }}</th><th class="num w-36">{{ _("Thành tiền") }}</th></tr></thead>
+      <tbody>
+        {% for m in rows %}
+        <tr><td class="tabular-nums text-fg-2">{{ m.item.code }}</td><td>{{ m.item.name }}</td><td class="text-fg-2">{{ m.item.unit }}</td>
+            <td class="num">{{ m.qty_in|qty }}</td><td class="num">{{ m.unit_cost|qty(2) if m.unit_cost else "–" }}</td><td class="num">{{ m.amount|money }}</td></tr>
+        {% endfor %}
+      </tbody>
+      <tfoot><tr class="row-total"><td colspan="5">{{ _("Cộng") }}</td><td class="num">{{ rows|sum(attribute="amount")|money }}</td></tr></tfoot>
+    </table>
+  </div>
+  {% else %}{{ ui.empty_state(_("Chưa có tồn kho đầu kỳ"), "archive", compact=True) }}{% endif %}
+{% endcall %}
+{% endif %}
+{% endblock %}

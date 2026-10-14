@@ -1,0 +1,38 @@
+{% extends "gl/print/_base.html" %}
+{% import "gl/print/_base.html" as p %}
+{% block title %}Sổ Nhật ký chung{% endblock %}
+{% block page_size %}size: A4 landscape; margin: 12mm 10mm 14mm 12mm;{% endblock %}
+{% block body %}
+{{ p.head(company, "S03a-DNN", issued) }}
+<p class="title">SỔ NHẬT KÝ CHUNG</p>
+<p class="subtitle">{{ subtitle }}</p>
+<p class="unit">Đơn vị tính: Đồng Việt Nam</p>
+<table class="book">
+  <colgroup><col style="width:8%"><col style="width:10%"><col style="width:8%"><col style="width:34%"><col style="width:5%"><col style="width:5%"><col style="width:7%"><col style="width:11.5%"><col style="width:11.5%"></colgroup>
+  <thead>
+    <tr><th rowspan="2">Ngày, tháng ghi sổ</th><th colspan="2">Chứng từ</th><th rowspan="2">Diễn giải</th><th rowspan="2">Đã ghi Sổ Cái</th><th rowspan="2">STT dòng</th><th rowspan="2">Số hiệu TK đối ứng</th><th colspan="2">Số phát sinh</th></tr>
+    <tr><th>Số hiệu</th><th>Ngày, tháng</th><th>Nợ</th><th>Có</th></tr>
+    <tr class="letters"><th>A</th><th>B</th><th>C</th><th>D</th><th>E</th><th>G</th><th>H</th><th>1</th><th>2</th></tr>
+  </thead>
+  <tbody>
+    <tr><td></td><td></td><td></td><td class="i">Số trang trước chuyển sang</td><td></td><td></td><td></td><td></td><td></td></tr>
+    {% for r in book.rows %}
+    <tr>
+      <td class="c">{{ r.date|date if r.new_entry }}</td>
+      <td class="c">{{ r.number if r.new_entry }}</td>
+      <td class="c">{{ r.doc_date|date if r.new_entry }}</td>
+      <td>{{ r.description }}</td>
+      <td class="c">x</td>
+      <td class="c">{{ r.stt }}</td>
+      <td class="c">{{ r.account }}</td>
+      <td class="num">{{ r.debit|money0 }}</td>
+      <td class="num">{{ r.credit|money0 }}</td>
+    </tr>
+    {% endfor %}
+    <tr class="b"><td></td><td></td><td></td><td>Cộng chuyển sang trang sau</td><td></td><td></td><td></td><td class="num">{{ book.total_debit|money }}</td><td class="num">{{ book.total_credit|money }}</td></tr>
+  </tbody>
+</table>
+<p class="book-note">- Sổ này có {{ total_pages or "......" }} trang, đánh số từ trang số 01 đến trang {{ "%02d"|format(total_pages) if total_pages else "......" }}</p>
+<p class="book-note">- Ngày mở sổ: {{ company.start_date|date }}</p>
+{{ p.signatures(company, left="Người ghi sổ", date_label=date_label) }}
+{% endblock %}

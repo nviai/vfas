@@ -1,0 +1,84 @@
+{#- Line grid of a stock document – uses the Alpine invoiceGrid component (without the tax columns).
+    Submitted inputs: lines-count, lines-{i}-item_id, -description, -unit, -quantity, -unit_price, -amount -#}
+{% import "macros.html" as ui with context %}
+{% macro stock_grid(lines, with_value=True, price_field="purchase_price") -%}
+{%- set opts = {"prefix": "lines", "lines": lines or [], "priceField": price_field, "defaultVat": "KCT",
+                "vatRates": [{"value": "KCT", "label": "KCT", "rate": 0}]} -%}
+<div x-data='invoiceGrid({{ opts|tojson }})' class="min-w-0">
+  <input type="hidden" :name="`${prefix}-count`" :value="lines.length">
+  <div class="table-wrap rounded-lg border border-line">
+    <table class="table table-compact table-fixed {{ 'min-w-[860px]' if with_value else 'min-w-[640px]' }}">
+      <colgroup>
+        <col class="w-10"><col class="w-64"><col><col class="w-24"><col class="w-28">
+        {% if with_value %}<col class="w-32"><col class="w-36">{% endif %}<col class="w-10">
+      </colgroup>
+      <thead>
+        <tr>
+          <th class="text-center">#</th>
+          <th>{{ _("Vật tư, hàng hóa") }}</th>
+          <th>{{ _("Diễn giải") }}</th>
+          <th>{{ _("ĐVT") }}</th>
+          <th class="num">{{ _("Số lượng") }}</th>
+          {% if with_value %}<th class="num">{{ _("Đơn giá") }}</th><th class="num">{{ _("Thành tiền") }}</th>{% endif %}
+          <th><span class="sr-only">{{ _("Xóa") }}</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <template x-for="(line, i) in lines" :key="line.uid">
+          <tr data-row class="group">
+            <td class="text-center text-xs text-fg-3 tabular-nums" x-text="i + 1"></td>
+            <td class="!px-1.5">
+              <div x-data='combobox({"url": "/lookup/items", "params": {}})' x-init="setInitial(line.item_id, line.item_label)"
+                   @click.outside="open = false" @combobox-select.stop="onItem(line, $event.detail)">
+                <div class="relative">
+                  <input x-ref="input" data-cell type="text" autocomplete="off" class="input input-sm" placeholder="{{ _('Mã hoặc tên hàng…') }}"
+                         x-model="query" @focus="onFocus()" @input="onInput()" @keydown="onKey($event); keys($event, i)" @blur="onBlur()">
+                  <div x-show="open && items.length" x-cloak data-fixed class="menu absolute top-full left-0 z-50 mt-1 max-h-64 w-80 max-w-[80vw] overflow-y-auto p-1" x-ref="list">
+                    <template x-for="(it, j) in items" :key="String(it.value) + ':' + j">
+                      <button type="button" tabindex="-1" :data-i="j" class="flex w-full flex-col rounded-md px-2.5 py-1.5 text-left" :class="j === active ? 'bg-surface-3' : ''"
+                              @mousedown.prevent="select(it)" @mouseenter="active = j">
+                        <span class="truncate text-[13px]" x-text="it.label"></span>
+                        <span class="truncate text-xs text-fg-3" x-show="it.hint" x-text="it.hint"></span>
+                      </button>
+                    </template>
+                  </div>
+                </div>
+              </div>
+              <input type="hidden" :name="name(i, 'item_id')" :value="line.item_id">
+            </td>
+            <td class="!px-1.5"><input data-cell type="text" class="input input-sm" x-model="line.description" :name="name(i, 'description')" @keydown="keys($event, i)"></td>
+            <td class="!px-1.5"><input data-cell type="text" class="input input-sm" x-model="line.unit" :name="name(i, 'unit')" @keydown="keys($event, i)"></td>
+            <td class="!px-1.5"><input data-cell type="text" inputmode="decimal" class="input input-sm input-num"
+                 x-effect="qtyEffect($el, line.quantity)" @input="setQty(line, 'quantity', $event)" @blur="$el.value = fmtQty(line.quantity)" @keydown="keys($event, i)">
+                 <input type="hidden" :name="name(i, 'quantity')" :value="num(line.quantity)"></td>
+            {% if with_value %}
+            <td class="!px-1.5"><input data-cell type="text" inputmode="decimal" class="input input-sm input-num"
+                 x-effect="qtyEffect($el, line.unit_price)" @input="setQty(line, 'unit_price', $event)" @blur="$el.value = fmtQty(line.unit_price)" @keydown="keys($event, i)">
+                 <input type="hidden" :name="name(i, 'unit_price')" :value="num(line.unit_price)"></td>
+            <td class="!px-1.5"><input data-cell type="text" inputmode="decimal" class="input input-sm input-num" :class="line.amountLocked && 'border-amber-400'"
+                 x-effect="moneyEffect($el, line.amount)" @change="setMoney(line, 'amount', $event)" @keydown="keys($event, i)">
+                 <input type="hidden" :name="name(i, 'amount')" :value="num(line.amount)"></td>
+            {% endif %}
+            <td class="!px-1 text-center">
+              <button type="button" class="btn-ghost btn-xs btn-icon text-fg-3 opacity-60 hover:text-rose-600 group-hover:opacity-100" @click="removeLine(i)" aria-label="{{ _('Xóa dòng') }}" tabindex="-1">{{ ui.icon("trash", "size-3.5") }}</button>
+            </td>
+          </tr>
+        </template>
+      </tbody>
+      <tfoot>
+        <tr class="row-total">
+          <td></td>
+          <td colspan="3"><button type="button" class="btn-ghost btn-xs -ml-1.5 font-medium text-primary dark:text-brand-400" @click="addLine(); focusRow(lines.length - 1)">{{ ui.icon("plus", "size-3.5") }}{{ _("Thêm dòng") }}</button></td>
+          <td class="num" x-text="fmtQty(lines.reduce((s, l) => s + (Number(l.quantity) || 0), 0))"></td>
+          {% if with_value %}<td></td><td class="num" x-text="fmt(subtotal)"></td>{% endif %}
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  <p class="mt-2 hidden text-xs text-fg-3 sm:block">
+    {{ ui.kbd("Enter") }} {{ _("sang ô tiếp / thêm dòng") }} · {{ ui.kbd("Ctrl+D") }} {{ _("nhân bản dòng") }} · {{ ui.kbd("Ctrl+Delete") }} {{ _("xóa dòng") }}
+    {% if with_value %} · {{ _("Sửa tay Thành tiền khi cần làm tròn theo chứng từ.") }}{% endif %}
+  </p>
+</div>
+{%- endmacro %}

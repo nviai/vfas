@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% set dep = kind == "depreciation" %}
+{% block title %}{{ _(meta.title) }}{% endblock %}
+{% block content %}
+{% set qs = "?year=" ~ year ~ "&month=" ~ month %}
+{% call ui.page_header(_(meta.title), _("Tháng {m}/{y}", m="%02d"|format(month), y=year) ~ " · " ~ (_("đường thẳng theo tháng, tháng cuối bù chênh lệch") if dep else _("phân bổ đều theo số tháng")), breadcrumbs=breadcrumbs, icon_name="trending-down" if dep else "calendar") %}
+  {% if can("assets.export") %}{{ ui.report_toolbar(pdf_href=meta.url ~ "/sheet.pdf" ~ qs, xlsx_href=meta.url ~ "/sheet.xlsx" ~ qs) }}{% endif %}
+{% endcall %}
+
+<div class="card mb-5 flex flex-wrap items-end justify-between gap-3 p-3 sm:px-5">
+  <form method="get" action="{{ meta.url }}" class="flex flex-wrap items-end gap-2">
+    <div>
+      <label class="label" for="f-month">{{ _("Tháng") }}</label>
+      <select id="f-month" name="month" class="input input-sm w-24">{% for m in range(1, 13) %}<option value="{{ m }}" {{ "selected" if m == month }}>{{ "%02d"|format(m) }}</option>{% endfor %}</select>
+    </div>
+    <div>
+      <label class="label" for="f-year">{{ _("Năm") }}</label>
+      <input id="f-year" type="number" name="year" value="{{ year }}" class="input input-sm w-24 tabular-nums">
+    </div>
+    <button class="btn-secondary btn-sm" type="submit">{{ _("Xem") }}</button>
+  </form>
+  <div class="flex flex-wrap items-center gap-2">
+    {% if run and run.entry and run.entry.status == "posted" %}
+      {{ ui.badge(_("Đã ghi sổ") ~ " " ~ run.entry.number, "green", icon_name="check", dot=False) }}
+    {% elif run and run.entry and run.entry.status == "draft" %}
+      {{ ui.badge(_("Chứng từ nháp") ~ " #" ~ run.entry.id, "amber") }}
+    {% else %}
+      {{ ui.badge(_("Chưa trích") if dep else _("Chưa phân bổ"), "gray") }}
+    {% endif %}
+    {% if can("assets.post") and preview.lines and not locked %}
+    <form method="post" action="{{ meta.url }}/run" {% if run and run.entry and run.entry.status == "posted" %}data-confirm="{{ _('Chứng từ cũ của tháng sẽ bị hủy và lập lại theo số liệu hiện tại. Tiếp tục?') }}"{% endif %}>
+      {{ ui.csrf_field() }}<input type="hidden" name="year" value="{{ year }}"><input type="hidden" name="month" value="{{ month }}">
+      {{ ui.button((_("Tính lại") if run and run.entry and run.entry.status == "posted" else (_("Trích khấu hao") if dep else _("Phân bổ"))) ~ " " ~ "%02d"|format(month) ~ "/" ~ year, "primary", icon_name="zap") }}
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+{% if locked %}{{ ui.alert(_("Kỳ {m}/{y} đã khóa sổ – không trích lại được.", m="%02d"|format(month), y=year), "warning", cls="mb-5") }}{% endif %}
+{% if missing %}
+  {% call ui.alert(_("{n} tháng đã qua chưa có chứng từ ghi sổ.", n=missing|length), "warning", cls="mb-5") %}
+    {% for y, m in missing[:12] %}{{ ui.link_button("%02d"|format(m) ~ "/" ~ y, meta.url ~ "?year=" ~ y ~ "&month=" ~ m, "secondary", size="xs") }}{% endfor %}
+  {% endcall %}
+{% endif %}
+
+<div class="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
+  {% call ui.card((_("Bảng tính khấu hao tháng") if dep else _("Bảng phân bổ tháng")) ~ " " ~ "%02d"|format(month) ~ "/" ~ year, flush=True) %}
+  {% if not preview.lines %}
+    {{ ui.empty_state(_("Không có số cần trích trong tháng này") if dep else _("Không có khoản cần phân bổ trong tháng này"), "inbox", compact=True) }}
+  {% else %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th class="w-28">{{ _("Mã") }}</th><th>{{ _(meta.item_label) }}</th><th class="num w-36 max-md:hidden">{{ _("Nguyên giá") if dep else _("Giá trị") }}</th><th class="w-24 max-md:hidden">{{ _("Số tháng") }}</th><th class="w-28">{{ _("Nợ / Có") }}</th><th class="num w-36">{{ _("Số tiền") }}</th></tr></thead>
+      <tbody>
+        {% for ln in preview.lines %}
+        <tr>
+          <td><a class="doc-no whitespace-nowrap hover:underline" href="{{ ('/assets/' if dep else '/prepaid/') ~ ln.ref.id }}">{{ ln.ref.code }}</a></td>
+          <td>{{ ln.ref.name }}</td>
+          <td class="num max-md:hidden text-fg-2">{{ (ln.ref.cost if dep else ln.ref.amount)|money }}</td>
+          <td class="max-md:hidden tabular-nums text-fg-2">{{ ln.ref.useful_life_months if dep else ln.ref.months }}</td>
+          <td class="tabular-nums text-fg-2">{{ ln.debit_account }} / {{ ln.credit_account }}</td>
+          <td class="num font-medium">{{ ln.amount|money }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot><tr class="row-total"><td colspan="5" class="max-md:hidden">{{ _("Cộng") }}</td><td class="md:hidden">{{ _("Cộng") }}</td><td class="num">{{ preview.total|money }}</td></tr></tfoot>
+    </table>
+  </div>
+  {% endif %}
+  {% endcall %}
+
+  <aside class="space-y-5">
+    {% if preview.lines %}
+    {% call ui.card(_("Định khoản")) %}
+      <ul class="space-y-2 text-[13.5px]">
+        {% for d, c, v in preview.by_account() %}
+        <li class="flex items-center justify-between gap-3"><span class="tabular-nums text-fg-2">{{ _("Nợ") }} {{ d }} / {{ _("Có") }} {{ c }}</span><span class="tabular-nums font-medium">{{ v|money }}</span></li>
+        {% endfor %}
+      </ul>
+    {% endcall %}
+    {% endif %}
+    {% call ui.card(_("Các lần đã chạy"), flush=True) %}
+    {% if runs %}
+      <ul class="divide-y divide-line">
+        {% for r in runs %}
+        <li><a href="{{ meta.url }}?year={{ r.year }}&month={{ r.month }}" class="flex items-center gap-3 px-5 py-2.5 hover:bg-surface-2 {{ 'bg-surface-2' if r.year == year and r.month == month }}">
+          <span class="w-16 tabular-nums text-[13px]">{{ "%02d"|format(r.month) }}/{{ r.year }}</span>
+          <span class="doc-no whitespace-nowrap flex-1 text-[13px]">{{ r.entry.number if r.entry and r.entry.number else "–" }}</span>
+          {{ ui.status_badge(r.entry.status if r.entry else "pending") }}
+        </a></li>
+        {% endfor %}
+      </ul>
+    {% else %}{{ ui.empty_state(_("Chưa chạy lần nào"), "history", compact=True) }}{% endif %}
+    {% endcall %}
+  </aside>
+</div>
+{% endblock %}

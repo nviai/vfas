@@ -1,0 +1,32 @@
+name: Feature request
+description: A missing business process, ledger, report or integration
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: You may write in English or Vietnamese.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Need
+      description: What are you trying to do and what is hard today? (e.g. "At month end I add up the listing by hand…")
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What should VFAS do? Sample forms or Excel files (with real data removed) help a lot.
+    validations:
+      required: true
+  - type: textarea
+    id: legal
+    attributes:
+      label: Legal basis
+      description: Related documents, articles and form numbers (e.g. Circular 133/2016/TT-BTC, Appendix …)
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contribution
+      options:
+        - label: I can help review the accounting rules or write code for this feature

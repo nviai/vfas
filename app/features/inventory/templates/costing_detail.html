@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ entry.display_number }}{% endblock %}
+{% block content %}
+{% call ui.page_header(_("Giá vốn hàng xuất") ~ " " ~ entry.display_number, entry.description, breadcrumbs=breadcrumbs, back="/inventory/costing", badge=ui.status_badge(entry.status)) %}
+{% endcall %}
+{% if entry.status == "cancelled" %}{{ ui.alert(_("Chứng từ đã hủy. Lý do: {r}", r=entry.cancel_reason or ""), "warning", cls="mb-5") }}{% endif %}
+
+<div class="space-y-5">
+  {% call ui.card(_("Định khoản"), flush=True) %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th class="w-24">{{ _("TK Nợ") }}</th><th class="w-24">{{ _("TK Có") }}</th><th>{{ _("Hàng hóa") }}</th><th class="num w-40">{{ _("Số tiền") }}</th></tr></thead>
+      <tbody>
+        {% for l in entry.lines %}
+        <tr><td class="font-medium tabular-nums">{{ l.debit_account }}</td><td class="font-medium tabular-nums">{{ l.credit_account }}</td>
+            <td class="text-fg-2">{% if l.item_id and items.get(l.item_id) %}{{ items[l.item_id].code }} – {{ items[l.item_id].name }}{% else %}{{ l.description }}{% endif %}</td>
+            <td class="num">{{ l.amount|money }}</td></tr>
+        {% endfor %}
+      </tbody>
+      <tfoot><tr class="row-total"><td colspan="3">{{ _("Cộng") }}</td><td class="num">{{ entry.total|money }}</td></tr></tfoot>
+    </table>
+  </div>
+  {% endcall %}
+
+  {% if moves %}
+  {% call ui.card(_("Dòng xuất, nhập lại đã tính giá"), flush=True) %}
+  <div class="table-wrap">
+    <table class="table table-compact">
+      <thead><tr><th class="w-28">{{ _("Ngày") }}</th><th class="w-36">{{ _("Chứng từ") }}</th><th>{{ _("Hàng hóa") }}</th><th class="num w-24">{{ _("Nhập") }}</th><th class="num w-24">{{ _("Xuất") }}</th><th class="num w-32">{{ _("Đơn giá") }}</th><th class="num w-36">{{ _("Thành tiền") }}</th></tr></thead>
+      <tbody>
+        {% for m in moves %}
+        <tr><td class="tabular-nums text-fg-2">{{ m.date|date }}</td><td class="doc-no">{{ m.number }}</td><td>{{ items[m.item_id].name if items.get(m.item_id) else m.item_id }}</td>
+            <td class="num">{{ m.qty_in|qty if m.qty_in else "" }}</td><td class="num">{{ m.qty_out|qty if m.qty_out else "" }}</td>
+            <td class="num">{{ m.unit_cost|qty(2) if m.unit_cost else "–" }}</td><td class="num">{{ m.amount|money }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endcall %}
+  {% endif %}
+</div>
+{% endblock %}

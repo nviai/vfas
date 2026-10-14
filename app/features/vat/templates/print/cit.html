@@ -1,0 +1,30 @@
+{% extends "vat/print/_layout.html" %}
+{% block title %}Bảng tính thuế TNDN {{ year }}{% endblock %}
+{% block body %}
+<table class="doc-head"><tr>
+  <td class="left"><p><span class="b">Đơn vị:</span> {{ company.name }}</p><p><span class="b">Mã số thuế:</span> {{ company.tax_code }}</p><p><span class="b">Địa chỉ:</span> {{ company.address }}</p></td>
+  <td class="right"></td>
+</tr></table>
+<p class="title">BẢNG TÍNH THUẾ THU NHẬP DOANH NGHIỆP</p>
+<p class="subtitle">Kỳ tính thuế: Năm {{ year }}</p>
+<p class="subtitle i small">(Tài liệu nội bộ tham khảo các chỉ tiêu chính của tờ khai quyết toán thuế TNDN mẫu 03/TNDN)</p>
+<p class="r i small" style="margin-top:2mm">Đơn vị tiền: Đồng Việt Nam</p>
+<table class="grid">
+  <colgroup><col style="width:9%"><col style="width:63%"><col style="width:28%"></colgroup>
+  <thead><tr><th>Mã</th><th>Chỉ tiêu</th><th>Số tiền</th></tr></thead>
+  <tbody>
+    {% for code, label in labels.items() %}
+    <tr class="{{ 'head' if code in ('A1', 'B12', 'C4', 'D', 'F') }}">
+      <td class="code">{{ code }}</td><td>{{ label }}</td>
+      <td class="num">{% if code == "C7" %}{{ v.C7 }}%{% else %}{{ v.get(code, 0)|money }}{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<p class="note">Lợi nhuận kế toán lấy từ phát sinh các tài khoản 511, 515, 711, 632, 635, 642, 811 trong năm (không gồm bút toán kết chuyển). Thuế suất theo Luật Thuế TNDN số 67/2025/QH15.</p>
+<table class="signatures"><tr>
+  <td style="width:33%"><p class="role">Người lập biểu</p><p class="hint">(Ký, họ tên)</p><p class="name">{{ company.preparer }}</p></td>
+  <td style="width:33%"><p class="role">Kế toán trưởng</p><p class="hint">(Ký, họ tên)</p><p class="name">{{ company.chief_accountant }}</p></td>
+  <td style="width:34%"><p class="i">Ngày ..... tháng ..... năm ..........</p><p class="role">Người đại diện theo pháp luật</p><p class="hint">(Ký, họ tên, đóng dấu)</p><p class="name">{{ company.legal_rep }}</p></td>
+</tr></table>
+{% endblock %}

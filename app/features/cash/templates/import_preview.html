@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Xem trước dữ liệu nhập") }}{% endblock %}
+{% block content %}
+{{ ui.page_header(_("Xem trước: {f}", f=p.filename), _("Kiểm tra số liệu trước khi ghi vào sổ."), breadcrumbs=breadcrumbs, back="/cash/import", icon_name="file-spreadsheet") }}
+
+{% for i in p.blocking %}{{ ui.alert(_(i.msg, **i.params), "error", cls="mb-3") }}{% endfor %}
+{% for i in p.notices %}{{ ui.alert(_(i.msg, **i.params), "info", cls="mb-3") }}{% endfor %}
+
+<div class="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+  {{ ui.stat_card(_("Dòng hợp lệ"), p.valid_rows|length, unit="", money_value=False, icon_name="circle-check",
+                  hint=_("{e} lỗi · {w} cảnh báo", e=p.error_rows|length, w=p.warning_rows|length)) }}
+  {{ ui.stat_card(_("Tổng thu"), p.total_in, icon_name="circle-arrow-down", hint=(_("File: {v}", v=p.file_total_in|money) if p.file_total_in is not none else None)) }}
+  {{ ui.stat_card(_("Tổng chi"), p.total_out, icon_name="circle-arrow-up", hint=(_("File: {v}", v=p.file_total_out|money) if p.file_total_out is not none else None)) }}
+  {{ ui.stat_card(_("Tồn sau khi nhập"), p.closing_after, icon_name="wallet", hint=(_("File: {v}", v=p.file_closing|money) if p.file_closing is not none else None)) }}
+</div>
+
+{% call ui.card(_("Tùy chọn"), cls="mb-5") %}
+<form method="get" action="" class="grid grid-cols-1 items-end gap-4 sm:grid-cols-2 lg:grid-cols-4">
+  {{ ui.combobox("receipt_contra", _("TK đối ứng mặc định – dòng thu"), "/lookup/accounts", value=options.default_receipt_contra or None, value_label=options.default_receipt_contra or None, hint=(_("{n} dòng thu thiếu TK", n=p.missing_contra.get("PT", 0)) if p.missing_contra.get("PT") else None)) }}
+  {{ ui.combobox("payment_contra", _("TK đối ứng mặc định – dòng chi"), "/lookup/accounts", value=options.default_payment_contra or None, value_label=options.default_payment_contra or None, hint=(_("{n} dòng chi thiếu TK", n=p.missing_contra.get("PC", 0)) if p.missing_contra.get("PC") else None)) }}
+  {% if p.needs_bank %}
+  <div>
+    <label class="label" for="f-bank">{{ _("Tài khoản ngân hàng cho dòng TK 112") }}</label>
+    <select id="f-bank" name="bank_account_id" class="input">
+      <option value="">{{ _("— Chọn —") }}</option>
+      {% for b in banks %}<option value="{{ b.id }}" {{ "selected" if options.bank_account_id == b.id }}>{{ b.label }}</option>{% endfor %}
+    </select>
+  </div>
+  {% endif %}
+  <div>{{ ui.button(_("Kiểm tra lại"), "secondary", icon_name="refresh-cw") }}</div>
+</form>
+<p class="mt-3 text-[13px] text-fg-3">
+  {% if p.opening_mode == "set" %}{{ _("Số dư đầu kỳ TK 1111 sẽ đặt bằng ô H12: {v} đ (hiện tại {c} đ).", v=(p.opening_file or 0)|money, c=p.opening_current|money) }}
+  {% else %}{{ _("Sổ quỹ đã có số liệu: ô H12 phải bằng tồn trên sổ trước ngày đầu tiên của file.") }}{% endif %}
+  {% if p.skipped_examples %} {{ _("Bỏ qua {n} dòng ví dụ.", n=p.skipped_examples) }}{% endif %}
+</p>
+{% endcall %}
+
+{% call ui.card(_("Các dòng đọc được"), flush=True) %}
+<div class="table-wrap max-h-[60vh]">
+  <table class="table table-compact table-sticky">
+    <thead><tr><th class="w-16">{{ _("Dòng") }}</th><th class="w-28">{{ _("Ngày") }}</th><th class="w-28">{{ _("Số phiếu") }}</th><th>{{ _("Diễn giải") }}</th><th class="w-20">{{ _("TK ĐƯ") }}</th><th class="num w-32">{{ _("Thu") }}</th><th class="num w-32">{{ _("Chi") }}</th><th class="num w-36">{{ _("Tồn") }}</th></tr></thead>
+    <tbody>
+      {% for r in p.rows %}
+      <tr class="{{ 'bg-rose-50/60 dark:bg-rose-500/5' if not r.ok else '' }}">
+        <td class="tabular-nums text-fg-3">{{ r.row_no }}</td>
+        <td class="tabular-nums">{{ r.post_date|date }}</td>
+        <td class="doc-no">{{ r.number or "" }}</td>
+        <td>
+          <p>{{ r.description }}</p>
+          {% for i in r.errors %}<p class="field-error">{{ ui.icon("circle-alert", "size-3.5") }}{{ _(i.msg, **i.params) }}</p>{% endfor %}
+          {% for i in r.warnings %}<p class="text-xs text-amber-700 dark:text-amber-400">{{ _(i.msg, **i.params) }}</p>{% endfor %}
+        </td>
+        <td class="tabular-nums">{{ r.contra or "" }}</td>
+        <td class="num">{{ (r.amount if r.kind == "PT" else 0)|money0 }}</td>
+        <td class="num">{{ (r.amount if r.kind == "PC" else 0)|money0 }}</td>
+        <td class="num">{{ r.balance|money if r.balance is not none else "" }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" class="py-8 text-center text-fg-3">{{ _("Không đọc được dòng nào") }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endcall %}
+
+<form method="post" action="/cash/import/{{ token }}/confirm" class="mt-5 flex flex-wrap items-center justify-end gap-3">
+  {{ ui.csrf_field() }}
+  <input type="hidden" name="receipt_contra" value="{{ options.default_receipt_contra }}">
+  <input type="hidden" name="payment_contra" value="{{ options.default_payment_contra }}">
+  <input type="hidden" name="bank_account_id" value="{{ options.bank_account_id or '' }}">
+  {% if p.error_rows %}{{ ui.checkbox("skip_errors", _("Bỏ qua {n} dòng lỗi, chỉ nhập dòng hợp lệ", n=p.error_rows|length), cls="mr-auto") }}{% endif %}
+  <button type="submit" formaction="/cash/import/{{ token }}/discard" class="btn-ghost">{{ _("Hủy phiên nhập") }}</button>
+  {{ ui.button(_("Nhập {n} phiếu vào sổ", n=p.valid_rows|length), icon_name="check", disabled=not p.can_import,
+               confirm=_("Ghi {n} phiếu thu, chi vào sổ? Thao tác này ghi sổ ngay.", n=p.valid_rows|length)) }}
+</form>
+{% endblock %}

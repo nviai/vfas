@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("API & tích hợp") }}{% endblock %}
+{% block content %}
+{% call ui.page_header(_("API & tích hợp"), _("Kết nối phần mềm khác, agent AI hoặc ứng dụng chat tương thích OpenAI với sổ sách của công ty."), breadcrumbs=breadcrumbs, icon_name="key") %}
+  {{ ui.link_button(_("Tài liệu API"), "/api/docs", "secondary", icon_name="book-open", target="_blank") }}
+  {{ ui.button(_("Tạo token"), "primary", icon_name="plus", type="button", attrs="@click=\"$dispatch('modal-open', 'token-new')\"") }}
+{% endcall %}
+
+{% if new_token %}
+  {% call ui.alert(_("Sao chép và lưu token ở nơi an toàn. Token chỉ hiện một lần – mất thì thu hồi và tạo token mới."), "success", title=_("Đã tạo token"), cls="mb-5") %}
+    <div class="flex w-full max-w-2xl items-center gap-2" x-data="{ copied: false }">
+      <input class="input input-sm font-mono" readonly value="{{ new_token }}" x-ref="tok" @focus="$el.select()" aria-label="{{ _('API token') }}">
+      <button type="button" class="btn-secondary btn-sm" @click="navigator.clipboard.writeText($refs.tok.value); copied = true">
+        {{ ui.icon("copy", "size-3.5") }}<span x-text="copied ? {{ _('Đã chép')|tojson|forceescape }} : {{ _('Chép')|tojson|forceescape }}"></span>
+      </button>
+    </div>
+  {% endcall %}
+{% endif %}
+{% if errors.name %}{{ ui.alert(_(errors.name), "error", cls="mb-5") }}{% endif %}
+
+<div class="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_26rem]">
+  {% call ui.card(_("Token đang có"), flush=True, cls="self-start") %}
+  {% if tokens %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr>
+        <th>{{ _("Tên") }}</th><th class="w-36">{{ _("Phạm vi") }}</th>
+        <th class="w-40 max-md:hidden">{{ _("Dùng gần nhất") }}</th><th class="w-28 max-sm:hidden">{{ _("Trạng thái") }}</th><th class="w-10"></th>
+      </tr></thead>
+      <tbody>
+        {% for t in tokens %}
+        {% set revoked = t.revoked_at is not none %}
+        <tr class="{{ 'is-muted' if revoked }}">
+          <td><p class="font-medium text-fg">{{ t.name }}</p><p class="font-mono text-xs text-fg-3">{{ t.prefix }}…</p></td>
+          <td><div class="flex flex-wrap gap-1">
+            {% for sc in t.scope_set|sort %}{{ ui.badge(_("Đọc") if sc == "read" else _("Lập nháp"), "blue" if sc == "read" else "violet") }}{% endfor %}
+          </div></td>
+          <td class="max-md:hidden tabular-nums text-fg-3">{{ t.last_used_at|datetime if t.last_used_at else _("Chưa dùng") }}</td>
+          <td class="max-sm:hidden">{% if revoked %}{{ ui.badge(_("Đã thu hồi"), "gray") }}{% elif t.id in expired_ids %}{{ ui.badge(_("Hết hạn"), "amber") }}{% else %}{{ ui.status_badge("active") }}{% endif %}</td>
+          <td class="!pr-3 text-right">
+            {% if not revoked %}
+            <form method="post" action="/settings/api-tokens/{{ t.id }}/revoke" data-confirm="{{ _('Thu hồi token {name}? Ứng dụng đang dùng token này sẽ mất kết nối.', name=t.name) }}" data-danger>
+              {{ ui.csrf_field() }}{{ ui.icon_button("trash-2", _("Thu hồi"), type="submit") }}
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    {% call ui.empty_state(_("Chưa có API token"), "key", _("Tạo token để n8n, Open WebUI, OpenAI SDK hoặc phần mềm khác đọc sổ sách và lập chứng từ nháp.")) %}
+      {{ ui.button(_("Tạo token"), "primary", icon_name="plus", type="button", attrs="@click=\"$dispatch('modal-open', 'token-new')\"") }}
+    {% endcall %}
+  {% endif %}
+  {% endcall %}
+
+  <div class="space-y-5">
+    {% call ui.card(_("Dùng như một model OpenAI"), icon_name="sparkles") %}
+      <p class="text-[13px] text-fg-2">{{ _("Trỏ ứng dụng tương thích OpenAI về địa chỉ dưới đây, dùng API token làm khóa. Trợ lý trả lời bằng số liệu thật của công ty theo quyền của token.") }}</p>
+      {{ ui.desc_list([(_("Base URL"), api_base), (_("Model"), model_id)], cols="", cls="mt-4 [&_dd]:font-mono [&_dd]:text-[12.5px]") }}
+      <pre class="mt-4 overflow-x-auto rounded-lg border border-line bg-surface-2 p-3 text-[12px] leading-relaxed text-fg-2"><code>from openai import OpenAI
+
+client = OpenAI(base_url="{{ api_base }}",
+                api_key="vfas_…")
+r = client.chat.completions.create(
+    model="{{ model_id }}",
+    messages=[{"role": "user",
+               "content": "Tồn quỹ tiền mặt hôm nay?"}])
+print(r.choices[0].message.content)</code></pre>
+    {% endcall %}
+    {% call ui.card(_("Gọi công cụ trực tiếp"), icon_name="plug") %}
+      <p class="text-[13px] text-fg-2">{{ _("GET /tools trả danh sách công cụ đúng định dạng tools của OpenAI để agent của bạn tự gọi; thực thi bằng POST /tools/{tên}.") }}</p>
+      <pre class="mt-3 overflow-x-auto rounded-lg border border-line bg-surface-2 p-3 text-[12px] leading-relaxed text-fg-2"><code>curl {{ api_base }}/tools/get_account_balance \
+  -H "Authorization: Bearer vfas_…" \
+  -H "Content-Type: application/json" \
+  -d '{"account": "1111"}'</code></pre>
+    {% endcall %}
+  </div>
+</div>
+
+{% call ui.modal("token-new", _("Tạo API token"), description=_("Token mang quyền của bạn trong công ty này, giới hạn theo phạm vi. Không thể ghi sổ, hủy chứng từ hay quản trị qua API.")) %}
+<form method="post" action="/settings/api-tokens" class="space-y-4 px-5 pb-5">
+  {{ ui.csrf_field() }}
+  {{ ui.input("name", _("Tên gợi nhớ"), "", required=True, placeholder=_("vd: n8n, Open WebUI, báo cáo Power BI")) }}
+  <fieldset>
+    <legend class="label">{{ _("Phạm vi") }}</legend>
+    <div class="space-y-2">
+      {{ ui.checkbox("scopes", _("Đọc số liệu"), True, value="read", id="scope-read", hint=_("Danh mục, chứng từ, sổ, báo cáo, hỏi trợ lý AI")) }}
+      {{ ui.checkbox("scopes", _("Lập chứng từ nháp"), False, value="write_draft", id="scope-write", hint=_("Tạo đối tượng và chứng từ ở trạng thái nháp")) }}
+    </div>
+  </fieldset>
+  {{ ui.select("days", _("Thời hạn"), [("0", _("Không hết hạn")), ("30", _("30 ngày")), ("90", _("90 ngày")), ("365", _("1 năm"))], "90") }}
+  <div class="modal-footer -mx-5 -mb-5">
+    {{ ui.button(_("Hủy"), "secondary", type="button", attrs="@click=\"$dispatch('modal-close')\"") }}
+    {{ ui.button(_("Tạo token"), "primary", icon_name="key") }}
+  </div>
+</form>
+{% endcall %}
+{% endblock %}

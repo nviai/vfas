@@ -1,0 +1,35 @@
+{% extends "vat/print/_layout.html" %}
+{% block title %}Phụ lục giảm thuế GTGT {{ period.label }}{% endblock %}
+{% block body %}
+<table class="doc-head"><tr>
+  <td class="left"></td>
+  <td class="right"><p class="b">Mẫu số 01</p><p class="i small">(Kèm theo Nghị định số 174/2025/NĐ-CP)</p></td>
+</tr></table>
+<p class="title">GIẢM THUẾ GIÁ TRỊ GIA TĂNG THEO NGHỊ QUYẾT SỐ 204/2025/QH15</p>
+<p class="subtitle i">(Kèm theo tờ khai 01/GTGT kỳ tính thuế {{ period.label }})</p>
+<div class="info" style="margin-top:3mm">
+  <p>[01] Kỳ tính thuế: {{ period.label }}</p>
+  <p>[02] Tên người nộp thuế: <span class="b">{{ company.name }}</span></p>
+  <p>[03] Mã số thuế: <span class="b">{{ company.tax_code }}</span></p>
+</div>
+<p class="r i small" style="margin-top:2mm">Đơn vị tiền: Đồng Việt Nam</p>
+<table class="grid">
+  <colgroup><col style="width:6%"><col style="width:36%"><col style="width:18%"><col style="width:10%"><col style="width:12%"><col style="width:18%"></colgroup>
+  <thead>
+    <tr><th>STT</th><th>Tên hàng hóa, dịch vụ</th><th>Giá trị hàng hóa, dịch vụ chưa có thuế GTGT</th><th>Thuế suất theo quy định</th><th>Thuế suất sau giảm</th><th>Thuế GTGT được giảm</th></tr>
+    <tr class="small"><th>(1)</th><th>(2)</th><th>(3)</th><th>(4)</th><th>(5)</th><th>(6) = (3) × [(4) − (5)]</th></tr>
+  </thead>
+  <tbody>
+    {% for r in rows %}
+    <tr><td class="code">{{ loop.index }}</td><td>{{ r.description }}{% if r.invoice %} <span class="small">(HĐ {{ r.series }}-{{ r.invoice }})</span>{% endif %}</td><td class="num">{{ r.goods|money }}</td><td class="code">10%</td><td class="code">8%</td><td class="num">{{ r.reduced|money }}</td></tr>
+    {% else %}
+    <tr><td colspan="6" class="c i">Không phát sinh</td></tr>
+    {% endfor %}
+    <tr class="total"><td colspan="2" class="c">Tổng cộng</td><td class="num">{{ rows|sum(attribute="goods")|money }}</td><td></td><td></td><td class="num">{{ rows|sum(attribute="reduced")|money }}</td></tr>
+  </tbody>
+</table>
+<table class="signatures"><tr>
+  <td style="width:50%"></td>
+  <td style="width:50%"><p class="i">..........., ngày ..... tháng ..... năm ..........</p><p class="role">NGƯỜI NỘP THUẾ hoặc ĐẠI DIỆN HỢP PHÁP CỦA NGƯỜI NỘP THUẾ</p><p class="hint">(Chữ ký, ghi rõ họ tên; chức vụ và đóng dấu (nếu có)/Ký điện tử)</p><p class="name">{{ company.legal_rep }}</p></td>
+</tr></table>
+{% endblock %}

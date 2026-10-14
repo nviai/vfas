@@ -1,0 +1,35 @@
+{% extends "auth_base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Thiết lập lần đầu") }}{% endblock %}
+{% block width %}max-w-[520px]{% endblock %}
+{% block content %}
+{%- set f = form if form is defined and form else {} -%}
+<div class="mb-7">
+  <span class="mb-3 inline-flex items-center gap-1.5 rounded-full bg-primary-soft px-2.5 py-1 text-xs font-medium text-primary-soft-fg">{{ ui.icon("settings", "size-3.5") }}{{ _("Cài đặt hệ thống") }}</span>
+  <h1 class="text-2xl font-semibold tracking-tight">{{ _("Thiết lập lần đầu") }}</h1>
+  <p class="mt-1.5 text-[14px] text-fg-3">{{ _("Tạo tài khoản quản trị và khai báo doanh nghiệp. Bước này chỉ làm một lần.") }}</p>
+</div>
+<form method="post" action="/setup" class="space-y-6">
+  {{ ui.csrf_field() }}
+  {{ ui.input("setup_token", _("Mã cài đặt"), f.setup_token, errors=errors, required=True, input_cls="font-mono",
+              hint=_("In trong log khi khởi động (docker compose logs) và lưu ở file .setup_token trong thư mục dữ liệu."),
+              attrs='autocomplete="off" autocapitalize="off" spellcheck="false"') }}
+  <fieldset class="space-y-4">
+    <legend class="mb-3 flex items-center gap-2 text-sm font-semibold"><span class="flex size-5 items-center justify-center rounded-full bg-primary text-[11px] text-primary-fg">1</span>{{ _("Tài khoản quản trị") }}</legend>
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {{ ui.input("full_name", _("Họ và tên"), f.full_name, errors=errors, required=True, attrs='autocomplete="name"', autofocus=True) }}
+      {{ ui.input("email", _("Email"), f.email, "email", errors=errors, required=True, attrs='autocomplete="email" autocapitalize="off"') }}
+    </div>
+    {{ ui.password_input("password", _("Mật khẩu"), errors=errors, autocomplete="new-password", hint=_("Ít nhất 8 ký tự."), minlength=8) }}
+  </fieldset>
+  <fieldset class="space-y-4 border-t border-line pt-6">
+    <legend class="mb-3 flex items-center gap-2 text-sm font-semibold"><span class="flex size-5 items-center justify-center rounded-full bg-primary text-[11px] text-primary-fg">2</span>{{ _("Doanh nghiệp") }}</legend>
+    {{ ui.input("company_name", _("Tên doanh nghiệp"), f.company_name, errors=errors, required=True) }}
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,10rem)_minmax(0,1fr)]">
+      {{ ui.input("tax_code", _("Mã số thuế"), f.tax_code, errors=errors, attrs='inputmode="numeric"', input_cls="tabular-nums") }}
+      {{ ui.input("address", _("Địa chỉ"), f.address, errors=errors) }}
+    </div>
+  </fieldset>
+  {{ ui.button(_("Hoàn tất thiết lập"), size="lg", cls="btn-block", icon_right="arrow-right") }}
+</form>
+{% endblock %}

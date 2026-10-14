@@ -1,0 +1,42 @@
+{# Shared parts of the TT133 print forms (money module). Always Vietnamese. #}
+
+{% macro doc_header(company, code, issued) -%}
+<table class="doc-head">
+  <tr>
+    <td class="left">
+      <p><span class="b">Đơn vị:</span> {{ company.name }}</p>
+      <p><span class="b">Địa chỉ:</span> {{ company.address }}</p>
+      {% if company.tax_code %}<p><span class="b">Mã số thuế:</span> {{ company.tax_code }}</p>{% endif %}
+    </td>
+    <td class="right">
+      <p class="form-code">Mẫu số {{ code }}</p>
+      <p class="issued">{{ issued }}</p>
+    </td>
+  </tr>
+</table>
+{%- endmacro %}
+
+{# Two-digit page numbers: 01, 02 ...; the first (page-counting) pass
+   uses a placeholder of the same width. #}
+{% macro page_no(n) -%}{% if n %}{{ '%02d' % n }}{% else %}..{% endif %}{%- endmacro %}
+
+{% macro book_footer(company, total_pages) -%}
+<p>- Sổ này có {{ page_no(total_pages) }} trang, đánh số từ trang 01 đến trang {{ page_no(total_pages) }}</p>
+<p>- Ngày mở sổ: {{ company.start_date|date }}</p>
+{%- endmacro %}
+
+{% macro book_signatures(company) -%}
+<table class="signatures">
+  <tr><td></td><td></td><td class="i" style="padding-bottom:1mm">Ngày ..... tháng ..... năm ..........</td></tr>
+  <tr>
+    <td style="width:33%"><p class="role">Người ghi sổ</p><p class="hint">(Ký, họ tên)</p></td>
+    <td style="width:33%"><p class="role">Kế toán trưởng</p><p class="hint">(Ký, họ tên)</p></td>
+    <td style="width:34%"><p class="role">Người đại diện theo pháp luật</p><p class="hint">(Ký, họ tên, đóng dấu)</p></td>
+  </tr>
+  <tr>
+    <td class="name">{{ company.preparer }}</td>
+    <td class="name">{{ company.chief_accountant }}</td>
+    <td class="name">{{ company.legal_rep }}</td>
+  </tr>
+</table>
+{%- endmacro %}

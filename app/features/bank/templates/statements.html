@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Đối chiếu sao kê") }}{% endblock %}
+{% block content %}
+{% call ui.page_header(_("Đối chiếu sao kê ngân hàng"), _("Nhập sao kê, khớp với chứng từ đã ghi sổ, lập chứng từ cho giao dịch còn thiếu."), breadcrumbs=breadcrumbs, icon_name="git-compare") %}
+  {% if can("bank.reconcile") and bank %}
+    <form method="post" action="/bank/statements/automatch">{{ ui.csrf_field() }}<input type="hidden" name="bank_account_id" value="{{ bank.id }}">{{ ui.button(_("Tự khớp"), "secondary", icon_name="zap") }}</form>
+    {{ ui.link_button(_("Nhập sao kê"), "/bank/statements/import?bank_account_id=" ~ bank.id, "primary", icon_name="upload") }}
+  {% endif %}
+{% endcall %}
+
+{% if not banks %}
+  {% call ui.card() %}
+    {% call ui.empty_state(_("Chưa có tài khoản ngân hàng"), "landmark") %}{{ ui.link_button(_("Thêm tài khoản"), "/bank-accounts", "primary", icon_name="plus") }}{% endcall %}
+  {% endcall %}
+{% else %}
+<div class="mb-4 flex flex-wrap items-center gap-2">
+  {% for b in banks %}
+  <a href="/bank/statements?bank_account_id={{ b.id }}" class="{{ 'btn-secondary' if bank and b.id == bank.id else 'btn-ghost' }} btn-sm">{{ ui.icon("landmark", "size-3.5") }}{{ b.label }}</a>
+  {% endfor %}
+</div>
+
+{% if rec %}
+<div class="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+  {{ ui.stat_card(_("Số dư theo sao kê"), rec.statement_balance if rec.statement_balance is not none else "–", money_value=rec.statement_balance is not none, unit="đ" if rec.statement_balance is not none else "", icon_name="file-text", hint=(_("Ngày {d}", d=rec.as_of|date) if rec.as_of else _("Chưa nhập sao kê"))) }}
+  {{ ui.stat_card(_("Số dư trên sổ"), rec.book_balance, icon_name="book-text", hint=(_("Ngày {d}", d=rec.as_of|date) if rec.as_of else _("Đến hôm nay")), href="/bank/book?bank_account_id=" ~ bank.id) }}
+  {% if rec.difference is not none %}
+    {{ ui.stat_card(_("Chênh lệch"), rec.difference, icon_name="scale", hint=(_("Khớp số dư") if rec.difference == 0 else _("Sao kê − sổ"))) }}
+  {% endif %}
+  {{ ui.stat_card(_("Đã khớp"), rec.matched_count ~ "/" ~ rec.total_count, unit="", money_value=False, icon_name="check-check", hint=_("giao dịch trên sao kê")) }}
+</div>
+{% endif %}
+
+<div class="grid grid-cols-1 gap-5 2xl:grid-cols-[minmax(0,1fr)_24rem]">
+  <div class="min-w-0 space-y-5">
+    {{ ui.tabs([
+      {"key": "unmatched", "label": _("Chưa khớp"), "href": "/bank/statements?bank_account_id=" ~ bank.id ~ "&status=unmatched"},
+      {"key": "matched", "label": _("Đã khớp"), "href": "/bank/statements?bank_account_id=" ~ bank.id ~ "&status=matched"},
+      {"key": "ignored", "label": _("Bỏ qua"), "href": "/bank/statements?bank_account_id=" ~ bank.id ~ "&status=ignored"},
+      {"key": "all", "label": _("Tất cả"), "href": "/bank/statements?bank_account_id=" ~ bank.id ~ "&status=all"},
+    ], status) }}
+    <div class="card">
+    {% if not lines %}
+      {{ ui.empty_state(_("Không có giao dịch") if status != "unmatched" else _("Không còn giao dịch chưa khớp"), "check-check", _("Nhập sao kê mới để tiếp tục đối chiếu.") if status == "unmatched" else None) }}
+    {% else %}
+      <div class="table-wrap md:overflow-visible">
+        <table class="table table-hover">
+          <thead><tr><th class="w-28">{{ _("Ngày") }}</th><th>{{ _("Diễn giải") }}</th><th class="num w-36">{{ _("Tiền vào") }}</th><th class="num w-36">{{ _("Tiền ra") }}</th><th class="w-48">{{ _("Trạng thái / gợi ý") }}</th><th class="w-10"></th></tr></thead>
+          <tbody>
+            {% for sl in lines %}
+            <tr>
+              <td class="tabular-nums text-fg-2">{{ sl.date|date }}</td>
+              <td class="max-w-0"><a href="/bank/statements/lines/{{ sl.id }}" class="block truncate text-fg hover:underline">{{ sl.description or "—" }}</a>{% if sl.reference %}<p class="mono truncate text-xs text-fg-3">{{ sl.reference }}</p>{% endif %}</td>
+              <td class="num amount-in">{{ sl.money_in|money0 }}</td>
+              <td class="num">{{ sl.money_out|money0 }}</td>
+              <td>
+                {% if sl.status == "matched" %}{{ ui.status_badge("matched") }}
+                {% elif sl.status == "ignored" %}{{ ui.badge(_("Bỏ qua"), "gray") }}
+                {% else %}
+                  {% set rule = suggestions.get(sl.id) %}
+                  {% if rule %}{{ ui.badge(_("Gợi ý") ~ " " ~ rule.account, "brand", icon_name="sparkles") }}{% else %}{{ ui.status_badge("unmatched") }}{% endif %}
+                {% endif %}
+              </td>
+              <td class="!pr-3 text-right">
+                {% if can("bank.reconcile") %}
+                {% call ui.dropdown(icon_name="ellipsis", variant="ghost", size="xs", width="w-56", aria_label=_("Thao tác")) %}
+                  {{ ui.menu_item(_("Khớp với chứng từ…"), "/bank/statements/lines/" ~ sl.id, "link") }}
+                  {% if sl.status == "unmatched" and can("bank.create") %}{{ ui.menu_post(_("Lập chứng từ nháp"), "/bank/statements/lines/" ~ sl.id ~ "/draft", "file-plus") }}{% endif %}
+                  {% if sl.status != "matched" %}{{ ui.menu_post(_("Bỏ qua") if sl.status == "unmatched" else _("Theo dõi lại"), "/bank/statements/lines/" ~ sl.id ~ "/ignore", "eye-off") }}{% endif %}
+                {% endcall %}
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+    </div>
+
+    {% if rec and rec.unmatched_book %}
+    {% call ui.card(_("Chứng từ trên sổ chưa có trên sao kê"), _("Trong khoảng thời gian của các sao kê đã nhập"), flush=True) %}
+      <div class="table-wrap">
+        <table class="table table-hover">
+          <tbody>
+            {% for ln, e in rec.unmatched_book %}
+            <tr class="is-link"><td class="w-28 tabular-nums text-fg-2">{{ e.date|date }}</td><td class="w-32"><a href="{{ e.url }}" class="doc-no hover:underline">{{ e.display_number }}</a></td>
+                <td class="max-w-0 truncate">{{ ln.description or e.description }}</td><td class="num w-36">{{ ln.amount|money }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endcall %}
+    {% endif %}
+  </div>
+
+  <aside class="space-y-5">
+    {% call ui.card(_("Luật gợi ý định khoản"), _("Diễn giải sao kê chứa từ khóa → TK đối ứng"), flush=True) %}
+      {% if rules %}
+      <ul class="divide-y divide-line">
+        {% for r in rules %}
+        <li class="flex items-center gap-3 px-5 py-2.5 text-[13px]">
+          <span class="min-w-0 flex-1"><span class="font-medium">"{{ r.keyword }}"</span> → <span class="tabular-nums">{{ r.account }}</span>
+            <span class="text-fg-3">· {{ {"in": _("tiền vào"), "out": _("tiền ra"), "any": _("mọi chiều")}[r.direction] }}</span></span>
+          {% if can("bank.manage") %}
+          <form method="post" action="/bank/rules/{{ r.id }}/delete">{{ ui.csrf_field() }}<input type="hidden" name="bank_account_id" value="{{ bank.id }}">
+            <button class="btn-ghost btn-xs btn-icon hover:text-rose-600" aria-label="{{ _('Xóa') }}">{{ ui.icon("trash", "size-3.5") }}</button></form>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}<p class="px-5 py-4 text-[13px] text-fg-3">{{ _("Chưa có luật. Ví dụ: \"PHI QUAN LY TK\" → 6422, \"LAI TIEN GUI\" → 515.") }}</p>{% endif %}
+      {% if can("bank.manage") %}
+      <form method="post" action="/bank/rules" class="space-y-3 border-t border-line px-5 py-4">
+        {{ ui.csrf_field() }}<input type="hidden" name="bank_account_id" value="{{ bank.id }}">
+        {{ ui.input("keyword", _("Từ khóa"), "", required=True, input_cls="input-sm") }}
+        <div class="grid grid-cols-2 gap-3">
+          {{ ui.combobox("account", _("TK đối ứng"), "/lookup/accounts", input_cls="input-sm") }}
+          {{ ui.select("direction", _("Chiều"), [("any", _("Mọi chiều")), ("in", _("Tiền vào")), ("out", _("Tiền ra"))], "any", input_cls="input-sm") }}
+        </div>
+        {{ ui.button(_("Thêm luật"), "secondary", size="sm", icon_name="plus") }}
+      </form>
+      {% endif %}
+    {% endcall %}
+    {% if history %}
+    {% call ui.card(_("Sao kê đã nhập"), flush=True) %}
+      <ul class="divide-y divide-line text-[13px]">
+        {% for s in history %}
+        <li class="px-5 py-2.5"><p class="truncate font-medium">{{ s.filename }}</p>
+          <p class="text-xs text-fg-3">{{ s.period_start|date }} – {{ s.period_end|date }} · {{ _("{n} giao dịch", n=s.line_count) }} · {{ s.imported_at|datetime }}</p></li>
+        {% endfor %}
+      </ul>
+    {% endcall %}
+    {% endif %}
+  </aside>
+</div>
+{% endif %}
+{% endblock %}

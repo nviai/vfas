@@ -1,0 +1,42 @@
+{% extends "vat/print/_layout.html" %}
+{% block title %}Biên bản đối chiếu công nợ {{ p.name }}{% endblock %}
+{% block body %}
+{% set od, oc = split(led.opening) %}{% set cd, cc = split(led.closing) %}
+<p class="nation">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
+<p class="motto">Độc lập - Tự do - Hạnh phúc</p>
+<p class="title" style="margin-top:6mm">BIÊN BẢN ĐỐI CHIẾU CÔNG NỢ</p>
+<p class="subtitle i">Từ ngày {{ period.start|date }} đến ngày {{ period.end|date }}</p>
+<div class="info" style="margin-top:4mm">
+  <p>Hôm nay, ngày ..... tháng ..... năm .........., chúng tôi gồm:</p>
+  <p class="b" style="margin-top:2mm">Bên A{{ " (bên bán)" if kind == "receivable" else " (bên mua)" }}: {{ company.name }}</p>
+  <p>Địa chỉ: {{ company.address }}</p><p>Mã số thuế: {{ company.tax_code }}</p>
+  <p>Đại diện: {{ company.legal_rep }} &nbsp;&nbsp; Chức vụ: {{ company.legal_rep_title }}</p>
+  <p class="b" style="margin-top:2mm">Bên B{{ " (bên mua)" if kind == "receivable" else " (bên bán)" }}: {{ p.name }}</p>
+  <p>Địa chỉ: {{ p.address }}</p><p>Mã số thuế: {{ p.tax_code }}</p>
+  <p>Đại diện: {{ p.contact_person or "........................................" }} &nbsp;&nbsp; Chức vụ: ......................</p>
+  <p style="margin-top:2mm">Cùng nhau đối chiếu công nợ phát sinh trong kỳ như sau:</p>
+</div>
+<p class="r i small" style="margin-top:2mm">Đơn vị tiền: Đồng Việt Nam</p>
+<table class="grid">
+  <colgroup><col style="width:11%"><col style="width:14%"><col style="width:39%"><col style="width:18%"><col style="width:18%"></colgroup>
+  <thead><tr><th>Ngày</th><th>Chứng từ</th><th>Diễn giải</th><th>{{ "Bên B phải trả (tăng)" if kind == "receivable" else "Bên A đã trả (giảm)" }}</th><th>{{ "Bên B đã trả (giảm)" if kind == "receivable" else "Bên A phải trả (tăng)" }}</th></tr></thead>
+  <tbody>
+    <tr class="head"><td colspan="3">Số dư đầu kỳ</td><td class="num">{{ od|money0 }}</td><td class="num">{{ oc|money0 }}</td></tr>
+    {% for r in led.rows %}
+    <tr><td class="code">{{ r.date|date }}</td><td class="code">{{ r.number or "" }}</td><td>{{ r.description }}</td><td class="num">{{ r.debit|money0 }}</td><td class="num">{{ r.credit|money0 }}</td></tr>
+    {% endfor %}
+    <tr class="total"><td colspan="3">Cộng phát sinh</td><td class="num">{{ led.total_debit|money }}</td><td class="num">{{ led.total_credit|money }}</td></tr>
+    <tr class="total"><td colspan="3">Số dư cuối kỳ</td><td class="num">{{ cd|money0 }}</td><td class="num">{{ cc|money0 }}</td></tr>
+  </tbody>
+</table>
+{% set owed = led.closing if kind == "receivable" else -led.closing %}
+<p style="margin-top:3mm">Kết luận: Tính đến ngày {{ period.end|date }},
+  {% if owed > 0 %}{{ "Bên B còn phải thanh toán cho Bên A" if kind == "receivable" else "Bên A còn phải thanh toán cho Bên B" }} số tiền <span class="b">{{ owed|money }} đồng</span> (bằng chữ: {{ owed|words }}).
+  {% elif owed < 0 %}{{ "Bên A còn giữ tiền trả trước của Bên B" if kind == "receivable" else "Bên B còn giữ tiền ứng trước của Bên A" }} số tiền <span class="b">{{ (-owed)|money }} đồng</span>.
+  {% else %}hai bên không còn công nợ.{% endif %}</p>
+<p style="margin-top:1mm">Biên bản được lập thành 02 bản, mỗi bên giữ 01 bản có giá trị như nhau. Nếu sau 07 ngày kể từ ngày nhận biên bản mà Bên B không phản hồi thì số liệu trên được coi là đã xác nhận.</p>
+<table class="signatures"><tr>
+  <td style="width:50%"><p class="role">ĐẠI DIỆN BÊN A</p><p class="hint">(Ký, họ tên, đóng dấu)</p><p class="name">{{ company.legal_rep }}</p></td>
+  <td style="width:50%"><p class="role">ĐẠI DIỆN BÊN B</p><p class="hint">(Ký, họ tên, đóng dấu)</p><p class="name">&nbsp;</p></td>
+</tr></table>
+{% endblock %}

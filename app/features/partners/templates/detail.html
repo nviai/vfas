@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ p.name }}{% endblock %}
+{% block content %}
+{% set role_badges %}{% for r in p.roles %}{{ ui.badge(_(role_labels[r]), {"customer": "brand", "supplier": "violet", "employee": "blue"}[r]) }} {% endfor %}{% if not p.is_active %}{{ ui.status_badge("inactive") }}{% endif %}{% endset %}
+{% call ui.page_header(p.name, p.code ~ (" · MST " ~ p.tax_code if p.tax_code and not masked else ""), breadcrumbs=breadcrumbs, back="/partners", badge=role_badges) %}
+  {% if can("journal.view") %}
+    {{ ui.link_button(_("Sổ chi tiết công nợ"), "/debts/partner/" ~ p.id, "secondary", icon_name="book-open") }}
+  {% endif %}
+{% endcall %}
+
+{% if balances %}
+<div class="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+  {% for b in balances %}
+    {{ ui.stat_card(_(b.label) ~ " (" ~ b.account ~ ")", b.net if b.net >= 0 else -b.net,
+                    hint=(_("Dư Nợ") if b.net >= 0 else _("Dư Có")) ~ " · " ~ _("đến hôm nay"), icon_name="scale") }}
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if masked %}
+{% call ui.card(_("Thông tin")) %}
+  <p class="text-[13px] text-fg-3">{{ ui.icon("lock", "inline size-3.5") }} {{ _("Thông tin cá nhân của nhân viên chỉ hiện với người có quyền xem lương.") }}</p>
+{% endcall %}
+{% elif can("catalog.manage") %}
+<form method="post" action="/partners/{{ p.id }}" class="card">
+  {{ ui.csrf_field() }}
+  <div class="card-body divide-y divide-line">
+    {% include "partners/_fields.html" %}
+  </div>
+  <div class="card-footer flex justify-end gap-2">
+    {{ ui.button(_("Lưu thay đổi"), "primary", icon_name="check", hotkey="save", kbd_hint="Ctrl+S") }}
+  </div>
+</form>
+{% else %}
+{% call ui.card(_("Thông tin")) %}
+  {{ ui.desc_list([(_("Địa chỉ"), p.address), (_("Điện thoại"), p.phone), (_("Email"), p.email),
+                   (_("Người liên hệ"), p.contact_person), (_("Tài khoản ngân hàng"), (p.bank_account ~ " " ~ p.bank_name)|trim),
+                   (_("Hạn thanh toán"), _("{n} ngày", n=p.payment_terms_days))]) }}
+{% endcall %}
+{% endif %}
+{% endblock %}

@@ -1,0 +1,155 @@
+{#- Money voucher detail (PT/PC/BC/BN/CK), shared by the cash and bank modules. -#}
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _(kind_label) }} {{ e.display_number }}{% endblock %}
+{% block content %}
+{% call ui.page_header(_(kind_label) ~ " " ~ e.display_number, e.description, breadcrumbs=breadcrumbs, back=back,
+                       badge=ui.status_badge(e.status)) %}
+  {% if print_url %}{{ ui.link_button(_("In"), print_url, "secondary", icon_name="printer", target="_blank") }}{% endif %}
+  {% if e.status == "draft" and can_edit %}{{ ui.link_button(_("Sửa"), edit_url, "secondary", icon_name="pencil") }}{% endif %}
+  {% if e.status == "draft" and can_post %}
+  <form method="post" action="/entries/{{ e.id }}/post">
+    {{ ui.csrf_field() }}
+    {{ ui.button(_("Ghi sổ"), "primary", icon_name="check", confirm=_("Ghi sổ {kind} này? Sau khi ghi sổ không sửa được số liệu.", kind=_(kind_label).lower())) }}
+  </form>
+  {% endif %}
+  {% call ui.dropdown(icon_name="ellipsis", aria_label=_("Thao tác khác"), width="w-64") %}
+    {% if copy_url and can_edit %}{{ ui.menu_item(_("Nhân bản thành nháp mới"), copy_url, "copy") }}{% endif %}
+    {% if e.status == "posted" and can_post and not locked %}{{ ui.menu_item(_("Sửa thông tin mô tả…"), None, "pencil", attrs="@click=\"$dispatch('modal-open', 'edit-info')\"") }}{% endif %}
+    {% if e.status == "posted" and can_cancel %}
+      {{ ui.menu_item(_("Lập chứng từ điều chỉnh…"), None, "undo-2", attrs="@click=\"$dispatch('modal-open', 'reverse-entry')\"") }}
+      {% if not locked %}{{ ui.menu_sep() }}{{ ui.menu_item(_("Hủy chứng từ…"), None, "ban", danger=True, attrs="@click=\"$dispatch('modal-open', 'cancel-entry')\"") }}{% endif %}
+    {% endif %}
+    {% if e.status == "draft" and can_edit %}
+      {{ ui.menu_sep() }}
+      {{ ui.menu_post(_("Xóa nháp"), "/entries/" ~ e.id ~ "/delete", "trash", danger=True, confirm=_("Xóa chứng từ nháp này?"), fields={"next": back}) }}
+    {% endif %}
+  {% endcall %}
+{% endcall %}
+
+{% if e.status == "posted" %}
+<div class="mb-5 flex flex-wrap items-center gap-x-5 gap-y-1 rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-2.5 text-[13px] text-emerald-900 dark:border-emerald-500/20 dark:bg-emerald-500/5 dark:text-emerald-200">
+  <span class="inline-flex items-center gap-1.5 font-medium">{{ ui.icon("lock", "size-3.5") }}{{ _("Đã ghi sổ – không thể sửa số liệu") }}</span>
+  <span class="text-emerald-800/80 dark:text-emerald-300/80">{{ poster }} · {{ e.posted_at|datetime }}</span>
+  {% if locked %}<span class="inline-flex items-center gap-1 text-emerald-800/80 dark:text-emerald-300/80">{{ ui.icon("lock", "size-3.5") }}{{ _("Kỳ {m}/{y} đã khóa sổ – sửa sai bằng chứng từ điều chỉnh", m="%02d"|format(e.date.month), y=e.date.year) }}</span>{% endif %}
+</div>
+{% elif e.status == "cancelled" %}
+{{ ui.alert(_("Hủy bởi {who} lúc {at}. Lý do: {reason}", who=canceller, at=e.cancelled_at|datetime, reason=e.cancel_reason), "warning", title=_("Chứng từ đã hủy – không còn trên sổ"), cls="mb-5") }}
+{% else %}
+{{ ui.alert(_("Chứng từ nháp chưa vào sổ, chưa có số. Kiểm tra rồi bấm Ghi sổ."), "info", cls="mb-5") }}
+{% endif %}
+{% if reverses %}{{ ui.alert(_("Chứng từ điều chỉnh cho {n}.", n=reverses.display_number), "info", cls="mb-5") }}{% endif %}
+{% for adj in adjustments %}
+  {% call ui.alert(_("Đã có chứng từ điều chỉnh {n} ({s}).", n=adj.display_number, s=_(adj.status_label)), "info", cls="mb-5") %}
+    {{ ui.link_button(_("Xem"), adj.url, "secondary", size="sm") }}
+  {% endcall %}
+{% endfor %}
+
+<div class="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
+  <div class="min-w-0 space-y-5">
+    {% call ui.card(_("Thông tin chứng từ")) %}
+      {{ ui.desc_list([
+        (_("Ngày hạch toán"), e.date|date), (_("Ngày chứng từ"), e.doc_date|date),
+        (_("Người nộp tiền") if incoming else _("Người nhận tiền"), e.contact_name), (_("Địa chỉ"), e.contact_address),
+        (_("Đối tượng"), e.partner.label if e.partner else ""), (_("Kèm theo"), (_("{n} chứng từ gốc", n=e.attached_docs) if e.attached_docs else "") ~ ((" · " ~ e.ref_no) if e.ref_no else "")),
+        (_("Người lập"), creator), (_("Ngày lập"), e.created_at|datetime), (_("Nguồn"), {"import": _("Nhập từ Excel"), "cashcount": _("Xử lý kiểm kê quỹ"), "ai": _("Trợ lý AI")}.get(e.source, "")),
+      ]) }}
+    {% endcall %}
+
+    {% call ui.card(_("Định khoản"), flush=True) %}
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th class="w-28">{{ _("TK Nợ") }}</th><th class="w-28">{{ _("TK Có") }}</th><th>{{ _("Diễn giải") }}</th><th class="max-md:hidden">{{ _("Đối tượng / Ngân hàng") }}</th><th class="num w-36">{{ _("Số tiền") }}</th></tr></thead>
+        <tbody>
+          {% for l in lines %}
+          <tr>
+            <td class="font-medium tabular-nums" title="{{ l.debit_name }}">{{ l.debit }}</td>
+            <td class="font-medium tabular-nums" title="{{ l.credit_name }}">{{ l.credit }}</td>
+            <td class="text-fg-2">{{ l.description }}</td>
+            <td class="max-md:hidden text-fg-2">{{ l.partner.label if l.partner else "" }}{% if l.bank %}{{ " · " if l.partner }}{{ l.bank.label }}{% endif %}</td>
+            <td class="num">{{ l.amount|money }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot><tr class="row-total"><td colspan="3" class="md:hidden">{{ _("Cộng") }}</td><td colspan="4" class="max-md:hidden">{{ _("Cộng") }}</td><td class="num">{{ e.total|money }}</td></tr></tfoot>
+      </table>
+    </div>
+    {% endcall %}
+
+    {% for vr in e.vat_records %}
+    {% call ui.card(_("Hóa đơn GTGT đầu vào") if vr.direction == "in" else _("Hóa đơn GTGT đầu ra"), icon_name="receipt-text") %}
+      {{ ui.desc_list([(_("Mẫu số"), vr.invoice_template), (_("Ký hiệu"), vr.invoice_series), (_("Số hóa đơn"), vr.invoice_no), (_("Ngày hóa đơn"), vr.invoice_date|date),
+                       (_("Người bán") if vr.direction == "in" else _("Người mua"), vr.partner_name), (_("Mã số thuế"), vr.partner_tax_code),
+                       (_("Giá trị chưa thuế"), vr.goods_amount|money), (_("Thuế suất"), vr.vat_rate ~ ("%" if vr.vat_rate[:1].isdigit() else "")), (_("Tiền thuế"), vr.vat_amount|money)],
+                      cols="sm:grid-cols-2 lg:grid-cols-3") }}
+    {% endcall %}
+    {% endfor %}
+  </div>
+
+  <aside class="space-y-5">
+    <section class="card p-5">
+      <p class="text-[13px] font-medium text-fg-3">{{ _("Số tiền") }}</p>
+      <p class="mt-1 text-3xl font-semibold tracking-tight tabular-nums {{ 'amount-in' if incoming }}">{{ e.total|money }} <span class="text-base font-normal text-fg-3">đ</span></p>
+      <p class="mt-2 text-[13px] text-fg-2 italic">{{ words }}.</p>
+    </section>
+    {% set upload %}{% if can_edit and e.status != "cancelled" %}<button type="button" class="btn-ghost btn-xs" @click="$refs.up.click()">{{ ui.icon("upload", "size-3.5") }}{{ _("Tải lên") }}</button>{% endif %}{% endset %}
+    {% call ui.card(_("Đính kèm"), actions=upload) %}
+      {% if files %}{{ ui.attachment_list(files, can_delete=(e.status == "draft" and can_edit)) }}
+      {% else %}<p class="text-[13px] text-fg-3">{{ _("Chưa có file. Đính kèm ảnh hóa đơn, chứng từ gốc (JPG, PNG, PDF).") }}</p>{% endif %}
+      {% if can_edit and e.status != "cancelled" %}
+      <form method="post" action="/entries/{{ e.id }}/attachments" enctype="multipart/form-data" class="hidden" x-data>
+        {{ ui.csrf_field() }}
+        <input type="file" name="file" accept="image/jpeg,image/png,image/webp,application/pdf" x-ref="up" @change="$el.form.submit()">
+      </form>
+      {% endif %}
+    {% endcall %}
+    {% call ui.card(_("Lịch sử")) %}{{ ui.timeline(history) if history else "" }}{% endcall %}
+  </aside>
+</div>
+
+{% if e.status == "posted" and can_cancel %}
+{% call ui.modal("cancel-entry", _("Hủy chứng từ") ~ " " ~ e.display_number, description=_("Chứng từ đã hủy vẫn được lưu nhưng không còn trên sổ. Hệ thống kiểm tra lại số dư sau khi hủy.")) %}
+<form method="post" action="/entries/{{ e.id }}/cancel">
+  {{ ui.csrf_field() }}
+  <div class="px-5 pb-5">{{ ui.textarea("reason", _("Lý do hủy"), rows=3, required=True) }}</div>
+  <div class="modal-footer">
+    {{ ui.button(_("Đóng"), "secondary", type="button", attrs="@click=\"$dispatch('modal-close')\"") }}
+    {{ ui.button(_("Hủy chứng từ"), "danger", icon_name="ban") }}
+  </div>
+</form>
+{% endcall %}
+{% call ui.modal("reverse-entry", _("Lập chứng từ điều chỉnh"), description=_("Tạo chứng từ nháp đảo ngược toàn bộ định khoản của {n} vào kỳ đang mở. Kiểm tra, sửa số tiền nếu chỉ điều chỉnh một phần, rồi ghi sổ.", n=e.display_number)) %}
+<form method="post" action="/entries/{{ e.id }}/reverse">
+  {{ ui.csrf_field() }}
+  <div class="space-y-4 px-5 pb-5">
+    {{ ui.date_input("date", _("Ngày điều chỉnh"), today, required=True) }}
+    {{ ui.textarea("reason", _("Lý do điều chỉnh"), rows=2) }}
+  </div>
+  <div class="modal-footer">
+    {{ ui.button(_("Đóng"), "secondary", type="button", attrs="@click=\"$dispatch('modal-close')\"") }}
+    {{ ui.button(_("Lập nháp điều chỉnh"), "primary", icon_name="undo-2") }}
+  </div>
+</form>
+{% endcall %}
+{% endif %}
+{% if e.status == "posted" and can_post and not locked %}
+{% call ui.modal("edit-info", _("Sửa thông tin mô tả"), description=_("Chỉ sửa phần mô tả; số tiền, ngày, tài khoản không đổi. Thay đổi được ghi nhật ký.")) %}
+<form method="post" action="/entries/{{ e.id }}/info">
+  {{ ui.csrf_field() }}
+  <div class="space-y-4 px-5 pb-5">
+    {{ ui.input("description", _("Diễn giải"), e.description, required=True) }}
+    {{ ui.input("contact_name", _("Người nộp tiền") if incoming else _("Người nhận tiền"), e.contact_name) }}
+    {{ ui.input("contact_address", _("Địa chỉ"), e.contact_address) }}
+    <div class="grid grid-cols-2 gap-4">
+      {{ ui.input("attached_docs", _("Kèm theo (chứng từ gốc)"), e.attached_docs, type="number", attrs='min="0"') }}
+      {{ ui.input("ref_no", _("Số chứng từ gốc"), e.ref_no) }}
+    </div>
+  </div>
+  <div class="modal-footer">
+    {{ ui.button(_("Đóng"), "secondary", type="button", attrs="@click=\"$dispatch('modal-close')\"") }}
+    {{ ui.button(_("Lưu"), "primary", icon_name="check") }}
+  </div>
+</form>
+{% endcall %}
+{% endif %}
+{% endblock %}

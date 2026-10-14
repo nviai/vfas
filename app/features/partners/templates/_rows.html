@@ -1,0 +1,59 @@
+{% import "macros.html" as ui with context %}
+{% macro page_url(p) %}/partners?page={{ p }}&q={{ q|urlencode }}&role={{ role }}&show={{ show }}{% endmacro %}
+{% if not partners %}
+  {% call ui.empty_state(_("Chưa có đối tượng nào") if not q else _("Không tìm thấy đối tượng phù hợp"), "users", _("Khách hàng, nhà cung cấp được thêm tự động khi lập chứng từ hoặc nhập hóa đơn điện tử.")) %}
+    {% if can("catalog.create") %}{{ ui.link_button(_("Thêm đối tượng"), "/partners/new", "primary", icon_name="plus") }}{% endif %}
+  {% endcall %}
+{% else %}
+<div class="table-wrap max-md:hidden">
+  <table class="table table-hover">
+    <thead>
+      <tr>
+        <th class="w-32">{{ _("Mã") }}</th>
+        <th>{{ _("Tên") }}</th>
+        <th class="w-36">{{ _("Mã số thuế") }}</th>
+        <th class="w-40 max-lg:hidden">{{ _("Điện thoại") }}</th>
+        <th class="w-48">{{ _("Loại") }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in partners %}
+      <tr class="is-link {{ 'is-muted' if not p.is_active }}">
+        <td><a href="/partners/{{ p.id }}" class="doc-no hover:underline">{{ p.code }}</a></td>
+        <td class="max-w-0">
+          <p class="truncate text-fg">{{ p.name }}</p>
+          {% if p.address and p.id not in masked_ids %}<p class="truncate text-xs text-fg-3">{{ p.address }}</p>{% endif %}
+        </td>
+        <td class="tabular-nums text-fg-2">{{ "–" if p.id in masked_ids else (p.tax_code or "–") }}</td>
+        <td class="max-lg:hidden tabular-nums text-fg-2">{{ "–" if p.id in masked_ids else (p.phone or "–") }}</td>
+        <td>
+          <div class="flex flex-wrap gap-1">
+            {% for r in p.roles %}{{ ui.badge(_(role_labels[r]), {"customer": "brand", "supplier": "violet", "employee": "blue"}[r]) }}{% endfor %}
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<ul class="divide-y divide-line md:hidden">
+  {% for p in partners %}
+  <li>
+    <a href="/partners/{{ p.id }}" class="flex items-start gap-3 px-4 py-3 active:bg-surface-2">
+      {{ ui.avatar(p.name, "size-9") }}
+      <div class="min-w-0 flex-1">
+        <p class="truncate text-[14px] font-medium text-fg">{{ p.name }}</p>
+        <p class="truncate text-xs text-fg-3">{{ p.code }}{% if p.tax_code and p.id not in masked_ids %} · MST {{ p.tax_code }}{% endif %}</p>
+      </div>
+    </a>
+  </li>
+  {% endfor %}
+</ul>
+<div class="flex items-center justify-between border-t border-line px-4 py-3 text-[13px] sm:px-5">
+  <span class="text-fg-3">{{ _("Trang {page}", page=page) }}</span>
+  <div class="flex gap-1">
+    {% if page > 1 %}{{ ui.link_button(_("Trang trước"), page_url(page - 1), "secondary", size="sm", icon_name="chevron-left") }}{% endif %}
+    {% if has_next %}{{ ui.link_button(_("Trang sau"), page_url(page + 1), "secondary", size="sm", icon_right="chevron-right") }}{% endif %}
+  </div>
+</div>
+{% endif %}

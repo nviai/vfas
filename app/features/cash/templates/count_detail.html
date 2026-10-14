@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Bảng kiểm kê quỹ") }} {{ cc.number }}{% endblock %}
+{% block content %}
+{% call ui.page_header(_("Bảng kiểm kê quỹ") ~ " " ~ cc.number, _("Ngày {d}", d=cc.count_date|date) ~ ((" · " ~ cc.count_time) if cc.count_time else ""), breadcrumbs=breadcrumbs, back="/cash/counts", icon_name="calculator") %}
+  {{ ui.link_button(_("In 08a-TT"), "/cash/counts/" ~ cc.id ~ "/print.pdf", "secondary", icon_name="printer", target="_blank") }}
+{% endcall %}
+
+{% if cc.difference == 0 %}
+  {{ ui.alert(_("Tiền thực tế khớp tồn sổ."), "success", cls="mb-5") }}
+{% elif suggestion %}
+  {% call ui.alert(_("Còn chênh lệch {v} đồng chưa xử lý. Gợi ý: {kind} – Nợ {d} / Có {c}. Kiểm tra lại nguyên nhân rồi mới lập chứng từ.", v=(suggestion.amount|money), kind=(_("phiếu thu") if suggestion.kind == "PT" else _("phiếu chi")), d=suggestion.debit, c=suggestion.credit),
+                   "warning", title=(_("Thừa quỹ") if remaining > 0 else _("Thiếu quỹ")), cls="mb-5") %}
+    {% if can("cash.create") %}{{ ui.link_button(_("Lập phiếu thu xử lý thừa") if suggestion.kind == "PT" else _("Lập phiếu chi xử lý thiếu"), suggestion.url, "primary", size="sm", icon_name="file-plus") }}{% endif %}
+  {% endcall %}
+{% else %}
+  {{ ui.alert(_("Chênh lệch đã được xử lý bằng chứng từ đã ghi sổ."), "success", cls="mb-5") }}
+{% endif %}
+
+<div class="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
+  <div class="min-w-0 space-y-5">
+    {% call ui.card(_("Kết quả đếm"), flush=True) %}
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>{{ _("Mệnh giá") }}</th><th class="num w-36">{{ _("Số tờ") }}</th><th class="num w-48">{{ _("Thành tiền") }}</th></tr></thead>
+        <tbody>
+          {% for ln in cc.lines if ln.quantity %}
+          <tr><td class="tabular-nums">{{ ln.denomination|money }} đ</td><td class="num">{{ ln.quantity|money }}</td><td class="num">{{ ln.amount|money }}</td></tr>
+          {% else %}
+          <tr><td colspan="3" class="py-6 text-center text-fg-3">{{ _("Không có tiền mặt trong quỹ") }}</td></tr>
+          {% endfor %}
+        </tbody>
+        <tfoot><tr class="row-total"><td colspan="2">{{ _("Tổng thực tế") }}</td><td class="num">{{ cc.actual_total|money }}</td></tr></tfoot>
+      </table>
+    </div>
+    {% endcall %}
+    {% call ui.card(_("Thành phần, kết luận")) %}
+      {{ ui.desc_list([(_("Đại diện kế toán"), cc.accountant_name), (_("Đại diện thủ quỹ"), cc.cashier_name),
+                       (_("Thành viên khác"), (cc.other_member_name ~ (" (" ~ cc.other_member_role ~ ")" if cc.other_member_role else ""))|trim),
+                       (_("Người chịu trách nhiệm"), cc.responsible_name), (_("Lý do chênh lệch"), cc.difference_reason),
+                       (_("Kết luận"), cc.conclusion), (_("Người lập"), creator), (_("Lập lúc"), cc.created_at|datetime)], cols="sm:grid-cols-2") }}
+    {% endcall %}
+    {% if linked %}
+    {% call ui.card(_("Chứng từ xử lý chênh lệch"), flush=True) %}
+      <ul class="divide-y divide-line">
+        {% for e in linked %}
+        <li><a href="{{ e.url }}" class="flex items-center gap-3 px-5 py-3 hover:bg-surface-2">
+          <span class="doc-no">{{ e.display_number }}</span><span class="flex-1 truncate text-[13.5px] text-fg-2">{{ e.description }}</span>
+          <span class="tabular-nums">{{ e.total|money }}</span>{{ ui.status_badge(e.status) }}</a></li>
+        {% endfor %}
+      </ul>
+    {% endcall %}
+    {% endif %}
+  </div>
+  <aside>
+    <section class="card p-5">
+      <dl class="space-y-3 text-[13.5px]">
+        <div class="flex justify-between gap-4"><dt class="text-fg-3">{{ _("I. Tồn theo sổ quỹ") }}</dt><dd class="font-semibold tabular-nums">{{ cc.book_balance|money }}</dd></div>
+        <div class="flex justify-between gap-4"><dt class="text-fg-3">{{ _("II. Kiểm kê thực tế") }}</dt><dd class="font-semibold tabular-nums">{{ cc.actual_total|money }}</dd></div>
+        <div class="flex justify-between gap-4 border-t border-line pt-3 text-[15px]"><dt class="font-medium">{{ _("Chênh lệch (thực tế − sổ)") }}</dt>
+          <dd class="font-semibold tabular-nums {{ 'amount-neg' if cc.difference < 0 }}">{{ ('+' if cc.difference > 0 else '') ~ (cc.difference|money) }}</dd></div>
+        <div class="flex justify-between gap-4"><dt class="text-fg-3">{{ _("Còn chưa xử lý") }}</dt><dd class="tabular-nums">{{ remaining|money }}</dd></div>
+      </dl>
+    </section>
+  </aside>
+</div>
+{% endblock %}

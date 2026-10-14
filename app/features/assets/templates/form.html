@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% set editing = asset is not none %}
+{% block title %}{{ _("Sửa thẻ TSCĐ") if editing else _("Ghi tăng TSCĐ") }}{% endblock %}
+{% block content %}
+{{ ui.page_header(_("Sửa thẻ TSCĐ") ~ " " ~ asset.code if editing else _("Ghi tăng TSCĐ"),
+                  _("Khấu hao đường thẳng theo tháng; tháng cuối bù chênh lệch làm tròn."), breadcrumbs=breadcrumbs,
+                  back=("/assets/" ~ asset.id) if editing else "/assets", icon_name="building") }}
+
+{% if errors.get("_") %}{{ ui.alert(_(errors["_"]), "error", cls="mb-5") }}{% endif %}
+{% if suggestions and suggestions|length > 1 %}
+  {% call ui.alert(_("Chứng từ có {n} dòng ghi Nợ TK 211. Đang lấy dòng đã chọn – mỗi tài sản lập một thẻ.", n=suggestions|length), "info", cls="mb-5") %}
+    {% for s in suggestions %}{{ ui.link_button(s.name ~ " · " ~ s.cost|money, "/assets/new?from_entry=" ~ s.entry_id ~ "&line=" ~ loop.index0, "secondary", size="sm") }}{% endfor %}
+  {% endcall %}
+{% endif %}
+
+<form method="post" action="{{ '/assets/' ~ asset.id if editing else '/assets' }}" class="card" x-data="docForm()" @keydown="keys($event)">
+  {{ ui.csrf_field() }}
+  {% if form.get("entry_id") %}<input type="hidden" name="entry_id" value="{{ form.entry_id }}">{% endif %}
+  {% if form.get("source") %}<input type="hidden" name="source" value="{{ form.source }}">{% endif %}
+  <div class="card-body divide-y divide-line" x-data="{ opening: {{ 'true' if form.get('is_opening') else 'false' }} }">
+    {% call ui.form_section(_("Thông tin tài sản"), _("Mã để trống sẽ tự cấp (TS0001…).")) %}
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-[10rem_minmax(0,1fr)]">
+        {{ ui.input("code", _("Mã tài sản"), form.get("code", ""), input_cls="tabular-nums") }}
+        {{ ui.input("name", _("Tên tài sản"), form.get("name", ""), required=True, autofocus=not editing) }}
+      </div>
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {{ ui.select("category", _("Nhóm tài sản"), categories, form.get("category")) }}
+        {{ ui.input("department", _("Bộ phận sử dụng"), form.get("department", "")) }}
+        {{ ui.input("manufacturer", _("Nước/hãng sản xuất"), form.get("manufacturer", "")) }}
+        <div class="grid grid-cols-2 gap-4">
+          {{ ui.input("serial_no", _("Số hiệu"), form.get("serial_no", "")) }}
+          {{ ui.input("year_made", _("Năm sản xuất"), form.get("year_made") or "", type="number", input_cls="tabular-nums") }}
+        </div>
+      </div>
+      {{ ui.combobox("partner_id", _("Nhà cung cấp"), "/lookup/partners", value=form.get("partner_id") or none, value_label=form.get("partner_label"), params={"role": "supplier"}, placeholder=_("Tùy chọn")) }}
+    {% endcall %}
+
+    {% call ui.form_section(_("Giá trị và khấu hao"), _("Nguyên giá gồm giá mua và chi phí liên quan, không gồm thuế GTGT được khấu trừ.")) %}
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {{ ui.money_input("cost", _("Nguyên giá"), form.get("cost") or none, required=True) }}
+        {{ ui.input("useful_life_months", _("Thời gian sử dụng (tháng)"), form.get("useful_life_months", ""), type="number", required=True, input_cls="tabular-nums", hint=_("Ví dụ 36 tháng = 3 năm")) }}
+        {{ ui.date_input("acquired_date", _("Ngày ghi tăng / đưa vào sử dụng"), form.get("acquired_date"), required=True) }}
+        {% if editing %}
+          {{ ui.date_input("depreciation_start", _("Bắt đầu khấu hao từ"), form.get("depreciation_start"), hint=_("Ngày 1 của tháng bắt đầu trích")) }}
+        {% else %}
+          <div class="flex items-end pb-2">{{ ui.checkbox("start_next_month", _("Bắt đầu khấu hao từ tháng sau"), form.get("start_next_month"), hint=_("Mặc định trích ngay từ tháng ghi tăng")) }}</div>
+        {% endif %}
+      </div>
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {{ ui.select("asset_account", _("TK nguyên giá"), asset_accounts, form.get("asset_account")) }}
+        {{ ui.select("expense_account", _("TK chi phí khấu hao"), expense_accounts, form.get("expense_account")) }}
+      </div>
+      <label class="flex cursor-pointer items-start gap-2.5">
+        <input type="checkbox" name="is_opening" value="1" class="checkbox mt-0.5" x-model="opening">
+        <span><span class="block text-[13.5px] text-fg">{{ _("Tài sản đã khấu hao trước khi dùng phần mềm") }}</span>
+          <span class="mt-0.5 block text-xs text-fg-3">{{ _("Nhập hao mòn lũy kế và số tháng đã trích; số còn lại chia đều cho các tháng còn lại.") }}</span></span>
+      </label>
+      <div x-show="opening" x-cloak class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {{ ui.money_input("opening_accumulated", _("Hao mòn lũy kế đầu kỳ"), form.get("opening_accumulated") or none) }}
+        {{ ui.input("opening_months_used", _("Số tháng đã khấu hao"), form.get("opening_months_used") or "", type="number", input_cls="tabular-nums") }}
+      </div>
+      {{ ui.textarea("note", _("Ghi chú"), form.get("note", ""), rows=2) }}
+    {% endcall %}
+  </div>
+  <div class="card-footer flex justify-end gap-2">
+    {{ ui.link_button(_("Hủy"), ("/assets/" ~ asset.id) if editing else "/assets", "secondary") }}
+    {{ ui.button(_("Lưu"), "primary", icon_name="check", hotkey="save", kbd_hint="Ctrl+S") }}
+  </div>
+</form>
+{% endblock %}

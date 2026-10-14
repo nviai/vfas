@@ -1,0 +1,103 @@
+{#- PATTERN (a) – Document list: status tabs + filter bar + table (desktop) / cards (mobile) + pagination.
+    Copy this when building a new list. For htmx filtering: move #results into a partial and use filter_bar(hx_target="#results"). -#}
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Chứng từ") }}{% endblock %}
+{% macro page_url(p) %}?page={{ p }}{% endmacro %}
+{% block content %}
+{% call ui.page_header(_("Phiếu thu, chi"), _("Chứng từ tiền mặt và tiền gửi · 184 chứng từ trong kỳ"), breadcrumbs=[(_("Tiền"), "#"), (_("Phiếu thu, chi"), None)]) %}
+  {{ ui.link_button(_("Xuất Excel"), "#", "secondary", icon_name="file-spreadsheet", cls="max-sm:hidden") }}
+  {% call ui.dropdown(_("Tạo mới"), icon_name="plus", variant="primary", size=None) %}
+    {{ ui.menu_item(_("Phiếu thu"), "/ui-kit/form-entry", "circle-arrow-down", kbd_hint="Alt+T") }}
+    {{ ui.menu_item(_("Phiếu chi"), "/ui-kit/form-entry", "circle-arrow-up", kbd_hint="Alt+C") }}
+    {{ ui.menu_sep() }}
+    {{ ui.menu_item(_("Nhập từ Excel"), "#", "upload") }}
+  {% endcall %}
+{% endcall %}
+
+{{ ui.tabs([
+  {"key": "all", "label": _("Tất cả"), "href": "?", "count": 184},
+  {"key": "draft", "label": _("Nháp"), "href": "?status=draft", "count": 5},
+  {"key": "posted", "label": _("Đã ghi sổ"), "href": "?status=posted", "count": 176},
+  {"key": "cancelled", "label": _("Đã hủy"), "href": "?status=cancelled", "count": 3},
+], "all", cls="mb-4") }}
+
+<div class="card">
+  <div class="border-b border-line p-3 sm:px-5">
+    {% call ui.filter_bar("", reset_href="?") %}
+      <div class="w-full sm:w-64">
+        <label class="sr-only" for="q">{{ _("Tìm") }}</label>
+        {{ ui.input("q", None, filters.q, "search", placeholder=_("Số chứng từ, diễn giải, đối tượng…"), prefix=ui.icon("search"), input_cls="input-sm") }}
+      </div>
+      {{ ui.select("doc_type", None, [("PT", _("Phiếu thu")), ("PC", _("Phiếu chi")), ("BC", _("Báo có")), ("BN", _("Báo nợ"))], filters.doc_type, placeholder=_("Mọi loại"), input_cls="input-sm w-36") }}
+      <div class="flex items-center gap-1.5">
+        <input type="date" name="start" value="{{ filters.start.isoformat() }}" class="input input-sm w-36 tabular-nums" aria-label="{{ _('Từ ngày') }}">
+        <span class="text-fg-3">–</span>
+        <input type="date" name="end" value="{{ filters.end.isoformat() }}" class="input input-sm w-36 tabular-nums" aria-label="{{ _('Đến ngày') }}">
+      </div>
+    {% endcall %}
+  </div>
+
+  <div id="results">
+    {#- Desktop: table -#}
+    <div class="table-wrap max-md:hidden md:overflow-visible">
+      <table class="table table-hover">
+        <thead>
+          <tr>
+            <th class="w-36">{{ _("Số chứng từ") }}</th>
+            <th class="w-28">{{ _("Ngày") }}</th>
+            <th class="w-32">{{ _("Loại") }}</th>
+            <th>{{ _("Diễn giải") }}</th>
+            <th class="num w-40">{{ _("Số tiền") }}</th>
+            <th class="w-32">{{ _("Trạng thái") }}</th>
+            <th class="w-10"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in entries %}
+          <tr class="is-link {{ 'is-muted' if e.status == 'cancelled' }}">
+            <td><a href="/ui-kit/detail" class="doc-no hover:underline">{{ e.number or _("(chưa cấp)") }}</a></td>
+            <td class="tabular-nums text-fg-2">{{ e.date|date }}</td>
+            <td>{{ ui.kind_badge(e.doc_type) }}</td>
+            <td class="max-w-0">
+              <p class="truncate text-fg">{{ e.description }}</p>
+              {% if e.partner %}<p class="truncate text-xs text-fg-3">{{ e.partner }}</p>{% endif %}
+            </td>
+            <td class="num font-medium {{ 'amount-in' if e.doc_type in ('PT', 'BC') else '' }}">{{ e.amount|money }}</td>
+            <td>{{ ui.status_badge(e.status) }}</td>
+            <td class="!pr-3 text-right">
+              {% call ui.dropdown(icon_name="ellipsis", variant="ghost", size="xs", width="w-48", aria_label=_("Thao tác")) %}
+                {{ ui.menu_item(_("Xem"), "/ui-kit/detail", "eye") }}
+                {{ ui.menu_item(_("In phiếu"), "#", "printer") }}
+                {{ ui.menu_item(_("Nhân bản"), "#", "copy") }}
+              {% endcall %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {#- Mobile: cards -#}
+    <ul class="divide-y divide-line md:hidden">
+      {% for e in entries %}
+      <li>
+        <a href="/ui-kit/detail" class="flex items-start gap-3 px-4 py-3 active:bg-surface-2">
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2">
+              <span class="doc-no text-[13px]">{{ e.number or _("Nháp") }}</span>
+              <span class="text-xs text-fg-3 tabular-nums">{{ e.date|date }}</span>
+            </div>
+            <p class="mt-0.5 truncate text-[13.5px] text-fg">{{ e.description }}</p>
+            <div class="mt-1.5 flex items-center gap-1.5">{{ ui.kind_badge(e.doc_type) }}{{ ui.status_badge(e.status) }}</div>
+          </div>
+          <span class="shrink-0 text-[14px] font-semibold tabular-nums {{ 'amount-in' if e.doc_type in ('PT', 'BC') }}">{{ e.amount|money }}</span>
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+
+    {{ ui.pagination(page, pages, page_url, total=total) }}
+  </div>
+</div>
+{% endblock %}

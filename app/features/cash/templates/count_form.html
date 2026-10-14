@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Kiểm kê quỹ") }}{% endblock %}
+{% block content %}
+{% set initial = {} %}
+{% for d in denoms %}{% do initial.update({d|string: (qty.get(d) or 0)|int}) %}{% endfor %}
+<form method="post" action="/cash/counts" x-data='cashCount({{ denoms|list|tojson }}, {{ book|tojson }}, {{ initial|tojson }})' x-ref="form"
+      @keydown.ctrl.enter.prevent="$el.requestSubmit()" novalidate>
+  {{ ui.csrf_field() }}
+  {{ ui.page_header(_("Kiểm kê quỹ tiền mặt"), _("Đếm số tờ theo mệnh giá; tồn sổ lấy theo ngày kiểm kê."), breadcrumbs=breadcrumbs, back="/cash/counts", icon_name="calculator") }}
+
+  <div class="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
+    <div class="min-w-0 space-y-5">
+      {% call ui.card(_("Thời điểm kiểm kê")) %}
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-3"
+             @change="if ($event.target.name === 'count_date' && $event.target.value) fetch('/cash/counts/balance?d=' + $event.target.value).then(r => r.json()).then(j => bookBalance = j.balance)">
+          {{ ui.date_input("count_date", _("Ngày kiểm kê"), v.count_date, errors=errors, required=True, max=today) }}
+          {{ ui.input("count_time", _("Giờ"), v.count_time or "", type="time", errors=errors) }}
+        </div>
+      {% endcall %}
+
+      {% call ui.card(_("Số tiền đếm được"), flush=True) %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>{{ _("Mệnh giá") }}</th><th class="num w-40">{{ _("Số tờ") }}</th><th class="num w-48">{{ _("Thành tiền") }}</th></tr></thead>
+          <tbody>
+            {% for d in denoms %}
+            <tr>
+              <td class="font-medium tabular-nums">{{ d|money }} đ</td>
+              <td class="!py-1.5"><input type="number" min="0" step="1" inputmode="numeric" name="qty_{{ d }}" class="input input-sm input-num {{ 'input-error' if errors.get('qty_' ~ d) }}"
+                     x-model.number="qty[{{ d }}]" @focus="$el.select()" aria-label="{{ _('Số tờ') }} {{ d|money }}"></td>
+              <td class="num" x-text="fmt(lineTotal({{ d }}))"></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot><tr class="row-total"><td colspan="2">{{ _("Tổng thực tế") }}</td><td class="num" x-text="fmt(total)"></td></tr></tfoot>
+        </table>
+      </div>
+      {% endcall %}
+
+      {% call ui.card(_("Thành phần kiểm kê")) %}
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {{ ui.input("accountant_name", _("Đại diện kế toán"), v.accountant_name or "") }}
+          {{ ui.input("cashier_name", _("Đại diện thủ quỹ"), v.cashier_name or "") }}
+          {{ ui.input("other_member_name", _("Thành viên khác"), v.other_member_name or "") }}
+          {{ ui.input("other_member_role", _("Đại diện cho"), v.other_member_role or "", placeholder=_("Ví dụ: ban giám đốc")) }}
+          {{ ui.input("responsible_name", _("Người chịu trách nhiệm kiểm kê"), v.responsible_name or "", cls="sm:col-span-2") }}
+          {{ ui.textarea("difference_reason", _("Lý do chênh lệch (nếu có)"), v.difference_reason or "", rows=2, cls="sm:col-span-2") }}
+          {{ ui.textarea("conclusion", _("Kết luận sau khi kiểm kê"), v.conclusion or "", rows=2, cls="sm:col-span-2") }}
+        </div>
+      {% endcall %}
+    </div>
+
+    <aside class="space-y-5 xl:sticky xl:top-20 xl:self-start">
+      <section class="card p-5">
+        <dl class="space-y-3 text-[13.5px]">
+          <div class="flex justify-between gap-4"><dt class="text-fg-3">{{ _("I. Tồn theo sổ quỹ") }}</dt><dd class="font-semibold tabular-nums" x-text="fmt(bookBalance)"></dd></div>
+          <div class="flex justify-between gap-4"><dt class="text-fg-3">{{ _("II. Kiểm kê thực tế") }}</dt><dd class="font-semibold tabular-nums" x-text="fmt(total)"></dd></div>
+          <div class="flex justify-between gap-4 border-t border-line pt-3 text-[15px]">
+            <dt class="font-medium">{{ _("Chênh lệch") }}</dt>
+            <dd class="font-semibold tabular-nums" :class="diff === 0 ? 'text-emerald-600 dark:text-emerald-400' : (diff > 0 ? 'text-sky-600 dark:text-sky-400' : 'amount-neg')" x-text="(diff > 0 ? '+' : '') + fmt(diff)"></dd>
+          </div>
+        </dl>
+        <p class="mt-3 text-[13px]" x-show="diff === 0">{{ ui.icon("circle-check", "inline size-4 text-emerald-600") }} {{ _("Quỹ khớp sổ.") }}</p>
+        <p class="mt-3 text-[13px] text-fg-2" x-show="diff > 0" x-cloak>{{ _("Thừa quỹ – sau khi lưu sẽ gợi ý phiếu thu (Nợ 1111 / Có 3381).") }}</p>
+        <p class="mt-3 text-[13px] text-fg-2" x-show="diff < 0" x-cloak>{{ _("Thiếu quỹ – sau khi lưu sẽ gợi ý phiếu chi (Nợ 1381 / Có 1111).") }}</p>
+      </section>
+    </aside>
+  </div>
+
+  {% call ui.form_actions() %}
+    {{ ui.link_button(_("Hủy bỏ"), "/cash/counts", "ghost") }}
+    {{ ui.button(_("Lưu bảng kiểm kê"), icon_name="check", kbd_hint="Ctrl+Enter") }}
+  {% endcall %}
+</form>
+{% endblock %}

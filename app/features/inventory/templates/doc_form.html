@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% import "inventory/_grid.html" as grid with context %}
+{% block title %}{{ _(kind_label) }}{% endblock %}
+{% block content %}
+{% set action = ("/inventory/" ~ path ~ "/" ~ (doc.entry_id if kind == "receipt" else doc.id) ~ "/edit") if doc else ("/inventory/" ~ path) %}
+<form method="post" action="{{ action }}" x-data="docForm()" @keydown="keys($event)" novalidate>
+  {{ ui.csrf_field() }}
+  {% call ui.page_header(_(kind_label) ~ (" " ~ doc.display_number if doc else ""),
+                         {"receipt": _("Ghi tăng hàng tồn kho: Nợ TK kho / Có TK đối ứng."),
+                          "issue": _("Ghi giảm hàng tồn kho theo số lượng; giá trị tính khi chạy tính giá xuất kho cuối tháng."),
+                          "transfer": _("Chuyển hàng giữa hai kho, không phát sinh bút toán.")}[kind],
+                         breadcrumbs=breadcrumbs, back="/inventory/" ~ path, badge=ui.status_badge("draft")) %}
+  {% endcall %}
+
+  {% if errors_list %}
+    {% call ui.alert(errors_list[0] if errors_list|length == 1 else _("Chứng từ có {n} lỗi cần sửa", n=errors_list|length), "error", cls="mb-5") %}
+      {% if errors_list|length > 1 %}<ul class="list-disc pl-5 text-[13px]">{% for e in errors_list %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+    {% endcall %}
+  {% endif %}
+
+  <div class="space-y-5">
+    {% call ui.card(_("Thông tin chung")) %}
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {{ ui.date_input("date", _("Ngày hạch toán"), v.date, required=True) }}
+      {% if kind == "receipt" %}{{ ui.date_input("doc_date", _("Ngày chứng từ"), v.doc_date) }}{% endif %}
+      <div>
+        <label class="label" for="f-warehouse_id">{{ _("Kho nhập") if kind == "receipt" else _("Kho xuất") }}<span class="required-mark" aria-hidden="true">*</span></label>
+        <select id="f-warehouse_id" name="warehouse_id" class="input">
+          {% for w in warehouses %}<option value="{{ w.id }}" {{ "selected" if w.id == v.warehouse_id }}>{{ w.code }} – {{ w.name }}</option>{% endfor %}
+        </select>
+      </div>
+      {% if kind == "transfer" %}
+      <div>
+        <label class="label" for="f-to_warehouse_id">{{ _("Kho nhận") }}<span class="required-mark" aria-hidden="true">*</span></label>
+        <select id="f-to_warehouse_id" name="to_warehouse_id" class="input">
+          <option value="">{{ _("Chọn kho nhận…") }}</option>
+          {% for w in warehouses %}<option value="{{ w.id }}" {{ "selected" if w.id == v.to_warehouse_id }}>{{ w.code }} – {{ w.name }}</option>{% endfor %}
+        </select>
+      </div>
+      {% endif %}
+      {% if kind != "transfer" %}
+        {{ ui.combobox("counter_account", _("TK Có (đối ứng)") if kind == "receipt" else _("TK Nợ (chi phí / đối ứng)"), "/lookup/accounts",
+                       value=v.counter_account or None, value_label=v.counter_account or None, params={"postable": 1},
+                       required=True, placeholder=_("Số tài khoản…"), hint=_(counter_hint)) }}
+      {% endif %}
+    </div>
+    <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {% if kind != "transfer" %}
+        {{ ui.combobox("partner_id", _("Đối tượng"), "/lookup/partners", value=v.partner_id, value_label=partner_label,
+                       params={"role": "supplier"} if kind == "receipt" else {}, placeholder=_("Không bắt buộc")) }}
+      {% endif %}
+      {{ ui.input("contact_name", {"receipt": _("Người giao hàng"), "issue": _("Người nhận hàng"), "transfer": _("Người vận chuyển")}[kind], v.contact_name) }}
+      {% if kind == "receipt" %}{{ ui.input("ref_no", _("Theo chứng từ số"), v.ref_no) }}{% endif %}
+      {{ ui.input("attached_docs", _("Số chứng từ gốc kèm theo"), v.attached_docs or 0, type="number", input_cls="tabular-nums") }}
+    </div>
+    <div class="mt-4">
+      {{ ui.input("description", {"receipt": _("Diễn giải"), "issue": _("Lý do xuất kho"), "transfer": _("Lý do chuyển kho")}[kind], v.description) }}
+    </div>
+    {% endcall %}
+
+    {% call ui.card(_("Vật tư, hàng hóa")) %}
+      {{ grid.stock_grid(lines, with_value=(kind == "receipt")) }}
+    {% endcall %}
+  </div>
+
+  {% call ui.form_actions() %}
+    {{ ui.link_button(_("Hủy bỏ"), doc.url if doc else "/inventory/" ~ path, "ghost") }}
+    {{ ui.button(_("Lưu nháp"), "secondary", name="action", value="save", hotkey="save", kbd_hint="Ctrl+S") }}
+    {% if can("inventory.post") %}
+      {{ ui.button(_("Lưu và ghi sổ"), icon_name="check", name="action", value="post", hotkey="post", kbd_hint="Ctrl+Enter") }}
+    {% endif %}
+  {% endcall %}
+</form>
+{% endblock %}

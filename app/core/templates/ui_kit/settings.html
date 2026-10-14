@@ -1,0 +1,110 @@
+{#- PATTERN (g) – Tabbed settings + form_section (title left, control right) + sticky save bar.
+    Real pages should use link tabs (ui.tabs, one URL per tab); this pattern demonstrates Alpine tabs inside a single form. -#}
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Cài đặt") }}{% endblock %}
+{% block content %}
+{% call ui.page_header(_("Cài đặt"), _("Thông tin doanh nghiệp, chế độ kế toán, thuế, đánh số chứng từ, trợ lý AI."), breadcrumbs=[(_("Hệ thống"), "#"), (_("Cài đặt"), None)]) %}{% endcall %}
+
+<form method="post" action="" x-data="{ tab: 'company', ...docForm() }" @keydown="keys($event)">
+  {{ ui.csrf_field() }}
+  <nav class="tabs mb-6" aria-label="Tabs">
+    {% for key, label, ic in [("company", _("Doanh nghiệp"), "building-2"), ("tax", _("Thuế"), "percent"), ("numbering", _("Chứng từ"), "hash"), ("ai", _("Trợ lý AI"), "sparkles"), ("api", _("API"), "key-round")] %}
+    <button type="button" class="tab" :class="tab === '{{ key }}' && 'tab-active'" @click="tab = '{{ key }}'">{{ ui.icon(ic) }}{{ label }}</button>
+    {% endfor %}
+  </nav>
+
+  <div class="card p-5 sm:p-6">
+    <div x-show="tab === 'company'" class="divide-y divide-line">
+      {% call ui.form_section(_("Thông tin doanh nghiệp"), _("In trên đầu mọi sổ, phiếu và báo cáo.")) %}
+        {{ ui.input("name", _("Tên doanh nghiệp"), company.name, required=True) }}
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {{ ui.input("short_name", _("Tên viết tắt"), company.short_name) }}
+          {{ ui.input("tax_code", _("Mã số thuế"), company.tax_code, input_cls="tabular-nums") }}
+        </div>
+        {{ ui.input("address", _("Địa chỉ"), company.address) }}
+      {% endcall %}
+      {% call ui.form_section(_("Chế độ kế toán"), _("Không đổi được sau khi đã có chứng từ ghi sổ.")) %}
+        {{ ui.radio_group("regime", None, [{"value": "tt133", "label": "Thông tư 133/2016/TT-BTC", "hint": _("Doanh nghiệp nhỏ và vừa")}, {"value": "tt99", "label": "Thông tư 99/2025/TT-BTC", "hint": _("Sắp hỗ trợ")}], "tt133", style="cards") }}
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {{ ui.date_input("start_date", _("Ngày bắt đầu ghi sổ"), settings.start_date, hint=_("Số dư đầu kỳ tính tại ngày này.")) }}
+          {{ ui.select("fiscal_start", _("Năm tài chính bắt đầu"), [(1, _("Tháng 1")), (4, _("Tháng 4")), (7, _("Tháng 7")), (10, _("Tháng 10"))], 1) }}
+        </div>
+      {% endcall %}
+      {% call ui.form_section(_("Người ký"), _("Tên in ở phần chữ ký của sổ, phiếu, báo cáo.")) %}
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {{ ui.input("legal_rep", _("Người đại diện theo pháp luật"), settings.legal_rep) }}
+          {{ ui.input("chief_accountant", _("Kế toán trưởng"), settings.chief_accountant) }}
+          {{ ui.input("preparer", _("Người lập biểu"), settings.preparer) }}
+          {{ ui.input("cashier", _("Thủ quỹ"), settings.cashier) }}
+        </div>
+      {% endcall %}
+    </div>
+
+    <div x-show="tab === 'tax'" x-cloak class="divide-y divide-line">
+      {% call ui.form_section(_("Thuế GTGT"), _("Dùng để lập tờ khai 01/GTGT và nhắc hạn nộp.")) %}
+        {{ ui.radio_group("vat_method", _("Phương pháp tính thuế"), [{"value": "khau_tru", "label": _("Khấu trừ"), "hint": _("Tờ khai 01/GTGT")}, {"value": "truc_tiep", "label": _("Trực tiếp trên doanh thu"), "hint": _("Tỷ lệ % trên doanh thu")}], settings.vat_method, style="cards") }}
+        {{ ui.radio_group("vat_period", _("Kỳ khai thuế"), [("month", _("Theo tháng")), ("quarter", _("Theo quý"))], settings.vat_period) }}
+      {% endcall %}
+      {% call ui.form_section(_("Lương và bảo hiểm"), _("Vùng lương tối thiểu theo địa bàn hoạt động.")) %}
+        {{ ui.select("region", _("Vùng"), [("I", _("Vùng I – 5.310.000 đ")), ("II", _("Vùng II – 4.730.000 đ")), ("III", _("Vùng III – 4.140.000 đ")), ("IV", _("Vùng IV – 3.700.000 đ"))], settings.region, cls="max-w-xs") }}
+      {% endcall %}
+    </div>
+
+    <div x-show="tab === 'numbering'" x-cloak class="divide-y divide-line" x-data="{ fmt: {{ settings.number_format|tojson|forceescape }} }">
+      {% call ui.form_section(_("Đánh số chứng từ"), _("Số được cấp liên tục theo loại chứng từ và năm, tại thời điểm ghi sổ.")) %}
+        <div>
+          <label class="label" for="f-number_format">{{ _("Mẫu số") }}</label>
+          <input id="f-number_format" name="number_format" class="input mono max-w-sm" x-model="fmt">
+          <p class="hint">{{ _("Biến:") }} <code class="mono">{prefix}</code> <code class="mono">{year}</code> <code class="mono">{seq:04d}</code></p>
+        </div>
+        <div class="rounded-lg border border-dashed border-line-strong bg-surface-2 px-4 py-3 text-[13px]">
+          {{ _("Ví dụ:") }} <span class="doc-no">PT2026-0001</span>, <span class="doc-no">PC2026-0042</span>, <span class="doc-no">BH2026-0118</span>
+        </div>
+        {{ ui.switch("reset_yearly", _("Bắt đầu lại từ 0001 mỗi năm"), True) }}
+      {% endcall %}
+    </div>
+
+    <div x-show="tab === 'ai'" x-cloak class="divide-y divide-line">
+      {% call ui.form_section(_("Trợ lý AI"), _("Dùng bất kỳ nhà cung cấp tương thích OpenAI Chat Completions. Khóa API được mã hóa khi lưu.")) %}
+        {{ ui.switch("ai_enabled", _("Bật trợ lý AI cho công ty này"), True, hint=_("Thành viên có quyền sẽ thấy nút Trợ lý AI.")) }}
+        {{ ui.radio_group("ai_preset", _("Nhà cung cấp"), [
+            {"value": "anthropic", "label": "Anthropic Claude", "hint": "api.anthropic.com/v1"},
+            {"value": "openai", "label": "OpenAI", "hint": "api.openai.com/v1"},
+            {"value": "ollama", "label": "Ollama", "hint": _("Chạy trên máy chủ riêng")},
+            {"value": "custom", "label": _("Tùy chỉnh"), "hint": _("OpenRouter, vLLM, LM Studio…")}], "anthropic", style="cards") }}
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {{ ui.input("ai_base_url", _("Base URL"), "https://api.anthropic.com/v1/", input_cls="mono") }}
+          {{ ui.input("ai_model", _("Model"), "claude-opus-5-5", input_cls="mono") }}
+        </div>
+        {{ ui.password_input("ai_api_key", _("API key"), required=False, hint=_("Đã lưu khóa kết thúc bằng …x7Qa. Để trống nếu không đổi."), attrs='placeholder="••••••••"') }}
+        <div class="flex flex-wrap items-center gap-2">
+          {{ ui.button(_("Kiểm tra kết nối"), "secondary", icon_name="plug", type="button") }}
+          <span class="inline-flex items-center gap-1.5 text-[13px] text-emerald-600 dark:text-emerald-400">{{ ui.icon("circle-check") }}{{ _("Kết nối được · 412 ms") }}</span>
+        </div>
+      {% endcall %}
+    </div>
+
+    <div x-show="tab === 'api'" x-cloak>
+      {% call ui.section_title(_("API token"), _("Dùng cho REST API và endpoint tương thích OpenAI (/api/v1/chat/completions).")) %}
+        {{ ui.button(_("Tạo token"), "secondary", size="sm", icon_name="plus", type="button") }}
+      {% endcall %}
+      <div class="table-wrap rounded-lg border border-line">
+        <table class="table">
+          <thead><tr><th>{{ _("Tên") }}</th><th>{{ _("Tiền tố") }}</th><th>{{ _("Phạm vi") }}</th><th>{{ _("Dùng lần cuối") }}</th><th class="w-10"></th></tr></thead>
+          <tbody>
+            <tr><td class="font-medium">n8n – đồng bộ hóa đơn</td><td class="mono text-fg-3">vfas_live_3fA9…</td><td>{{ ui.badge("read", "gray") }} {{ ui.badge("write_draft", "amber") }}</td><td class="tabular-nums text-fg-2">13/10/2026 22:10</td>
+                <td>{{ ui.icon_button("trash", _("Thu hồi")) }}</td></tr>
+            <tr><td class="font-medium">Open WebUI</td><td class="mono text-fg-3">vfas_live_b71C…</td><td>{{ ui.badge("read", "gray") }}</td><td class="tabular-nums text-fg-2">10/10/2026 08:41</td>
+                <td>{{ ui.icon_button("trash", _("Thu hồi")) }}</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  {% call ui.form_actions() %}
+    {{ ui.button(_("Lưu thay đổi"), icon_name="check", hotkey="save", kbd_hint="Ctrl+S") }}
+  {% endcall %}
+</form>
+{% endblock %}

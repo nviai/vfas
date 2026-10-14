@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Kiểm tra dữ liệu") }}{% endblock %}
+{% block content %}
+{% call ui.page_header(_("Kiểm tra dữ liệu"), _("Rà soát sai sót thường gặp trước khi khóa sổ, lập báo cáo và tờ khai."), breadcrumbs=breadcrumbs, icon_name="shield-check") %}
+  {{ ui.link_button(_("Kiểm tra lại"), "/checks", "secondary", icon_name="refresh-cw") }}
+{% endcall %}
+
+{% if total == 0 %}
+  {% call ui.card() %}
+    {{ ui.empty_state(_("Không phát hiện vấn đề nào"), "circle-check", _("Tất cả {n} mục kiểm tra đều đạt.", n=results|length)) }}
+  {% endcall %}
+{% else %}
+  {% if errors %}
+    {{ ui.alert(_("Phát hiện {n} vấn đề, trong đó {e} lỗi cần xử lý.", n=total, e=errors), "error", cls="mb-5") }}
+  {% else %}
+    {{ ui.alert(_("Phát hiện {n} điểm cần xem lại, không có lỗi nghiêm trọng.", n=total), "warning", cls="mb-5") }}
+  {% endif %}
+{% endif %}
+
+<div class="space-y-3">
+  {% for r in results %}
+  {% set n = r.issues|length %}
+  <section class="card" x-data="{ open: {{ 'true' if n and n <= 5 else 'false' }} }">
+    <button type="button" class="flex w-full items-center gap-3 px-5 py-3.5 text-left" @click="open = !open" {% if not n %}disabled{% endif %}>
+      {% if r.error %}{{ ui.icon("circle-alert", "size-5 text-rose-500") }}
+      {% elif n == 0 %}{{ ui.icon("circle-check", "size-5 text-emerald-500") }}
+      {% elif r.issues|selectattr("severity", "equalto", "error")|list %}{{ ui.icon("circle-x", "size-5 text-rose-500") }}
+      {% elif r.issues|selectattr("severity", "equalto", "warning")|list %}{{ ui.icon("triangle-alert", "size-5 text-amber-500") }}
+      {% else %}{{ ui.icon("info", "size-5 text-sky-500") }}{% endif %}
+      <span class="flex-1 text-[14px] font-medium text-fg">{{ _(r.title) }}</span>
+      {% if r.error %}{{ ui.badge(_("Lỗi khi kiểm tra"), "red") }}
+      {% elif n %}{{ ui.badge(_("{n} mục", n=n), "gray") }}{{ ui.icon("chevron-down", "size-4 text-fg-3") }}
+      {% else %}{{ ui.badge(_("Đạt"), "green") }}{% endif %}
+    </button>
+    {% if n %}
+    <ul x-show="open" x-cloak class="divide-y divide-line border-t border-line">
+      {% for i in r.issues %}
+      <li class="flex items-start gap-3 px-5 py-2.5 text-[13.5px]">
+        {{ ui.badge({"error": _("Lỗi"), "warning": _("Cảnh báo"), "info": _("Lưu ý")}.get(i.severity, i.severity), {"error": "red", "warning": "amber", "info": "blue"}.get(i.severity, "gray")) }}
+        <span class="flex-1 text-fg-2">{{ i.message }}</span>
+        {% if i.link %}<a href="{{ i.link }}" class="shrink-0 text-primary hover:underline">{{ _("Xem") }}</a>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% if r.error %}<p class="border-t border-line px-5 py-2.5 text-xs text-rose-600">{{ r.error }}</p>{% endif %}
+  </section>
+  {% endfor %}
+</div>
+{% endblock %}

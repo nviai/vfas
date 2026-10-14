@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Nhật ký thao tác") }}{% endblock %}
+{% block content %}
+{{ ui.page_header(_("Nhật ký thao tác"), _("Ghi lại mọi thao tác theo thứ tự thời gian. Không ai sửa hay xóa được nhật ký."), breadcrumbs=breadcrumbs, icon_name="history") }}
+<div class="card">
+  <div class="border-b border-line p-3 sm:px-5">
+    {% call ui.filter_bar("/audit", reset_href="/audit", hx_target="#audit-results") %}
+      <div class="w-full sm:w-64">{{ ui.input("q", None, q, "search", placeholder=_("Nội dung, người thao tác…"), prefix=ui.icon("search"), input_cls="input-sm") }}</div>
+      {{ ui.select("group", None, groups.items()|list, group, placeholder=_("Mọi nhóm"), input_cls="input-sm w-40") }}
+      {{ ui.select("via", None, [("web", "Web"), ("api", "API"), ("ai", _("Trợ lý AI")), ("cli", "CLI")], via, placeholder=_("Mọi kênh"), input_cls="input-sm w-32") }}
+      <div class="flex items-center gap-1.5">
+        <input type="date" name="start" value="{{ start }}" class="input input-sm w-36 tabular-nums" aria-label="{{ _('Từ ngày') }}">
+        <span class="text-fg-3">–</span>
+        <input type="date" name="end" value="{{ end }}" class="input input-sm w-36 tabular-nums" aria-label="{{ _('Đến ngày') }}">
+      </div>
+    {% endcall %}
+  </div>
+  <div id="audit-results">{% include "audit/_rows.html" %}</div>
+</div>
+{% endblock %}

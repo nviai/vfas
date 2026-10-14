@@ -1,0 +1,3 @@
+{#- Kept for v1 templates: {% with level=..., message=... %}{% include "partials/alert.html" %}{% endwith %} -#}
+{% import "macros.html" as _ui with context %}
+{{ _ui.alert(_(message) if _ is defined else message, "error" if level == "error" else (level or "info"), dismissible=True) }}

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Thêm đối tượng") }}{% endblock %}
+{% block content %}
+{{ ui.page_header(_("Thêm đối tượng"), breadcrumbs=breadcrumbs, back="/partners", icon_name="user-plus") }}
+<form method="post" action="/partners" class="card">
+  {{ ui.csrf_field() }}
+  <div class="card-body divide-y divide-line">
+    {% include "partners/_fields.html" %}
+  </div>
+  <div class="card-footer flex justify-end gap-2">
+    {{ ui.link_button(_("Hủy"), "/partners", "secondary") }}
+    {{ ui.button(_("Lưu"), "primary", icon_name="check", hotkey="save", kbd_hint="Ctrl+S") }}
+  </div>
+</form>
+{% endblock %}

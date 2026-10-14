@@ -1,0 +1,58 @@
+{% import "macros.html" as ui with context %}
+{% macro page_url(p) %}/entries?{{ f.query(page=p) }}{% endmacro %}
+{% if not rows %}
+  {% call ui.empty_state(_("Không có chứng từ phù hợp"), "files", _("Thử bỏ bớt điều kiện lọc hoặc lập chứng từ mới.")) %}
+    {% if can("journal.create") %}{{ ui.link_button(_("Lập phiếu kế toán"), "/entries/new", "primary", icon_name="plus") }}{% endif %}
+  {% endcall %}
+{% else %}
+<div class="table-wrap max-md:hidden">
+  <table class="table table-hover">
+    <thead>
+      <tr>
+        <th class="w-36">{{ _("Số chứng từ") }}</th>
+        <th class="w-28">{{ _("Ngày") }}</th>
+        <th class="w-40">{{ _("Loại") }}</th>
+        <th>{{ _("Diễn giải") }}</th>
+        <th class="num w-40">{{ _("Số tiền") }}</th>
+        <th class="w-32">{{ _("Trạng thái") }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in rows %}
+      <tr class="is-link {{ 'is-muted' if e.status == 'cancelled' }}">
+        <td><a href="{{ e.url }}" class="doc-no hover:underline">{{ e.number or _("Nháp #{id}", id=e.id) }}</a></td>
+        <td class="tabular-nums text-fg-2">{{ e.date|date }}</td>
+        <td>{{ ui.kind_badge(e.doc_type) }}</td>
+        <td class="max-w-0">
+          <p class="truncate text-fg">{{ e.description or "–" }}</p>
+          {% if e.contact_name %}<p class="truncate text-xs text-fg-3">{{ e.contact_name }}</p>{% endif %}
+        </td>
+        <td class="num font-medium">{{ e.total|money }}</td>
+        <td>{{ ui.status_badge(e.status) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr class="row-total"><td colspan="4">{{ _("Tổng số tiền chứng từ đã ghi sổ") }}</td><td class="num">{{ amount|money }}</td><td></td></tr>
+    </tfoot>
+  </table>
+</div>
+<ul class="divide-y divide-line md:hidden">
+  {% for e in rows %}
+  <li>
+    <a href="{{ e.url }}" class="flex items-start gap-3 px-4 py-3 active:bg-surface-2">
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center gap-2">
+          <span class="doc-no text-[13px]">{{ e.number or _("Nháp") }}</span>
+          <span class="text-xs text-fg-3 tabular-nums">{{ e.date|date }}</span>
+        </div>
+        <p class="mt-0.5 truncate text-[13.5px] text-fg">{{ e.description or e.contact_name or "–" }}</p>
+        <div class="mt-1.5 flex items-center gap-1.5">{{ ui.kind_badge(e.doc_type) }}{{ ui.status_badge(e.status) }}</div>
+      </div>
+      <span class="shrink-0 text-[14px] font-semibold tabular-nums">{{ e.total|money }}</span>
+    </a>
+  </li>
+  {% endfor %}
+</ul>
+{{ ui.pagination(f.page, pages, page_url, total=total) }}
+{% endif %}

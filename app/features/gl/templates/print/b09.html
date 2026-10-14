@@ -1,0 +1,47 @@
+{% extends "gl/print/_base.html" %}
+{% import "gl/print/_base.html" as p %}
+{% block title %}Bản thuyết minh báo cáo tài chính{% endblock %}
+{% block css %}
+  h3 { font-size: 11pt; margin: 4mm 0 1.5mm; }
+  h4 { font-size: 10.5pt; margin: 3mm 0 1mm; font-style: italic; }
+  dl.kv { margin: 0; } dl.kv div { display: flex; gap: 3mm; margin: .6mm 0; } dl.kv dt { width: 62mm; flex-shrink: 0; } dl.kv dd { margin: 0; }
+{% endblock %}
+{% block body %}
+{{ p.head(company, "B09-DNN", issued) }}
+<p class="title">BẢN THUYẾT MINH BÁO CÁO TÀI CHÍNH</p>
+<p class="subtitle">{{ subtitle }}</p>
+
+<h3>I. Đặc điểm hoạt động của doanh nghiệp; kỳ kế toán, đơn vị tiền tệ, chế độ kế toán áp dụng</h3>
+<dl class="kv">{% for k, v in notes.general %}<div><dt>{{ k }}</dt><dd>{{ v }}</dd></div>{% endfor %}</dl>
+
+<h3>II. Các chính sách kế toán áp dụng</h3>
+<dl class="kv">{% for k, v in notes.policies %}<div><dt>{{ k }}</dt><dd>{{ v }}</dd></div>{% endfor %}</dl>
+
+<h3>III. Thông tin bổ sung cho các khoản mục trình bày trong Báo cáo tình hình tài chính</h3>
+<p class="unit">Đơn vị tính: Đồng Việt Nam</p>
+{% for t in notes.balance_tables %}
+<h4>{{ t.code }}. {{ t.title }}</h4>
+<table class="book">
+  <colgroup><col style="width:60%"><col style="width:20%"><col style="width:20%"></colgroup>
+  <thead><tr><th>Chỉ tiêu</th><th>{{ t.columns[0] }}</th><th>{{ t.columns[1] }}</th></tr></thead>
+  <tbody>
+    {% for label, a, b in t.rows %}<tr><td>{{ label }}</td><td class="num">{{ p.paren(a) }}</td><td class="num">{{ p.paren(b) }}</td></tr>{% endfor %}
+    {% if t.code != "V.04" %}{% set ta, tb2 = t.total %}<tr class="b"><td>Cộng</td><td class="num">{{ p.paren(ta) }}</td><td class="num">{{ p.paren(tb2) }}</td></tr>{% endif %}
+  </tbody>
+</table>
+{% endfor %}
+
+<h3>IV. Thông tin bổ sung cho các khoản mục trình bày trong Báo cáo kết quả hoạt động kinh doanh</h3>
+{% for t in notes.income_tables %}
+<h4>{{ t.code }}. {{ t.title }}</h4>
+<table class="book">
+  <colgroup><col style="width:60%"><col style="width:20%"><col style="width:20%"></colgroup>
+  <thead><tr><th>Chỉ tiêu</th><th>{{ t.columns[0] }}</th><th>{{ t.columns[1] }}</th></tr></thead>
+  <tbody>{% for label, a, b in t.rows %}<tr><td>{{ label }}</td><td class="num">{{ p.paren(a) }}</td><td class="num">{{ p.paren(b) }}</td></tr>{% endfor %}</tbody>
+</table>
+{% endfor %}
+
+<h3>V. Những thông tin khác</h3>
+<p>……………………………………………………………………………………………………………………………</p>
+{{ p.signatures(company, date_label=date_label) }}
+{% endblock %}

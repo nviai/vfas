@@ -1,0 +1,56 @@
+# Changelog
+
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow
+[Semantic Versioning](https://semver.org/).
+
+## [2.0.0] – Unreleased
+
+First full accounting release, published as open source under the name **VFAS – Vietnam Free Accounting Software**.
+
+### Added
+- Multi-company accounting under TT133: general ledger, financial statements B01a/B02/B03/B09-DNN, cash, bank, sales,
+  purchases, e-invoice XML import, VAT (01/GTGT with XML in the HTKK layout), receivables/payables, inventory, fixed
+  assets and prepaid expenses, payroll.
+- AI assistant on the OpenAI Chat Completions protocol (tools, SSE), REST API `/api/v1` and OpenAI-compatible
+  endpoints.
+- New UI (Jinja2 + HTMX + Alpine.js + Tailwind CSS v4): light/dark, mobile, Vietnamese/English, Ctrl+K.
+- Backup/restore, single-company export, backup encryption with `BACKUP_PASSPHRASE`.
+- Test suite: unit, business rules, web, integration (cross-company isolation, concurrent posting) on SQLite and
+  PostgreSQL, Playwright end-to-end tests.
+- Open-source project files: MIT license (copyright NVIAI CO., LTD.), contributing guide, code of conduct,
+  security policy, issue/PR templates, CI.
+- Code style: PEP 8 enforced by ruff (79 columns), English-only comments and docs checked by
+  `tools/check_english.py`; Vietnamese README in `README.vi.md`.
+
+### Security
+Review of 2026-10-14, details in [docs/SECURITY-GUIDE.md](docs/SECURITY-GUIDE.md):
+- Brute-force throttling stored in the database; `X-Forwarded-For` trusted only from proxies in
+  `FORWARDED_ALLOW_IPS`.
+- The `/setup` page requires a setup code; sign-up and company creation are rate limited; idle sessions expire.
+- Fixed stored XSS in the warehouse list, formula injection in exported Excel files, DoS through voucher number
+  formats.
+- Payroll data hidden from users without payroll permission (ledgers, audit log, Ctrl+K, AI assistant).
+- The platform's AI API key is only sent to `AI_DEFAULT_BASE_URL`; SSRF to non-public addresses is blocked.
+- Container: read-only filesystem, all capabilities dropped, base images pinned by digest.
+
+### Upgrade notes (from the "NVIAI Kế toán" preview)
+- Cookie and API token prefixes changed from `nvk_` to `vfas_`: everyone has to sign in again and **existing API
+  tokens must be recreated**.
+- The OpenAI-style endpoint model is now `vfas-agent` (was `ketoan-agent`).
+- Exceptions were renamed to PEP 8 names (`NotFound` → `NotFoundError`, `PermissionDenied` → `PermissionDeniedError`,
+  `LoginRequired` → `LoginRequiredError`, `CompanyRequired` → `CompanyRequiredError`,
+  `AiUnavailable` → `AiUnavailableError`) – relevant only for code built on top of VFAS.
+- Docker Compose renamed the service `ketoan` → `vfas`, the volumes `ketoan-data`/`ketoan-pg` → `vfas-data`/`vfas-pg`,
+  and the PostgreSQL database and user `ketoan` → `vfas`. If you already deployed the old version, **keep the old
+  volume** so no data is lost, for example:
+  ```yaml
+  volumes:
+    vfas-data:
+      name: <project-dir>_ketoan-data   # check with: docker volume ls
+  ```
+  and keep `POSTGRES_DB`/`POSTGRES_USER`/`DATABASE_URL` as before.
+- Encrypted backups and stored AI API keys remain readable (formats unchanged).
+
+## [1.0] – 2026-10-13
+
+Cash book release (documentation in [docs/v1/](docs/v1/)).

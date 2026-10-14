@@ -1,0 +1,65 @@
+{% import "macros.html" as ui with context %}
+{#- Money voucher list results (shared by cash + bank).
+    Variables: entries, page, pages, total, base_q, list_url -#}
+{% set list_url = list_url if list_url is defined else "/cash" %}
+{% macro page_url(p) %}{{ list_url }}?page={{ p }}{% if base_q %}&{{ base_q }}{% endif %}{% if filters.status %}&status={{ filters.status }}{% endif %}{% endmacro %}
+{% if not entries %}
+  {% call ui.empty_state(_("Chưa có chứng từ nào") if not (filters.q or filters.start or filters.kind or filters.status) else _("Không có chứng từ phù hợp bộ lọc"), "receipt-text",
+                         _("Lập phiếu thu khi nhận tiền, phiếu chi khi xuất tiền khỏi quỹ.") if list_url == "/cash" else None) %}
+    {% if list_url == "/cash" and can("cash.create") %}
+      {{ ui.link_button(_("Phiếu thu"), "/cash/new?kind=PT", "secondary", icon_name="circle-arrow-down") }}
+      {{ ui.link_button(_("Phiếu chi"), "/cash/new?kind=PC", "primary", icon_name="circle-arrow-up") }}
+    {% endif %}
+  {% endcall %}
+{% else %}
+<div class="table-wrap max-md:hidden">
+  <table class="table table-hover">
+    <thead>
+      <tr>
+        <th class="w-36">{{ _("Số chứng từ") }}</th>
+        <th class="w-28">{{ _("Ngày") }}</th>
+        <th class="w-32">{{ _("Loại") }}</th>
+        <th>{{ _("Diễn giải") }}</th>
+        <th class="num w-40">{{ _("Số tiền") }}</th>
+        <th class="w-32">{{ _("Trạng thái") }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in entries %}
+      <tr class="is-link {{ 'is-muted' if e.status == 'cancelled' }}">
+        <td><a href="{{ e.url }}" class="doc-no hover:underline">{{ e.number or _("Nháp") ~ " #" ~ e.id }}</a></td>
+        <td class="tabular-nums text-fg-2">{{ e.date|date }}</td>
+        <td>{{ ui.kind_badge(e.doc_type) }}</td>
+        <td class="max-w-0">
+          <p class="truncate text-fg">{{ e.description }}</p>
+          {% if e.contact_name %}<p class="truncate text-xs text-fg-3">{{ e.contact_name }}</p>{% endif %}
+        </td>
+        <td class="num font-medium {{ 'amount-in' if e.doc_type in ('PT', 'BC') else 'amount-out' if e.doc_type in ('PC', 'BN') else '' }}">{{ e.total|money }}</td>
+        <td>{{ ui.status_badge(e.status) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<ul class="divide-y divide-line md:hidden">
+  {% for e in entries %}
+  <li>
+    <a href="{{ e.url }}" class="flex items-start gap-3 px-4 py-3 active:bg-surface-2 {{ 'opacity-60' if e.status == 'cancelled' }}">
+      <span class="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full {{ 'bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-300' if e.doc_type in ('PT', 'BC') else 'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300' if e.doc_type in ('PC', 'BN') else 'bg-surface-3 text-fg-2' }}">
+        {{ ui.icon("circle-arrow-down" if e.doc_type in ('PT', 'BC') else "circle-arrow-up" if e.doc_type in ('PC', 'BN') else "arrow-left-right", "size-4") }}
+      </span>
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center gap-2">
+          <span class="doc-no text-[13px]">{{ e.number or _("Nháp") }}</span>
+          <span class="text-xs text-fg-3 tabular-nums">{{ e.date|date }}</span>
+        </div>
+        <p class="mt-0.5 truncate text-[13.5px] text-fg">{{ e.description }}</p>
+        <div class="mt-1.5">{{ ui.status_badge(e.status) }}</div>
+      </div>
+      <span class="shrink-0 text-[14px] font-semibold tabular-nums {{ 'amount-in' if e.doc_type in ('PT', 'BC') else '' }}">{{ e.total|money }}</span>
+    </a>
+  </li>
+  {% endfor %}
+</ul>
+{{ ui.pagination(page, pages, page_url, total=total) }}
+{% endif %}

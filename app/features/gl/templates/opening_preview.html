@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Xem trước số dư đầu kỳ") }}{% endblock %}
+{% block content %}
+{{ ui.page_header(_("Xem trước số dư đầu kỳ"), filename, breadcrumbs=breadcrumbs, back="/opening", icon_name="file-spreadsheet") }}
+
+{% if errors %}
+  {{ ui.alert(_("{n} dòng có lỗi. Sửa file rồi nhập lại – không nhập một phần.", n=errors), "error", cls="mb-5") }}
+{% elif total_debit != total_credit %}
+  {{ ui.alert(_("Tổng dư Nợ khác tổng dư Có. Vẫn nhập được nhưng báo cáo sẽ không cân."), "warning", cls="mb-5") }}
+{% else %}
+  {{ ui.alert(_("File hợp lệ. Nhập sẽ thay toàn bộ số dư đầu kỳ hiện có."), "success", cls="mb-5") }}
+{% endif %}
+
+<div class="card">
+  <div class="table-wrap">
+    <table class="table table-compact">
+      <thead><tr><th class="w-16">{{ _("Dòng") }}</th><th class="w-24">{{ _("TK") }}</th><th>{{ _("Đối tượng / ngân hàng") }}</th><th class="num w-40">{{ _("Dư Nợ") }}</th><th class="num w-40">{{ _("Dư Có") }}</th><th>{{ _("Ghi chú / lỗi") }}</th></tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr class="{{ 'bg-rose-50/60 dark:bg-rose-500/5' if r.error }}">
+          <td class="tabular-nums text-fg-3">{{ r.row }}</td>
+          <td class="tabular-nums font-medium">{{ r.account }}</td>
+          <td class="text-fg-2">{{ r.partner or r.bank or "–" }}</td>
+          <td class="num">{{ r.debit|money0 }}</td>
+          <td class="num">{{ r.credit|money0 }}</td>
+          <td>{% if r.error %}<span class="text-rose-600 dark:text-rose-400">{{ r.error }}</span>{% else %}<span class="text-fg-3">{{ r.note }}</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot><tr class="row-total"><td colspan="3">{{ _("Cộng (dòng hợp lệ)") }}</td><td class="num">{{ total_debit|money }}</td><td class="num">{{ total_credit|money }}</td><td></td></tr></tfoot>
+    </table>
+  </div>
+</div>
+<form method="post" action="/opening/import/confirm">
+  {{ ui.csrf_field() }}
+  <input type="hidden" name="token" value="{{ token }}">
+  {% call ui.form_actions() %}
+    {{ ui.button(_("Hủy"), "ghost", name="action", value="discard") }}
+    {{ ui.button(_("Nhập {n} dòng", n=rows|length), "primary", icon_name="check", name="action", value="confirm", disabled=errors > 0, confirm=_("Thay toàn bộ số dư đầu kỳ bằng dữ liệu trong file?")) }}
+  {% endcall %}
+</form>
+{% endblock %}

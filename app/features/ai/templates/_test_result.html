@@ -1,0 +1,2 @@
+{% import "macros.html" as ui with context %}
+{{ ui.alert(message, "success" if ok else "error", title=(_("Kết nối thành công") if ok else _("Không kết nối được"))) }}

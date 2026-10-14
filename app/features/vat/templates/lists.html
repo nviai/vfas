@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% from "vat/_period_nav.html" import period_nav with context %}
+{% block title %}{{ _("Bảng kê thuế GTGT") }}{% endblock %}
+{% block content %}
+{% set crumbs = [] %}{% for b in breadcrumbs %}{% do crumbs.append((_(b[0]), b[1])) %}{% endfor %}
+{% set q = "direction=" ~ direction ~ "&period_type=" ~ period.period_type ~ "&year=" ~ period.year ~ "&period=" ~ period.period %}
+{% call ui.page_header(_("Bảng kê thuế GTGT"), _(period.label) ~ " · " ~ _("theo ngày hạch toán của chứng từ đã ghi sổ"), breadcrumbs=crumbs, icon_name="list") %}
+  {{ period_nav(period, options, "/vat/lists?direction=" ~ direction ~ "&") }}
+  {% if can("vat.export") %}{{ ui.report_toolbar(pdf_href="/vat/lists.pdf?" ~ q, xlsx_href="/vat/lists.xlsx?" ~ q) }}{% endif %}
+{% endcall %}
+
+{{ ui.tabs([
+  {"key": "out", "label": _("Bán ra"), "href": "/vat/lists?direction=out&period_type=" ~ period.period_type ~ "&year=" ~ period.year ~ "&period=" ~ period.period, "icon": "arrow-up-circle"},
+  {"key": "in", "label": _("Mua vào"), "href": "/vat/lists?direction=in&period_type=" ~ period.period_type ~ "&year=" ~ period.year ~ "&period=" ~ period.period, "icon": "arrow-down-circle"},
+], direction, cls="mb-4") }}
+
+<div class="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+  {{ ui.stat_card(_("Giá trị chưa thuế"), data.goods, icon_name="receipt") }}
+  {{ ui.stat_card(_("Thuế GTGT"), data.vat, icon_name="percent") }}
+  {{ ui.stat_card(_("Số hóa đơn"), data.rows|length, unit="", money_value=False, icon_name="file-text") }}
+</div>
+
+<div class="card">
+  {% if not data.rows %}
+    {{ ui.empty_state(_("Không có hóa đơn trong kỳ"), "receipt", _("Hóa đơn được lấy từ chứng từ mua, bán, phiếu chi… đã ghi sổ có thông tin hóa đơn GTGT.")) }}
+  {% else %}
+  <div class="table-wrap">
+    <table class="table table-hover">
+      <thead><tr>
+        <th class="w-12 text-center">{{ _("STT") }}</th><th class="w-40">{{ _("Hóa đơn") }}</th><th class="w-28">{{ _("Ngày") }}</th>
+        <th>{{ _("Người bán") if direction == "in" else _("Người mua") }}</th>
+        <th class="num w-36">{{ _("Giá trị chưa thuế") }}</th><th class="w-20">{{ _("Thuế suất") }}</th><th class="num w-32">{{ _("Thuế GTGT") }}</th>
+        <th class="w-36 max-lg:hidden">{{ _("Chứng từ") }}</th>
+      </tr></thead>
+      <tbody>
+        {% for rec, e, sign in data.rows %}
+        <tr class="is-link">
+          <td class="text-center text-xs text-fg-3">{{ loop.index }}</td>
+          <td class="tabular-nums">{{ (rec.invoice_series ~ "-" ~ rec.invoice_no) if rec.invoice_no else "–" }}
+            {% if sign < 0 %}{{ ui.badge(_("Điều chỉnh giảm"), "amber") }}{% endif %}
+            {% if direction == "in" and not rec.deductible %}{{ ui.badge(_("Không khấu trừ"), "gray") }}{% endif %}</td>
+          <td class="tabular-nums text-fg-2">{{ rec.invoice_date|date }}</td>
+          <td class="max-w-0"><p class="truncate">{{ rec.partner_name or "–" }}</p><p class="text-xs text-fg-3 tabular-nums">{{ rec.partner_tax_code }}</p></td>
+          <td class="num {{ 'amount-neg' if sign < 0 }}">{{ (sign * rec.goods_amount)|money }}</td>
+          <td>{{ vat_labels.get(rec.vat_rate, rec.vat_rate) }}</td>
+          <td class="num {{ 'amount-neg' if sign < 0 }}">{{ (sign * rec.vat_amount)|money0 }}</td>
+          <td class="max-lg:hidden"><a href="{{ e.url }}" class="doc-no hover:underline">{{ e.number }}</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        {% for rate, g in data.by_rate.items() %}
+        <tr><td colspan="4" class="text-right text-[13px] text-fg-3">{{ _("Thuế suất") }} {{ vat_labels.get(rate, rate) }}</td><td class="num">{{ g[0]|money }}</td><td></td><td class="num">{{ g[1]|money0 }}</td><td class="max-lg:hidden"></td></tr>
+        {% endfor %}
+        <tr class="row-total"><td colspan="4">{{ _("Tổng cộng") }}</td><td class="num">{{ data.goods|money }}</td><td></td><td class="num">{{ data.vat|money }}</td><td class="max-lg:hidden"></td></tr>
+      </tfoot>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

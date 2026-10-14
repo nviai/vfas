@@ -1,0 +1,67 @@
+{% extends "vat/print/_layout.html" %}
+{% block title %}Tờ khai thuế GTGT {{ period.label }}{% endblock %}
+{% block body %}
+{% macro m(code) %}{% if code %}{{ v.get(code, 0)|money }}{% endif %}{% endmacro %}
+{% macro row(label, cv=None, ct=None, head=False, indent=0) -%}
+<tr class="{{ 'head' if head }}">
+  <td style="padding-left: {{ 1.3 + indent * 4 }}mm">{{ label }}</td>
+  <td class="code">{% if cv %}[{{ cv }}]{% endif %}</td><td class="num">{{ m(cv) }}</td>
+  <td class="code">{% if ct %}[{{ ct }}]{% endif %}</td><td class="num">{{ m(ct) }}</td>
+</tr>
+{%- endmacro %}
+<table class="doc-head"><tr>
+  <td class="left"></td>
+  <td class="right"><p class="b">Mẫu số: 01/GTGT</p><p class="i small">(Ban hành kèm theo Thông tư số 80/2021/TT-BTC ngày 29 tháng 9 năm 2021 của Bộ trưởng Bộ Tài chính, sửa đổi, bổ sung bởi Thông tư số 40/2025/TT-BTC)</p></td>
+</tr></table>
+<p class="nation">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
+<p class="motto">Độc lập - Tự do - Hạnh phúc</p>
+<p class="title">TỜ KHAI THUẾ GIÁ TRỊ GIA TĂNG (GTGT)</p>
+<p class="subtitle i">(Áp dụng đối với người nộp thuế tính thuế theo phương pháp khấu trừ có hoạt động sản xuất kinh doanh)</p>
+<div class="info" style="margin-top:3mm">
+  <p>[01] Kỳ tính thuế: {{ period.label }} (từ ngày {{ period.start|date }} đến ngày {{ period.end|date }})</p>
+  <p>[02] Lần đầu: [X] &nbsp;&nbsp; [03] Bổ sung lần thứ: ....</p>
+  <p>[04] Tên người nộp thuế: <span class="b">{{ company.name }}</span></p>
+  <p>[05] Mã số thuế: <span class="b">{{ company.tax_code }}</span></p>
+  <p>[06] Địa chỉ: {{ company.address }}</p>
+</div>
+<p class="r i small" style="margin-top:2mm">Đơn vị tiền: Đồng Việt Nam</p>
+<table class="grid">
+  <colgroup><col style="width:52%"><col style="width:7%"><col style="width:17%"><col style="width:7%"><col style="width:17%"></colgroup>
+  <thead><tr><th>Chỉ tiêu</th><th colspan="2">Giá trị HHDV (chưa có thuế GTGT)</th><th colspan="2">Thuế GTGT</th></tr></thead>
+  <tbody>
+    <tr><td>Không phát sinh hoạt động mua, bán trong kỳ (đánh dấu "X")</td><td class="code">[21]</td><td class="c">{{ "X" if v.get("21") else "" }}</td><td></td><td></td></tr>
+    {{ row("Thuế GTGT còn được khấu trừ kỳ trước chuyển sang", None, "22", head=True) }}
+    {{ row("I. Kê khai thuế GTGT phải nộp Ngân sách nhà nước", head=True) }}
+    {{ row("1. Hàng hóa, dịch vụ (HHDV) mua vào trong kỳ", head=True) }}
+    {{ row("a) Giá trị và thuế GTGT của HHDV mua vào", "23", "24", indent=1) }}
+    {{ row("Trong đó: hàng hóa, dịch vụ nhập khẩu", "23a", "24a", indent=2) }}
+    {{ row("b) Thuế GTGT của HHDV mua vào được khấu trừ kỳ này", None, "25", indent=1) }}
+    {{ row("2. Hàng hóa, dịch vụ bán ra trong kỳ", head=True) }}
+    {{ row("2.1. HHDV bán ra không chịu thuế GTGT", "26", None, indent=1) }}
+    {{ row("2.2. HHDV bán ra chịu thuế GTGT ([27]=[29]+[30]+[32]+[32a]; [28]=[31]+[33])", "27", "28", indent=1) }}
+    {{ row("a) HHDV bán ra chịu thuế suất 0%", "29", None, indent=2) }}
+    {{ row("b) HHDV bán ra chịu thuế suất 5%", "30", "31", indent=2) }}
+    {{ row("c) HHDV bán ra chịu thuế suất 10%", "32", "33", indent=2) }}
+    {{ row("d) HHDV bán ra không phải kê khai, tính nộp thuế GTGT", "32a", None, indent=2) }}
+    {{ row("3. Tổng doanh thu và thuế GTGT của HHDV bán ra ([34]=[26]+[27]; [35]=[28])", "34", "35", head=True) }}
+    {{ row("II. Thuế GTGT phát sinh trong kỳ ([36]=[35]-[25])", None, "36", head=True) }}
+    {{ row("III. Điều chỉnh tăng, giảm thuế GTGT còn được khấu trừ của các kỳ trước", head=True) }}
+    {{ row("1. Điều chỉnh giảm", None, "37", indent=1) }}
+    {{ row("2. Điều chỉnh tăng", None, "38", indent=1) }}
+    {{ row("IV. Thuế GTGT nhận bàn giao được khấu trừ trong kỳ", None, "39a", head=True) }}
+    {{ row("V. Xác định nghĩa vụ thuế GTGT phải nộp trong kỳ", head=True) }}
+    {{ row("1. Thuế GTGT phải nộp của hoạt động sản xuất kinh doanh trong kỳ ([40a]=([36]-[22]+[37]-[38]-[39a]) ≥ 0)", None, "40a", indent=1) }}
+    {{ row("2. Thuế GTGT mua vào của dự án đầu tư được bù trừ với thuế GTGT phải nộp của hoạt động sản xuất kinh doanh cùng kỳ tính thuế", None, "40b", indent=1) }}
+    {{ row("3. Thuế GTGT còn phải nộp trong kỳ ([40]=[40a]-[40b])", None, "40", indent=1) }}
+    {{ row("4. Thuế GTGT chưa khấu trừ hết kỳ này ([41]=([36]-[22]+[37]-[38]-[39a]) ≤ 0)", None, "41", indent=1) }}
+    {{ row("4.1. Thuế GTGT đề nghị hoàn", None, "42", indent=2) }}
+    {{ row("4.2. Thuế GTGT còn được khấu trừ chuyển kỳ sau ([43]=[41]-[42])", None, "43", indent=2) }}
+  </tbody>
+</table>
+<p class="note">Tôi cam đoan số liệu khai trên là đúng và chịu trách nhiệm trước pháp luật về những số liệu đã khai./.</p>
+<table class="signatures"><tr>
+  <td style="width:50%"><p class="b">NHÂN VIÊN ĐẠI LÝ THUẾ</p><p>Họ và tên: ........................</p><p>Chứng chỉ hành nghề số: ............</p></td>
+  <td style="width:50%"><p class="i">..........., ngày ..... tháng ..... năm ..........</p><p class="role">NGƯỜI NỘP THUẾ hoặc ĐẠI DIỆN HỢP PHÁP CỦA NGƯỜI NỘP THUẾ</p><p class="hint">(Chữ ký, ghi rõ họ tên; chức vụ và đóng dấu (nếu có)/Ký điện tử)</p><p class="name">{{ company.legal_rep }}</p></td>
+</tr></table>
+<p class="note">Bản in từ phần mềm để đối chiếu. Tờ khai chính thức nộp điện tử qua thuedientu.gdt.gov.vn.</p>
+{% endblock %}

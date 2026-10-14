@@ -1,0 +1,17 @@
+{#- Attachments of a voucher. Variables: entry, files, perm (gl.entries.entry_context). -#}
+{% import "macros.html" as ui with context %}
+{% set can_upload = perm.create and not entry.is_cancelled %}
+{% set upload %}{% if can_upload %}<label for="att-file-{{ entry.id }}" class="btn-ghost btn-xs cursor-pointer">{{ ui.icon("upload", "size-3.5") }}{{ _("Tải lên") }}</label>{% endif %}{% endset %}
+{% call ui.card(_("Đính kèm"), actions=upload, icon_name="paperclip") %}
+  {% if files %}
+    {{ ui.attachment_list(files, can_delete=perm.create and entry.is_draft) }}
+  {% else %}
+    <p class="text-[13px] text-fg-3">{{ _("Chưa có file. Đính kèm ảnh hóa đơn, hợp đồng (PDF, JPG, PNG) hoặc XML hóa đơn điện tử.") }}</p>
+  {% endif %}
+  {% if can_upload %}
+  <form method="post" action="/entries/{{ entry.id }}/attachments" enctype="multipart/form-data" class="hidden" x-data>
+    {{ ui.csrf_field() }}
+    <input id="att-file-{{ entry.id }}" type="file" name="file" accept="image/*,application/pdf,.xml" @change="$el.form.submit()">
+  </form>
+  {% endif %}
+{% endcall %}

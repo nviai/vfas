@@ -1,0 +1,255 @@
+{#- Server-rendered SVG charts that scale with the width (% coordinates) while text keeps its real size.
+    Usage: {% import "charts.html" as charts %}   – docs: docs/UI.md, charts section.
+    series: [{"name": "Thu", "values": [..], "slot": 1}] – slot 1..8 = color --series-N (CVD-validated palette).
+    Color by entity, not by rank: always give the same kind of figure the same slot (inflow=1, outflow=2, balance=3). -#}
+
+{#- Compact Vietnamese-style numbers: `1,2 tỷ` · `350 tr` · `12 k` -#}
+{% macro compact(v) -%}
+{%- set a = v|abs -%}
+{%- if a >= 1000000000 -%}{{ ("%.1f"|format(v / 1000000000)).rstrip("0").rstrip(".")|replace(".", ",") }} tỷ
+{%- elif a >= 1000000 -%}{{ ("%.1f"|format(v / 1000000)).rstrip("0").rstrip(".")|replace(".", ",") }} tr
+{%- elif a >= 1000 -%}{{ ("%.1f"|format(v / 1000)).rstrip("0").rstrip(".")|replace(".", ",") }} k
+{%- else -%}{{ v|int }}{%- endif -%}
+{%- endmacro %}
+
+{%- macro _fmt(v, value_format) -%}
+{%- if value_format == "money" -%}{{ v|money }}{%- elif value_format == "compact" -%}{{ compact(v) }}{%- else -%}{{ v }}{%- endif -%}
+{%- endmacro -%}
+
+{#- "Nice" Y-axis scale: returns the string "lo|hi|step" -#}
+{#- Always returns t_hi > t_lo (even when all values are equal, all zero, or there is no data). -#}
+{%- macro _scale(lo, hi, ticks=4) -%}
+{%- set lo = lo or 0 -%}{%- set hi = hi or 0 -%}
+{%- if hi <= lo -%}{%- set hi = lo + ([lo|abs * 0.1, 1]|max) -%}{%- endif -%}
+{%- set ns = namespace(step=1, found=false) -%}
+{%- set span = hi - lo -%}
+{%- for e in range(0, 16) -%}{%- for m in [1, 2, 2.5, 5] -%}
+  {%- if not ns.found and m * 10 ** e * ticks >= span -%}{%- set ns.step = m * 10 ** e -%}{%- set ns.found = true -%}{%- endif -%}
+{%- endfor -%}{%- endfor -%}
+{%- set t_lo = (lo / ns.step)|round(0, "floor") * ns.step -%}
+{%- set t_hi = (hi / ns.step)|round(0, "ceil") * ns.step -%}
+{%- if t_hi <= t_lo -%}{%- set t_hi = t_lo + ns.step -%}{%- endif -%}
+{{- t_lo ~ "|" ~ t_hi ~ "|" ~ ns.step -}}
+{%- endmacro -%}
+
+{%- macro _legend(series, kind) -%}
+<div class="legend mb-3">
+  {% for s in series %}
+  <span class="inline-flex items-center gap-1.5"><span class="{{ 'legend-swatch' if kind == 'bar' else 'legend-line' }}" style="background: var(--series-{{ s.slot or loop.index }})"></span>{{ s.name }}</span>
+  {% endfor %}
+</div>
+{%- endmacro -%}
+
+{%- macro _sr_table(labels, series, caption) -%}
+<table class="sr-only">
+  {% if caption %}<caption>{{ caption }}</caption>{% endif %}
+  <thead><tr><th scope="col"></th>{% for s in series %}<th scope="col">{{ s.name }}</th>{% endfor %}</tr></thead>
+  <tbody>{% for l in labels %}{% set i = loop.index0 %}<tr><th scope="row">{{ l }}</th>{% for s in series %}<td>{{ s["values"][i]|money if s["values"][i] is not none else "" }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+</table>
+{%- endmacro -%}
+
+{%- macro _tip(title, series, i, value_format, kind) -%}
+{%- set rows = [] -%}
+{%- for s in series -%}{%- set v = s["values"][i] -%}{%- if v is not none -%}
+{%- set _x = rows.append({"label": s.name, "value": _fmt(v, value_format)|trim, "color": "var(--series-" ~ (s.slot or loop.index) ~ ")", "kind": kind}) -%}
+{%- endif -%}{%- endfor -%}
+{{- {"title": title, "rows": rows}|tojson -}}
+{%- endmacro -%}
+
+{%- macro _y_axis(t_lo, t_hi, step, height) -%}
+{%- set rng = (t_hi - t_lo) if t_hi > t_lo else 1 -%}
+{%- set step = step if step and step > 0 else rng -%}
+<div class="relative w-12 shrink-0 select-none" aria-hidden="true">
+  {% set n = [(rng / step)|round|int, 20]|min %}
+  {% for k in range(n + 1) %}{% set v = t_lo + k * step %}
+  <span class="absolute right-2 -translate-y-1/2 text-[11px] text-fg-3 tabular-nums" style="top: {{ ((t_hi - v) / rng * 100)|round(3) }}%">{{ compact(v) }}</span>
+  {% endfor %}
+</div>
+{%- endmacro -%}
+
+{%- macro _x_axis(labels) -%}
+<div class="ml-12 flex select-none" aria-hidden="true">
+  {% for l in labels %}
+  <span class="min-w-0 flex-1 truncate pt-2 text-center text-[11px] text-fg-3 {{ '@max-lg:invisible' if labels|length > 8 and loop.index is even }}">{{ l }}</span>
+  {% endfor %}
+</div>
+{%- endmacro -%}
+
+{#- Grouped columns: bar_chart(labels, series, height=240, value_format="money", caption=None, legend=True) -#}
+{% macro bar_chart(labels, series, height=240, value_format="money", caption=None, legend=True, id=None, cls="") -%}
+{%- set ns = namespace(lo=0, hi=0) -%}
+{%- for s in series %}{% for v in s["values"] %}{% if v is not none %}{% if v > ns.hi %}{% set ns.hi = v %}{% endif %}{% if v < ns.lo %}{% set ns.lo = v %}{% endif %}{% endif %}{% endfor %}{% endfor -%}
+{%- set sc = _scale(ns.lo, ns.hi).split("|") -%}
+{%- set t_lo, t_hi, step = sc[0]|float, sc[1]|float, sc[2]|float -%}
+{%- set rng = (t_hi - t_lo) if t_hi > t_lo else 1 -%}
+{%- set n = labels|length if labels else 1 -%}
+{%- set k = series|length if series else 1 -%}
+{%- set band = 100 / n -%}
+{%- set group_w = band * 0.62 -%}
+{%- set gap = band * 0.035 if k > 1 else 0 -%}
+{%- set bar_w = (group_w - gap * (k - 1)) / k -%}
+{%- set y0 = (t_hi - 0) / rng * 100 -%}
+{%- set y0_px = (t_hi - 0) / rng * height -%}
+<figure class="chart @container {{ cls }}"{% if id %} id="{{ id }}"{% endif %}>
+  {% if legend and series|length > 1 %}{{ _legend(series, "bar") }}{% endif %}
+  <div class="flex" style="height: {{ height }}px">
+    {{ _y_axis(t_lo, t_hi, step, height) }}
+    <div class="relative min-w-0 flex-1">
+      <svg class="absolute inset-0 size-full" role="img" aria-label="{{ caption or '' }}">
+        {% set tn = (rng / step)|round|int %}
+        {% for j in range(tn + 1) %}{% set yy = (j * step / rng * 100)|round(3) %}
+        <line class="grid-line" x1="0" x2="100%" y1="{{ yy }}%" y2="{{ yy }}%"/>
+        {% endfor %}
+        <line class="axis-line" x1="0" x2="100%" y1="{{ y0|round(3) }}%" y2="{{ y0|round(3) }}%"/>
+        {% for l in labels %}{% set i = loop.index0 %}
+        <g class="band" tabindex="0" data-tip='{{ _tip(l, series, i, value_format, "bar") }}'>
+          <rect class="band-bg" x="{{ (band * i)|round(3) }}%" width="{{ band|round(3) }}%" y="0" height="100%" rx="4"/>
+          {% for s in series %}{% set v = s["values"][i] %}
+          {% if v %}
+            {#- x in % (scales), y in px (fixed height) – data end rounded by 3px, baseline end square -#}
+            {% set x = band * i + (band - group_w) / 2 + loop.index0 * (bar_w + gap) %}
+            {% set yv = (t_hi - v) / rng * height %}
+            {% set top = [yv, y0_px]|min %}{% set h = [(yv - y0_px)|abs, 1]|max %}
+            {% set sq = [h, 3]|min %}
+            <rect class="bar" x="{{ x|round(3) }}%" width="{{ bar_w|round(3) }}%" y="{{ top|round(2) }}" height="{{ h|round(2) }}" rx="3" fill="var(--series-{{ s.slot or loop.index }})"/>
+            <rect class="bar" x="{{ x|round(3) }}%" width="{{ bar_w|round(3) }}%" y="{{ (top + h - sq if v > 0 else top)|round(2) }}" height="{{ sq|round(2) }}" fill="var(--series-{{ s.slot or loop.index }})"/>
+          {% endif %}
+          {% endfor %}
+        </g>
+        {% endfor %}
+      </svg>
+    </div>
+  </div>
+  {{ _x_axis(labels) }}
+  {{ _sr_table(labels, series, caption) }}
+</figure>
+{%- endmacro %}
+
+{#- Line: line_chart(labels, series, height=240, area=True, value_format="money") -#}
+{% macro line_chart(labels, series, height=240, area=True, value_format="money", caption=None, legend=True, id=None, cls="", zero_based=True) -%}
+{%- set ns = namespace(lo=None, hi=None) -%}
+{%- for s in series %}{% for v in s["values"] %}{% if v is not none %}
+  {% if ns.hi is none or v > ns.hi %}{% set ns.hi = v %}{% endif %}{% if ns.lo is none or v < ns.lo %}{% set ns.lo = v %}{% endif %}
+{% endif %}{% endfor %}{% endfor -%}
+{%- set lo = [ns.lo or 0, 0]|min if zero_based else (ns.lo or 0) -%}
+{%- set hi = [ns.hi or 0, 0]|max if zero_based else (ns.hi or 0) -%}
+{%- set sc = _scale(lo, hi).split("|") -%}
+{%- set t_lo, t_hi, step = sc[0]|float, sc[1]|float, sc[2]|float -%}
+{%- set rng = (t_hi - t_lo) if t_hi > t_lo else 1 -%}
+{%- set n = labels|length if labels else 1 -%}
+{%- set band = 100 / n -%}
+<figure class="chart @container {{ cls }}"{% if id %} id="{{ id }}"{% endif %}>
+  {% if legend and series|length > 1 %}{{ _legend(series, "line") }}{% endif %}
+  <div class="flex" style="height: {{ height }}px">
+    {{ _y_axis(t_lo, t_hi, step, height) }}
+    <div class="relative min-w-0 flex-1">
+      <svg class="absolute inset-0 size-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        {% set tn = (rng / step)|round|int %}
+        {% for j in range(tn + 1) %}{% set yy = (j * step / rng * 100)|round(3) %}
+        <line class="grid-line" x1="0" x2="100" y1="{{ yy }}" y2="{{ yy }}" vector-effect="non-scaling-stroke"/>
+        {% endfor %}
+        {% if t_lo < 0 %}{% set y0 = (t_hi / rng * 100)|round(3) %}<line class="axis-line" x1="0" x2="100" y1="{{ y0 }}" y2="{{ y0 }}" vector-effect="non-scaling-stroke"/>{% endif %}
+        {% for s in series %}{% set col = "var(--series-" ~ (s.slot or loop.index) ~ ")" %}
+          {% set pts = [] %}
+          {% for v in s["values"] %}{% if v is not none %}{% set _x = pts.append(((band * (loop.index0 + 0.5))|round(3)) ~ "," ~ (((t_hi - v) / rng * 100)|round(3))) %}{% endif %}{% endfor %}
+          {% if pts %}
+            {% if area and series|length == 1 %}
+            {% set base = ((t_hi - [0, t_lo]|max) / rng * 100)|round(3) %}
+            <path d="M{{ pts[0].split(',')[0] }},{{ base }} L{{ pts|join(' L') }} L{{ pts[-1].split(',')[0] }},{{ base }} Z" fill="{{ col }}" fill-opacity="0.1" stroke="none"/>
+            {% endif %}
+            <path d="M{{ pts|join(' L') }}" fill="none" stroke="{{ col }}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+          {% endif %}
+        {% endfor %}
+      </svg>
+      <svg class="absolute inset-0 size-full overflow-visible" role="img" aria-label="{{ caption or '' }}">
+        {% for l in labels %}{% set i = loop.index0 %}{% set cx = (band * (i + 0.5))|round(3) %}
+        <g class="band" tabindex="0" data-tip='{{ _tip(l, series, i, value_format, "line") }}'>
+          <rect x="{{ (band * i)|round(3) }}%" width="{{ band|round(3) }}%" y="0" height="100%" fill="transparent"/>
+          <line class="crosshair" x1="{{ cx }}%" x2="{{ cx }}%" y1="0" y2="100%"/>
+          {% for s in series %}{% set v = s["values"][i] %}{% if v is not none %}
+          <circle class="dot {{ 'is-end' if i == labels|length - 1 }}" cx="{{ cx }}%" cy="{{ ((t_hi - v) / rng * 100)|round(3) }}%" r="4" fill="var(--series-{{ s.slot or loop.index }})" stroke="var(--chart-surface)" stroke-width="2"/>
+          {% endif %}{% endfor %}
+        </g>
+        {% endfor %}
+      </svg>
+    </div>
+  </div>
+  {{ _x_axis(labels) }}
+  {{ _sr_table(labels, series, caption) }}
+</figure>
+{%- endmacro %}
+
+{#- Donut (shares, ≤ 6 segments): donut(items=[{label, value, slot}], center_label, center_value, size=148) -#}
+{% macro donut(items, center_label=None, center_value=None, size=148, value_format="money", cls="") -%}
+{%- set total = items|sum(attribute="value") or 1 -%}
+{%- set gap = 0.8 if items|length > 1 else 0 -%}
+<div class="@container {{ cls }}"><figure class="chart flex flex-col items-center gap-5 @sm:flex-row @sm:items-center">
+  <div class="relative shrink-0" style="width: {{ size }}px; height: {{ size }}px">
+    <svg viewBox="0 0 120 120" class="size-full -rotate-90">
+      <circle cx="60" cy="60" r="48" fill="none" stroke="var(--ui-surface-3)" stroke-width="14"/>
+      {% set ns = namespace(off=0) %}
+      {% for it in items %}{% set len = it.value / total * 100 %}
+      {% if len > 0 %}
+      <circle class="bar" cx="60" cy="60" r="48" fill="none" stroke="var(--series-{{ it.slot or loop.index }})" stroke-width="14" pathLength="100"
+        stroke-dasharray="{{ [len - gap, 0.01]|max|round(3) }} {{ (100 - [len - gap, 0.01]|max)|round(3) }}" stroke-dashoffset="{{ (-ns.off)|round(3) }}"
+        tabindex="0" data-tip='{{ {"title": it.label, "rows": [{"label": ("%.1f"|format(it.value / total * 100)) ~ "%", "value": _fmt(it.value, value_format)|trim, "color": "var(--series-" ~ (it.slot or loop.index) ~ ")", "kind": "bar"}]}|tojson }}'/>
+      {% endif %}
+      {% set ns.off = ns.off + len %}
+      {% endfor %}
+    </svg>
+    {% if center_value is not none %}
+    <div class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
+      <span class="text-base font-semibold text-fg">{{ center_value }}</span>
+      {% if center_label %}<span class="text-[11px] text-fg-3">{{ center_label }}</span>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+  <ul class="w-full min-w-0 space-y-2 text-[13px]">
+    {% for it in items %}
+    <li class="flex items-center gap-2">
+      <span class="legend-swatch shrink-0" style="background: var(--series-{{ it.slot or loop.index }})"></span>
+      <span class="min-w-0 flex-1 truncate text-fg-2">{{ it.label }}</span>
+      <span class="tabular-nums text-fg">{{ _fmt(it.value, value_format) }}</span>
+      <span class="w-12 text-right text-xs tabular-nums text-fg-3">{{ "%.1f"|format(it.value / total * 100)|replace(".", ",") }}%</span>
+    </li>
+    {% endfor %}
+  </ul>
+</figure></div>
+{%- endmacro %}
+
+{#- Sparkline inside a stat card: muted color, accent-colored end point. -#}
+{% macro sparkline(values, width="w-24", height=28) -%}
+{%- set vals = values|reject("none")|list -%}
+{%- if vals|length > 1 -%}
+{%- set lo, hi = vals|min, vals|max -%}
+{%- set rng = (hi - lo) if hi > lo else 1 -%}
+{%- set n = vals|length -%}
+{%- set pts = [] -%}
+{%- for v in vals %}{% set _x = pts.append(((loop.index0 / (n - 1) * 100)|round(2)) ~ "," ~ ((4 + (hi - v) / rng * 22)|round(2))) %}{% endfor -%}
+<span class="relative inline-block {{ width }} shrink-0" style="height: {{ height }}px" aria-hidden="true">
+  <svg viewBox="0 0 100 30" preserveAspectRatio="none" class="absolute inset-0 size-full overflow-visible">
+    <path d="M{{ pts|join(' L') }}" fill="none" stroke="var(--chart-axis)" stroke-width="1.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+  </svg>
+  <svg class="absolute inset-0 size-full overflow-visible"><circle cx="100%" cy="{{ ((4 + (hi - vals[-1]) / rng * 22) / 30 * 100)|round(2) }}%" r="2.5" fill="var(--ui-primary)"/></svg>
+</span>
+{%- endif -%}
+{%- endmacro %}
+
+{#- Horizontal bar list (ranking): hbar_list(items=[{label, value, hint, href}], value_format="money", slot=1) -#}
+{% macro hbar_list(items, value_format="money", slot=1, max_value=None, cls="") -%}
+{%- set mx = max_value or (items|map(attribute="value")|map("abs")|max if items else 1) or 1 -%}
+<ul class="space-y-3 {{ cls }}">
+  {% for it in items %}
+  <li class="group">
+    <div class="mb-1 flex items-baseline justify-between gap-3 text-[13px]">
+      {% if it.href %}<a href="{{ it.href }}" class="min-w-0 truncate text-fg-2 hover:text-fg hover:underline">{{ it.label }}</a>
+      {% else %}<span class="min-w-0 truncate text-fg-2">{{ it.label }}</span>{% endif %}
+      <span class="shrink-0 tabular-nums font-medium text-fg">{{ _fmt(it.value, value_format) }}</span>
+    </div>
+    <div class="h-1.5 w-full rounded-full bg-surface-3">
+      <div class="h-full rounded-full" style="width: {{ ([it.value|abs / mx * 100, 100]|min)|round(2) }}%; background: var(--series-{{ it.slot or slot }})"></div>
+    </div>
+  </li>
+  {% endfor %}
+</ul>
+{%- endmacro %}

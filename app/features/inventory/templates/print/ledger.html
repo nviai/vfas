@@ -1,0 +1,37 @@
+{% extends "inventory/print/_layout.html" %}
+{% import "inventory/print/_parts.html" as p %}
+{% block title %}{{ title }}{% endblock %}
+{% block body %}
+{{ p.doc_header(company, form_code, issued) }}
+<p class="title">{{ title }}</p>
+<p class="subtitle i">{{ period_label }}</p>
+<p class="subtitle">Tài khoản: {{ led.item.stock_account }} &nbsp;&nbsp; Tên kho: {{ led.warehouse.name if led.warehouse else "Tất cả các kho" }}</p>
+<p class="subtitle">Tên, quy cách vật liệu, dụng cụ (sản phẩm, hàng hóa): <span class="b">{{ led.item.code }} – {{ led.item.name }}</span> &nbsp;&nbsp; Đơn vị tính: {{ led.item.unit }}</p>
+<table class="book">
+  <colgroup><col style="width:9%"><col style="width:7%"><col style="width:20%"><col style="width:6%"><col style="width:8%"><col style="width:6%"><col style="width:9%"><col style="width:6%"><col style="width:9%"><col style="width:6%"><col style="width:9%"><col style="width:5%"></colgroup>
+  <thead>
+    <tr><th colspan="2">Chứng từ</th><th rowspan="2">Diễn giải</th><th rowspan="2">TK đối ứng</th><th rowspan="2">Đơn giá</th><th colspan="2">Nhập</th><th colspan="2">Xuất</th><th colspan="2">Tồn</th><th rowspan="2">Ghi chú</th></tr>
+    <tr><th>Số hiệu</th><th>Ngày, tháng</th><th>Số lượng</th><th>Thành tiền</th><th>Số lượng</th><th>Thành tiền</th><th>Số lượng</th><th>Thành tiền</th></tr>
+    <tr class="letters"><th>A</th><th>B</th><th>C</th><th>D</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th></tr>
+  </thead>
+  <tbody>
+    <tr class="opening"><td></td><td></td><td class="label">Số dư đầu kỳ</td><td></td><td></td><td></td><td></td><td></td><td></td><td class="num">{{ p.qty(led.opening_qty) }}</td><td class="num">{{ led.opening_val|money0 }}</td><td></td></tr>
+    {% for r in led.rows %}
+    <tr>
+      <td class="code">{{ r.number }}</td><td class="date">{{ r.date|date }}</td><td>{{ r.description }}</td><td class="code">{{ r.contra or "" }}</td>
+      <td class="num">{{ r.unit_cost|qty(2) if r.unit_cost else "" }}</td>
+      <td class="num">{{ p.qty(r.qty_in) }}</td><td class="num">{{ r.amount_in|money0 }}</td>
+      <td class="num">{{ p.qty(r.qty_out) }}</td><td class="num">{{ r.amount_out|money0 }}</td>
+      <td class="num">{{ r.balance_qty|qty }}</td><td class="num">{{ r.balance_val|money }}</td>
+      <td class="small">{{ "Chưa tính giá" if r.pending else "" }}</td>
+    </tr>
+    {% endfor %}
+    <tr class="sum"><td></td><td></td><td class="c">Cộng</td><td></td><td></td><td class="num">{{ p.qty(led.in_qty) }}</td><td class="num">{{ led.in_val|money0 }}</td><td class="num">{{ p.qty(led.out_qty) }}</td><td class="num">{{ led.out_val|money0 }}</td><td class="num">{{ led.closing_qty|qty }}</td><td class="num">{{ led.closing_val|money }}</td><td></td></tr>
+  </tbody>
+</table>
+<div class="after-table">
+  <p>- Sổ này có {{ p.page_no(total_pages) }} trang, đánh số từ trang 01 đến trang {{ p.page_no(total_pages) }}</p>
+  <p>- Ngày mở sổ: {{ company.start_date|date }}</p>
+  {{ p.book_signatures(company) }}
+</div>
+{% endblock %}

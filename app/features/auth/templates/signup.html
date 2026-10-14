@@ -1,0 +1,26 @@
+{% extends "auth_base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Đăng ký") }}{% endblock %}
+{% block width %}max-w-[440px]{% endblock %}
+{% block content %}
+{%- set f = form if form is defined and form else {} -%}
+<div class="mb-7">
+  <h1 class="text-2xl font-semibold tracking-tight">{{ _("Tạo tài khoản") }}</h1>
+  <p class="mt-1.5 text-[14px] text-fg-3">{{ _("Bắt đầu với công ty đầu tiên của bạn. Thêm công ty khác sau.") }}</p>
+</div>
+<form method="post" action="/signup" class="space-y-4">
+  {{ ui.csrf_field() }}
+  {{ ui.input("full_name", _("Họ và tên"), f.full_name, errors=errors, required=True, attrs='autocomplete="name"', autofocus=True) }}
+  {{ ui.input("email", _("Email"), f.email, "email", errors=errors, required=True, attrs='autocomplete="email" autocapitalize="off" spellcheck="false"') }}
+  {{ ui.password_input("password", _("Mật khẩu"), errors=errors, autocomplete="new-password", hint=_("Ít nhất 8 ký tự."), minlength=8) }}
+  <div class="relative py-1">
+    <div class="absolute inset-0 flex items-center" aria-hidden="true"><div class="w-full border-t border-line"></div></div>
+    <p class="relative flex justify-center"><span class="bg-surface px-3 text-xs font-medium text-fg-3">{{ _("Doanh nghiệp") }}</span></p>
+  </div>
+  {{ ui.input("company_name", _("Tên doanh nghiệp"), f.company_name, errors=errors, required=True, attrs='autocomplete="organization"', placeholder=_("Công ty TNHH …")) }}
+  {{ ui.input("tax_code", _("Mã số thuế"), f.tax_code, errors=errors, hint=_("Có thể bổ sung sau trong phần Cài đặt."), attrs='inputmode="numeric"', input_cls="tabular-nums") }}
+  {{ ui.button(_("Tạo tài khoản"), size="lg", cls="btn-block mt-2") }}
+  <p class="text-center text-xs text-fg-3">{{ _("Bằng việc đăng ký, bạn đồng ý với điều khoản sử dụng và chính sách bảo mật dữ liệu.") }}</p>
+</form>
+<p class="mt-8 text-center text-[13.5px] text-fg-3">{{ _("Đã có tài khoản?") }} <a href="/login" class="font-medium text-primary hover:underline dark:text-brand-400">{{ _("Đăng nhập") }}</a></p>
+{% endblock %}

@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Tính giá xuất kho") }}{% endblock %}
+{% block content %}
+{{ ui.page_header(_("Tính giá xuất kho"), _("Bình quân gia quyền cả kỳ theo tháng, theo từng hàng và kho. Kết quả ghi sổ thành chứng từ giá vốn (GV) ngày cuối tháng."), breadcrumbs=breadcrumbs, icon_name="calculator") }}
+
+<div class="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
+  {% call ui.card(_("Các tháng"), flush=True) %}
+  {% set rows = months|selectattr("moves")|list + months|rejectattr("moves")|selectattr("run")|list %}
+  {% if not rows %}
+    {{ ui.empty_state(_("Chưa có phát sinh xuất kho"), "calculator", _("Khi có xuất bán, xuất kho hoặc chuyển kho, tháng tương ứng sẽ hiện ở đây.")) }}
+  {% else %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th class="w-28">{{ _("Tháng") }}</th><th class="num w-28">{{ _("Dòng xuất") }}</th><th>{{ _("Trạng thái") }}</th><th class="w-36 max-md:hidden">{{ _("Chứng từ GV") }}</th><th class="num w-36 max-md:hidden">{{ _("Giá vốn") }}</th><th class="w-40"></th></tr></thead>
+      <tbody>
+        {% for s in months %}
+        {% if s.moves or (s.run and s.run.entry_id) %}
+        <tr>
+          <td class="font-medium tabular-nums">{{ "%02d"|format(s.month) }}/{{ s.year }}</td>
+          <td class="num">{{ s.moves }}</td>
+          <td>
+            {% if s.locked %}{{ ui.status_badge("locked") }}
+            {% elif s.uncosted %}{{ ui.badge(_("{n} dòng chưa tính giá", n=s.uncosted), "amber", dot=True) }}
+            {% elif s.run and s.run.is_stale %}{{ ui.badge(_("Cần tính lại"), "amber", dot=True) }}
+            {% elif s.run %}{{ ui.badge(_("Đã tính giá"), "green", dot=True) }}
+            {% else %}<span class="text-fg-3">–</span>{% endif %}
+            {% if s.run and s.run.computed_at %}<p class="mt-0.5 text-xs text-fg-3">{{ s.run.computed_at|datetime }}</p>{% endif %}
+          </td>
+          <td class="max-md:hidden">{% if s.run and s.run.entry_id %}<a href="/inventory/costing/{{ s.run.entry_id }}" class="doc-no hover:underline">{{ s.entry_number or "GV" }}</a>{% else %}–{% endif %}</td>
+          <td class="num max-md:hidden">{{ s.run.total_cost|money if s.run else "–" }}</td>
+          <td class="!pr-3 text-right">
+            {% if can("inventory.costing") and not s.locked %}
+            <form method="post" action="/inventory/costing/run">
+              {{ ui.csrf_field() }}<input type="hidden" name="year" value="{{ s.year }}"><input type="hidden" name="month" value="{{ s.month }}">
+              {{ ui.button(_("Tính giá") if not s.run else _("Tính lại"), "primary" if s.needs_run else "secondary", size="sm", icon_name="refresh-cw") }}
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+  {% endcall %}
+
+  {% call ui.card(_("Cách tính"), icon_name="info") %}
+    <div class="space-y-3 text-[13.5px] text-fg-2">
+      <p class="rounded-lg border border-line bg-surface-2 p-3 text-[13px] text-fg">{{ _("Đơn giá xuất = (Giá trị tồn đầu tháng + Giá trị nhập trong tháng) ÷ (Số lượng tồn đầu tháng + Số lượng nhập trong tháng)") }}</p>
+      <ul class="list-disc space-y-1.5 pl-5">
+        <li>{{ _("Tính theo thứ tự tháng: tháng trước chưa tính giá thì chưa tính được tháng sau.") }}</li>
+        <li>{{ _("Có chứng từ ghi lùi ngày sau khi đã tính giá → tháng đó và các tháng sau chuyển sang “Cần tính lại”.") }}</li>
+        <li>{{ _("Tính lại sẽ hủy chứng từ GV cũ và ghi sổ chứng từ GV mới; tháng đã khóa sổ không tính lại được.") }}</li>
+        <li>{{ _("Hết hàng cuối tháng: phần chênh lệch làm tròn dồn vào dòng xuất cuối để giá trị tồn bằng 0.") }}</li>
+      </ul>
+    </div>
+  {% endcall %}
+</div>
+{% endblock %}

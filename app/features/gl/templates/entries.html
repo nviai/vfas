@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Chứng từ") }}{% endblock %}
+{% block content %}
+{% call ui.page_header(_("Chứng từ"), _("Mọi chứng từ kế toán: phiếu thu, chi, ngân hàng, mua bán, phiếu kế toán, kết chuyển…"), breadcrumbs=breadcrumbs, icon_name="files") %}
+  {% if can("journal.export") %}{{ ui.link_button(_("Xuất Excel"), "/entries/export.xlsx?" ~ f.query(page=""), "secondary", icon_name="file-spreadsheet", cls="max-sm:hidden") }}{% endif %}
+  {% if can("journal.create") %}{{ ui.link_button(_("Phiếu kế toán"), "/entries/new", "primary", icon_name="plus") }}{% endif %}
+{% endcall %}
+
+{{ ui.tabs([
+  {"key": "", "label": _("Tất cả"), "href": "/entries?" ~ f.query(status="", page=""), "count": counts.get("all", 0)},
+  {"key": "draft", "label": _("Nháp"), "href": "/entries?" ~ f.query(status="draft", page=""), "count": counts.get("draft", 0)},
+  {"key": "posted", "label": _("Đã ghi sổ"), "href": "/entries?" ~ f.query(status="posted", page=""), "count": counts.get("posted", 0)},
+  {"key": "cancelled", "label": _("Đã hủy"), "href": "/entries?" ~ f.query(status="cancelled", page=""), "count": counts.get("cancelled", 0)},
+], f.status, cls="mb-4") }}
+
+<div class="card">
+  <div class="border-b border-line p-3 sm:px-5">
+    {% call ui.filter_bar("/entries", reset_href="/entries", hx_target="#entry-results") %}
+      <input type="hidden" name="status" value="{{ f.status }}">
+      <div class="w-full sm:w-64">
+        <label class="sr-only" for="f-q">{{ _("Tìm") }}</label>
+        {{ ui.input("q", None, f.q, "search", placeholder=_("Số chứng từ, diễn giải, đối tượng…"), prefix=ui.icon("search"), input_cls="input-sm") }}
+      </div>
+      {{ ui.select("doc_type", None, doc_types, f.doc_type, placeholder=_("Mọi loại"), input_cls="input-sm w-44") }}
+      <div class="w-28">{{ ui.input("account", None, f.account, placeholder=_("TK"), input_cls="input-sm tabular-nums") }}</div>
+      <div class="w-56">{{ ui.combobox("partner_id", None, "/lookup/partners", value=f.partner_id, value_label=partner_label, placeholder=_("Đối tượng"), input_cls="input-sm") }}</div>
+      <div class="flex items-center gap-1.5">
+        <input type="date" name="start" value="{{ f.start.isoformat() if f.start else '' }}" class="input input-sm w-36 tabular-nums" aria-label="{{ _('Từ ngày') }}">
+        <span class="text-fg-3">–</span>
+        <input type="date" name="end" value="{{ f.end.isoformat() if f.end else '' }}" class="input input-sm w-36 tabular-nums" aria-label="{{ _('Đến ngày') }}">
+      </div>
+    {% endcall %}
+  </div>
+  <div id="entry-results">{% include "gl/_entry_rows.html" %}</div>
+</div>
+{% endblock %}

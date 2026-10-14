@@ -1,0 +1,39 @@
+{% extends "inventory/print/_layout.html" %}
+{% import "inventory/print/_parts.html" as p %}
+{% block title %}{{ title }}{% endblock %}
+{% block page_size %}size: A4 portrait; margin: 12mm 10mm 14mm 12mm;{% endblock %}
+{% block body %}
+{{ p.doc_header(company, form_code, issued) }}
+<p class="title">{{ title }}</p>
+<p class="subtitle i">{{ period_label }}</p>
+<div class="meta" style="margin-top:2mm">
+  <p>- Tên, nhãn hiệu, quy cách vật tư: <span class="b">{{ led.item.name }}</span></p>
+  <p>- Đơn vị tính: {{ led.item.unit }}</p>
+  <p>- Mã số: {{ led.item.code }}{% if led.warehouse %} &nbsp;&nbsp; Kho: {{ led.warehouse.name }}{% endif %}</p>
+</div>
+<table class="book">
+  <colgroup><col style="width:5%"><col style="width:9%"><col style="width:11%"><col style="width:11%"><col style="width:25%"><col style="width:9%"><col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:6%"></colgroup>
+  <thead>
+    <tr><th rowspan="2">STT</th><th rowspan="2">Ngày, tháng</th><th colspan="2">Số hiệu chứng từ</th><th rowspan="2">Diễn giải</th><th rowspan="2">Ngày nhập, xuất</th><th colspan="3">Số lượng</th><th rowspan="2">Ký xác nhận của kế toán</th></tr>
+    <tr><th>Nhập</th><th>Xuất</th><th>Nhập</th><th>Xuất</th><th>Tồn</th></tr>
+    <tr class="letters"><th>A</th><th>B</th><th>C</th><th>D</th><th>E</th><th>F</th><th>1</th><th>2</th><th>3</th><th>G</th></tr>
+  </thead>
+  <tbody>
+    <tr class="opening"><td></td><td></td><td></td><td></td><td class="label">Số tồn đầu kỳ</td><td></td><td></td><td></td><td class="num">{{ led.opening_qty|qty }}</td><td></td></tr>
+    {% for r in led.rows %}
+    <tr>
+      <td class="code">{{ loop.index }}</td><td class="date">{{ r.date|date }}</td>
+      <td class="code">{{ r.number if r.qty_in else "" }}</td><td class="code">{{ r.number if r.qty_out else "" }}</td>
+      <td>{{ r.description }}</td><td class="date">{{ r.date|date }}</td>
+      <td class="num">{{ p.qty(r.qty_in) }}</td><td class="num">{{ p.qty(r.qty_out) }}</td><td class="num">{{ r.balance_qty|qty }}</td><td></td>
+    </tr>
+    {% endfor %}
+    <tr class="sum"><td></td><td></td><td></td><td></td><td class="c">Cộng cuối kỳ</td><td></td><td class="num">{{ p.qty(led.in_qty) }}</td><td class="num">{{ p.qty(led.out_qty) }}</td><td class="num">{{ led.closing_qty|qty }}</td><td></td></tr>
+  </tbody>
+</table>
+<div class="after-table">
+  <p>- Sổ này có {{ p.page_no(total_pages) }} trang, đánh số từ trang 01 đến trang {{ p.page_no(total_pages) }}</p>
+  <p>- Ngày mở sổ: {{ company.start_date|date }}</p>
+  {{ p.book_signatures(company, [("Thủ kho", "(Ký, họ tên)", company.storekeeper), ("Kế toán trưởng", "(Ký, họ tên)", company.chief_accountant), ("Người đại diện theo pháp luật", "(Ký, họ tên, đóng dấu)", company.legal_rep)]) }}
+</div>
+{% endblock %}

@@ -1,0 +1,59 @@
+{#- PATTERN (b) – Document form with a line grid (journal voucher).
+    form x-data="docForm()": Ctrl+S = button data-hotkey="save", Ctrl+Enter = button data-hotkey="post".
+    Grid: ui.line_grid(mode="split" | "pair", lines=…) – see docs/UI.md for the input names. -#}
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Phiếu kế toán mới") }}{% endblock %}
+{% block content %}
+<form method="post" action="" x-data="docForm()" @keydown="keys($event)" novalidate>
+  {{ ui.csrf_field() }}
+  {% call ui.page_header(_("Phiếu kế toán mới"), _("Bút toán tổng hợp nhiều dòng Nợ/Có. Số chứng từ được cấp khi ghi sổ."),
+                         breadcrumbs=[(_("Sổ sách"), "#"), (_("Phiếu kế toán"), "/ui-kit/list"), (_("Tạo mới"), None)], back="/ui-kit/list",
+                         badge=ui.status_badge("draft")) %}
+    {{ ui.button(_("Gợi ý định khoản"), "soft", icon_name="sparkles", type="button", attrs='@click="openAi()"', cls="max-sm:hidden") }}
+  {% endcall %}
+
+  <div class="grid grid-cols-1 gap-5 2xl:grid-cols-[minmax(0,1fr)_18rem]">
+    <div class="min-w-0 space-y-5">
+      {% call ui.card(_("Thông tin chung")) %}
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {{ ui.date_input("date", _("Ngày hạch toán"), entry.date, required=True, errors=errors) }}
+        {{ ui.date_input("doc_date", _("Ngày chứng từ"), entry.doc_date, errors=errors) }}
+        {{ ui.input("ref_no", _("Số tham chiếu"), entry.ref_no, placeholder=_("Số hóa đơn, hợp đồng…")) }}
+        {{ ui.input("attachments_note", _("Kèm theo"), entry.attachments_note, placeholder=_("01 chứng từ gốc")) }}
+        {{ ui.input("description", _("Diễn giải"), entry.description, required=True, cls="sm:col-span-2 lg:col-span-4", hint=_("Dòng mới tự lấy diễn giải này.")) }}
+      </div>
+      {% endcall %}
+
+      {% call ui.card(_("Định khoản"), _("Tổng Nợ phải bằng tổng Có. Tài khoản 131, 331, 141 bắt buộc chọn đối tượng.")) %}
+        {% if errors and errors.lines %}{{ ui.alert(errors.lines, "error", cls="mb-4") }}{% endif %}
+        {{ ui.line_grid("split", lines, accounts_url=lookup_base ~ "/accounts", partners_url=lookup_base ~ "/partners", description_from="#f-description", local_filter=True) }}
+      {% endcall %}
+    </div>
+
+    <aside class="grid grid-cols-1 gap-5 md:grid-cols-2 2xl:grid-cols-1 2xl:content-start">
+      {% call ui.card(_("Mẫu định khoản"), icon_name="clipboard-list") %}
+        <ul class="-my-1 space-y-1 text-[13px]">
+          {% for label, dc in [(_("Chi phí có hóa đơn GTGT"), "642, 1331 / 331"), (_("Trích trước chi phí"), "642 / 335"), (_("Phân bổ chi phí trả trước"), "642 / 242"), (_("Nộp thuế GTGT"), "33311 / 1121")] %}
+          <li><button type="button" class="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left hover:bg-surface-3">
+            <span class="text-fg-2">{{ label }}</span><span class="mono shrink-0 text-fg-3">{{ dc }}</span></button></li>
+          {% endfor %}
+        </ul>
+      {% endcall %}
+      {% call ui.card(_("Lưu ý"), icon_name="info") %}
+        <ul class="list-disc space-y-1.5 pl-4 text-[13px] text-fg-2">
+          <li>{{ _("Chứng từ đã ghi sổ không sửa được; muốn thay đổi thì hủy (kỳ mở) hoặc lập điều chỉnh (kỳ đã khóa).") }}</li>
+          <li>{{ _("Ngày hạch toán phải thuộc kỳ chưa khóa sổ.") }}</li>
+        </ul>
+      {% endcall %}
+    </aside>
+  </div>
+
+  {% call ui.form_actions() %}
+    <span class="mr-auto hidden text-xs text-fg-3 md:inline">{{ ui.kbd("Ctrl+S") }} {{ _("lưu nháp") }} · {{ ui.kbd("Ctrl+Enter") }} {{ _("lưu và ghi sổ") }}</span>
+    {{ ui.link_button(_("Hủy bỏ"), "/ui-kit/list", "ghost") }}
+    {{ ui.button(_("Lưu nháp"), "secondary", name="action", value="save", hotkey="save") }}
+    {{ ui.button(_("Lưu và ghi sổ"), icon_name="check", name="action", value="post", hotkey="post", kbd_hint="Ctrl+Enter") }}
+  {% endcall %}
+</form>
+{% endblock %}

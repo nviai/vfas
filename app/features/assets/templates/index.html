@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Tài sản cố định") }}{% endblock %}
+{% block content %}
+{% call ui.page_header(_("Tài sản cố định"), _("Sổ TSCĐ đến ngày {d} · nguyên giá, hao mòn lũy kế đã ghi sổ, giá trị còn lại", d=on|date), breadcrumbs=breadcrumbs, icon_name="building") %}
+  {{ ui.report_toolbar(pdf_href="/assets/register.pdf?on=" ~ on.isoformat() if can("assets.export") else None,
+                       xlsx_href="/assets/register.xlsx?on=" ~ on.isoformat() if can("assets.export") else None) }}
+  {% if can("assets.create") %}{{ ui.link_button(_("Ghi tăng TSCĐ"), "/assets/new", "primary", icon_name="plus") }}{% endif %}
+{% endcall %}
+
+<div class="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+  {{ ui.stat_card(_("Nguyên giá"), total_cost, icon_name="building") }}
+  {{ ui.stat_card(_("Hao mòn lũy kế"), total_acc, icon_name="trending-down") }}
+  {{ ui.stat_card(_("Giá trị còn lại"), total_cost - total_acc, icon_name="scale") }}
+</div>
+
+{{ ui.tabs([
+  {"key": "in_use", "label": _("Đang sử dụng"), "href": "/assets?status=in_use&on=" ~ on.isoformat()},
+  {"key": "disposed", "label": _("Đã ghi giảm"), "href": "/assets?status=disposed&on=" ~ on.isoformat()},
+  {"key": "all", "label": _("Tất cả"), "href": "/assets?status=all&on=" ~ on.isoformat()},
+], status, cls="mb-4") }}
+
+<div class="card">
+  <div class="border-b border-line p-3 sm:px-5">
+    {% call ui.filter_bar("/assets", reset_href="/assets") %}
+      <input type="hidden" name="status" value="{{ status }}">
+      <div class="w-full sm:w-64">{{ ui.input("q", None, q, "search", placeholder=_("Mã, tên tài sản…"), prefix=ui.icon("search"), input_cls="input-sm") }}</div>
+      <div><label class="sr-only" for="f-on">{{ _("Đến ngày") }}</label>
+        <input id="f-on" type="date" name="on" value="{{ on.isoformat() }}" class="input input-sm w-40 tabular-nums" aria-label="{{ _('Đến ngày') }}"></div>
+    {% endcall %}
+  </div>
+  {% if not rows %}
+    {% call ui.empty_state(_("Chưa có tài sản cố định"), "building", _("Ghi tăng từ chứng từ mua hàng (dòng Nợ 211) hoặc nhập tài sản đầu kỳ.")) %}
+      {% if can("assets.create") %}{{ ui.link_button(_("Ghi tăng TSCĐ"), "/assets/new", "primary", icon_name="plus") }}{% endif %}
+    {% endcall %}
+  {% else %}
+  <div class="table-wrap max-md:hidden">
+    <table class="table table-hover">
+      <thead>
+        <tr>
+          <th class="w-28">{{ _("Mã") }}</th>
+          <th>{{ _("Tên tài sản") }}</th>
+          <th class="w-28 max-xl:hidden">{{ _("Ngày ghi tăng") }}</th>
+          <th class="num w-36">{{ _("Nguyên giá") }}</th>
+          <th class="num w-36">{{ _("Hao mòn lũy kế") }}</th>
+          <th class="num w-36">{{ _("Còn lại") }}</th>
+          <th class="num w-32 max-lg:hidden">{{ _("Khấu hao/tháng") }}</th>
+          <th class="w-32">{{ _("Trạng thái") }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}{% set a = r.asset %}
+        <tr class="is-link {{ 'is-muted' if a.status == 'disposed' }}">
+          <td><a href="/assets/{{ a.id }}" class="doc-no whitespace-nowrap hover:underline">{{ a.code }}</a></td>
+          <td class="max-w-0">
+            <p class="truncate text-fg">{{ a.name }}</p>
+            <p class="truncate text-xs text-fg-3">{{ _(a.category_label) }}{% if a.department %} · {{ a.department }}{% endif %}</p>
+          </td>
+          <td class="max-xl:hidden tabular-nums text-fg-2">{{ a.acquired_date|date }}</td>
+          <td class="num">{{ r.cost|money }}</td>
+          <td class="num text-fg-2">{{ r.accumulated|money0 }}</td>
+          <td class="num font-medium">{{ r.remaining|money }}</td>
+          <td class="num max-lg:hidden text-fg-2">{{ monthly[a.id]|money0 }}</td>
+          <td>{{ ui.status_badge("disposed" if a.status == "disposed" else "active") }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr class="row-total">
+          <td colspan="3" class="max-xl:hidden">{{ _("Cộng") }}</td>
+          <td class="num">{{ total_cost|money }}</td><td class="num">{{ total_acc|money }}</td>
+          <td class="num">{{ (total_cost - total_acc)|money }}</td><td class="max-lg:hidden"></td><td></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  <ul class="divide-y divide-line md:hidden">
+    {% for r in rows %}{% set a = r.asset %}
+    <li><a href="/assets/{{ a.id }}" class="flex items-start gap-3 px-4 py-3 active:bg-surface-2">
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center gap-2"><span class="doc-no whitespace-nowrap text-[13px]">{{ a.code }}</span>{{ ui.status_badge("disposed" if a.status == "disposed" else "active") }}</div>
+        <p class="mt-0.5 truncate text-[13.5px] text-fg">{{ a.name }}</p>
+        <p class="text-xs text-fg-3">{{ _("Nguyên giá") }} {{ r.cost|money }}</p>
+      </div>
+      <div class="shrink-0 text-right">
+        <p class="text-[14px] font-semibold tabular-nums">{{ r.remaining|money }}</p>
+        <p class="text-xs text-fg-3">{{ _("còn lại") }}</p>
+      </div>
+    </a></li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</div>
+
+{% if future %}
+  {{ ui.alert(_("{n} tài sản có ngày ghi tăng sau ngày xem sổ nên chưa hiện trong danh sách.", n=future|length), "info", cls="mt-4") }}
+{% endif %}
+{% endblock %}

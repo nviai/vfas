@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% import "gl/_macros.html" as gm with context %}
+{% block title %}{{ _("Thuyết minh báo cáo tài chính") }}{% endblock %}
+{% block content %}
+{% call ui.page_header(_("Bản thuyết minh báo cáo tài chính"), _("Mẫu B09-DNN · khung tự điền số liệu; phần chữ sửa trên file Excel/Word trước khi nộp"), breadcrumbs=breadcrumbs, icon_name="file-text") %}
+  {% for k, label in [("b01a", "B01a"), ("b02", "B02"), ("b03", "B03"), ("b09", "B09")] %}
+    {{ ui.link_button(label, "/reports/" ~ k ~ "?" ~ period.query(), "primary" if k == "b09" else "ghost", size="sm") }}
+  {% endfor %}
+{% endcall %}
+{{ gm.report_bar(period, years, "/reports/b09") }}
+
+<div class="paper overflow-hidden">
+  <div class="p-6 sm:p-10">
+    {{ ui.official_header(company, "B09-DNN") }}
+    {{ ui.report_title("Bản thuyết minh báo cáo tài chính", period.label, unit_label=None) }}
+    <h3 class="mt-6 mb-2 font-semibold">I. Đặc điểm hoạt động, kỳ kế toán, chế độ kế toán áp dụng</h3>
+    <dl class="grid grid-cols-1 gap-x-6 gap-y-1.5 text-[13.5px] sm:grid-cols-[16rem_1fr]">
+      {% for k, v in notes.general %}<dt class="text-fg-3">{{ k }}</dt><dd>{{ v }}</dd>{% endfor %}
+    </dl>
+    <h3 class="mt-6 mb-2 font-semibold">II. Các chính sách kế toán áp dụng</h3>
+    <dl class="grid grid-cols-1 gap-x-6 gap-y-1.5 text-[13.5px] sm:grid-cols-[16rem_1fr]">
+      {% for k, v in notes.policies %}<dt class="text-fg-3">{{ k }}</dt><dd>{{ v }}</dd>{% endfor %}
+    </dl>
+    {% for header, tables in [("III. Thông tin bổ sung cho Báo cáo tình hình tài chính", notes.balance_tables), ("IV. Thông tin bổ sung cho Báo cáo kết quả hoạt động kinh doanh", notes.income_tables)] %}
+    <h3 class="mt-8 mb-3 font-semibold">{{ header }}</h3>
+    {% for t in tables %}
+    <p class="mt-4 mb-1.5 text-[13.5px] font-medium italic">{{ t.code }}. {{ t.title }}</p>
+    <div class="table-wrap">
+      <table class="table table-report">
+        <thead><tr><th>Chỉ tiêu</th><th class="w-44">{{ t.columns[0] }}</th><th class="w-44">{{ t.columns[1] }}</th></tr></thead>
+        <tbody>{% for label, a, b in t.rows %}<tr><td>{{ label }}</td><td class="num">{{ gm.paren(a) }}</td><td class="num">{{ gm.paren(b) }}</td></tr>{% endfor %}</tbody>
+      </table>
+    </div>
+    {% else %}<p class="text-[13px] text-fg-3">{{ _("Không có số liệu") }}</p>{% endfor %}
+    {% endfor %}
+    {{ gm.signatures(company) }}
+  </div>
+</div>
+{% endblock %}

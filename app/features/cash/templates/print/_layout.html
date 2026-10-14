@@ -1,0 +1,61 @@
+{# Shared frame of the TT133 print forms (money module). Always Vietnamese, no translation calls. #}
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>{% block title %}{% endblock %}</title>
+<style>
+  @page {
+    {% block page_size %}size: A4 landscape; margin: 12mm 10mm 14mm 12mm;{% endblock %}
+    @bottom-right { content: "Trang " counter(page) "/" counter(pages); font-family: "Times New Roman", "Liberation Serif", "Tinos", "DejaVu Serif", serif; font-size: 8pt; color: #333; }
+    {% block page_extra %}{% endblock %}
+  }
+  * { box-sizing: border-box; }
+  html { font-family: "Times New Roman", "Liberation Serif", "Tinos", "DejaVu Serif", serif; font-size: 10.5pt; color: #000; line-height: 1.3; }
+  body { margin: 0; }
+  p { margin: 0; }
+  .b { font-weight: bold; }
+  .i { font-style: italic; }
+  .c { text-align: center; }
+  .r { text-align: right; }
+  .nowrap { white-space: nowrap; }
+  .small { font-size: 8.5pt; }
+
+  .doc-head { width: 100%; border-collapse: collapse; margin-bottom: 3mm; }
+  .doc-head td { vertical-align: top; padding: 0; }
+  .doc-head .left { width: 58%; }
+  .doc-head .right { width: 42%; text-align: center; }
+  .doc-head .form-code { font-weight: bold; }
+  .doc-head .issued { font-style: italic; font-size: 8.5pt; }
+
+  .title { text-align: center; font-weight: bold; font-size: 14pt; margin-top: 2mm; letter-spacing: .2pt; }
+  .subtitle { text-align: center; margin-top: .8mm; }
+
+  table.book { width: 100%; border-collapse: collapse; margin-top: 3mm; table-layout: fixed; }
+  table.book th, table.book td { border: .6pt solid #000; padding: 1mm 1.3mm; vertical-align: top; overflow-wrap: break-word; }
+  table.book th { font-weight: bold; text-align: center; vertical-align: middle; font-size: 9.5pt; }
+  table.book thead tr.letters th { font-weight: normal; font-style: italic; padding: .6mm; font-size: 9pt; }
+  table.book td.num { text-align: right; white-space: nowrap; }
+  table.book td.date { text-align: center; white-space: nowrap; }
+  table.book td.code { text-align: center; white-space: nowrap; }
+  table.book tr { page-break-inside: avoid; }
+  table.book tr.summary td { font-weight: bold; }
+  table.book tr.summary td.label { font-weight: bold; }
+  table.book tbody tr.opening td.label { font-weight: bold; font-style: italic; }
+
+  .after-table { margin-top: 3mm; page-break-inside: avoid; }
+  .signatures { width: 100%; border-collapse: collapse; margin-top: 1mm; }
+  .signatures td { text-align: center; vertical-align: top; padding: 0 2mm; }
+  .signatures .role { font-weight: bold; }
+  .signatures .hint { font-style: italic; font-size: 9pt; }
+  .signatures .name { font-weight: bold; padding-top: 16mm; }
+  .date-line { text-align: right; font-style: italic; margin-top: 2mm; padding-right: 6mm; }
+
+  .watermark { position: fixed; top: 38%; left: 0; right: 0; text-align: center; font-size: 46pt; font-weight: bold; color: rgba(200, 0, 0, .14); transform: rotate(-18deg); letter-spacing: 2pt; }
+  {% block css %}{% endblock %}
+</style>
+</head>
+<body>
+{% block body %}{% endblock %}
+</body>
+</html>

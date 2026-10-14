@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Chuyển tiền nội bộ") }}{% endblock %}
+{% block content %}
+<form method="post" action="{{ action }}" x-data="docForm()" @keydown="keys($event)" novalidate>
+  {{ ui.csrf_field() }}
+  {{ ui.page_header(_("Sửa chuyển tiền nháp") if entry else _("Chuyển tiền nội bộ"),
+                    _("Rút tiền gửi về quỹ, nộp tiền mặt vào ngân hàng hoặc chuyển giữa hai tài khoản ngân hàng."),
+                    breadcrumbs=breadcrumbs, back=cancel_url, badge=ui.status_badge("draft"), icon_name="arrow-left-right") }}
+  {% if errors.get("_") %}{{ ui.alert(errors.get("_"), "error", cls="mb-5") }}{% endif %}
+  <div class="max-w-3xl space-y-5">
+    {% call ui.card(_("Thông tin chuyển tiền")) %}
+      <div class="grid grid-cols-1 items-end gap-4 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+        {{ ui.select("source", _("Chuyển từ"), options, v.source, placeholder=_("— Chọn —"), errors=errors, required=True) }}
+        <span class="hidden pb-2.5 text-fg-3 sm:block">{{ ui.icon("arrow-right", "size-5") }}</span>
+        {{ ui.select("target", _("Chuyển đến"), options, v.target, placeholder=_("— Chọn —"), errors=errors, required=True) }}
+      </div>
+      <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {{ ui.money_input("amount", _("Số tiền"), v.amount, errors=errors, required=True, input_cls="font-semibold") }}
+        {{ ui.date_input("date", _("Ngày hạch toán"), v.date, errors=errors, required=True, max=today) }}
+        {{ ui.date_input("doc_date", _("Ngày chứng từ"), v.doc_date, errors=errors) }}
+      </div>
+      <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_14rem]">
+        {{ ui.input("description", _("Diễn giải"), v.description or "", errors=errors, required=True, placeholder=_("Ví dụ: Rút tiền gửi về nhập quỹ")) }}
+        {{ ui.input("ref_no", _("Số chứng từ ngân hàng"), v.ref_no or "") }}
+      </div>
+      <p class="mt-4 text-[13px] text-fg-3">{{ _("Định khoản: Nợ TK nơi nhận / Có TK nơi chuyển. Không vào doanh thu, chi phí; bị loại khỏi lưu chuyển tiền tệ.") }}</p>
+    {% endcall %}
+  </div>
+  {% call ui.form_actions() %}
+    {{ ui.link_button(_("Hủy bỏ"), cancel_url, "ghost") }}
+    {{ ui.button(_("Lưu nháp"), "secondary", name="action", value="save", hotkey="save", kbd_hint="Ctrl+S") }}
+    {% if can_post %}{{ ui.button(_("Lưu và ghi sổ"), icon_name="check", name="action", value="post", hotkey="post", kbd_hint="Ctrl+Enter") }}{% endif %}
+  {% endcall %}
+</form>
+{% endblock %}

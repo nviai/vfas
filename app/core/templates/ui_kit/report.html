@@ -1,0 +1,65 @@
+{#- PATTERN (d) – Statutory-form report: period picker + export bar; "paper" preview (official_header, report_title, table-report, signature_block).
+    The official printout is still the PDF (WeasyPrint) – the web page is only a quick preview. -#}
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Bảng cân đối tài khoản") }}{% endblock %}
+{% block content %}
+{% call ui.page_header(_("Bảng cân đối tài khoản"), _("Mẫu F01-DNN · số dư đầu kỳ, phát sinh và số dư cuối kỳ của từng tài khoản"),
+                       breadcrumbs=[(_("Sổ sách & báo cáo"), "#"), (_("Bảng cân đối tài khoản"), None)]) %}
+  {{ ui.report_toolbar(pdf_href="#", xlsx_href="#") }}
+{% endcall %}
+
+<div class="card mb-5 flex flex-wrap items-end justify-between gap-3 p-3 sm:px-5">
+  {{ ui.period_selector(period, action="") }}
+  <div class="flex items-center gap-4">
+    {{ ui.checkbox("show_zero", _("Hiện tài khoản không phát sinh")) }}
+    {{ ui.checkbox("level2", _("Chi tiết cấp 2"), True) }}
+  </div>
+</div>
+
+<div class="mb-4 flex items-center gap-2 text-[13px]">
+  <span class="inline-flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400">{{ ui.icon("circle-check") }}{{ _("Tổng Nợ = tổng Có ở cả ba nhóm cột") }}</span>
+</div>
+
+<div class="paper overflow-hidden">
+  <div class="table-wrap">
+    <div class="min-w-[960px] p-6 sm:p-10">
+      {{ ui.official_header(company, "F01-DNN") }}
+      {{ ui.report_title("Bảng cân đối tài khoản", "Quý 3 năm 2026 (từ ngày 01/07/2026 đến ngày 30/09/2026)") }}
+      <table class="table table-report">
+        <thead>
+          <tr>
+            <th rowspan="2" class="w-20">Số hiệu tài khoản</th>
+            <th rowspan="2">Tên tài khoản</th>
+            <th colspan="2">Số dư đầu kỳ</th>
+            <th colspan="2">Số phát sinh trong kỳ</th>
+            <th colspan="2">Số dư cuối kỳ</th>
+          </tr>
+          <tr><th>Nợ</th><th>Có</th><th>Nợ</th><th>Có</th><th>Nợ</th><th>Có</th></tr>
+          <tr class="italic"><th>A</th><th>B</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+          <tr class="{{ 'font-semibold' if r.level == 1 }}">
+            <td class="text-center tabular-nums">{{ r.code }}</td>
+            <td class="{{ 'pl-6' if r.level == 2 }}">{{ r.name }}</td>
+            <td class="num">{{ r.open_d|money0 }}</td><td class="num">{{ r.open_c|money0 }}</td>
+            <td class="num">{{ r.per_d|money0 }}</td><td class="num">{{ r.per_c|money0 }}</td>
+            <td class="num">{{ r.close_d|money0 }}</td><td class="num">{{ r.close_c|money0 }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr class="row-total">
+            <td></td><td class="text-center uppercase">Tổng cộng</td>
+            <td class="num">{{ total.open_d|money }}</td><td class="num">{{ total.open_c|money }}</td>
+            <td class="num">{{ total.per_d|money }}</td><td class="num">{{ total.per_c|money }}</td>
+            <td class="num">{{ total.close_d|money }}</td><td class="num">{{ total.close_c|money }}</td>
+          </tr>
+        </tfoot>
+      </table>
+      {{ ui.signature_block([("Người lập biểu", "(Ký, họ tên)", "Lê Thị Hoa"), ("Kế toán trưởng", "(Ký, họ tên)", "Nguyễn Thị Minh Anh"), ("Người đại diện theo pháp luật", "(Ký, họ tên, đóng dấu)", "Phạm Quốc Hùng")], "Lập, ngày 14 tháng 10 năm 2026") }}
+    </div>
+  </div>
+</div>
+{% endblock %}

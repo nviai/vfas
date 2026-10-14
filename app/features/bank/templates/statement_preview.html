@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Ánh xạ cột sao kê") }}{% endblock %}
+{% block content %}
+{{ ui.page_header(_("Ánh xạ cột: {f}", f=filename), bank.label ~ " · " ~ bank.bank_name, breadcrumbs=breadcrumbs, back="/bank/statements/import", icon_name="table") }}
+<form method="get" action="" class="card mb-5">
+  <div class="card-body">
+    <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8">
+      {{ ui.input("header_row", _("Dòng tiêu đề"), header + 1, type="number", attrs='min="1"', input_cls="input-sm tabular-nums") }}
+      {% for key, label in fields.items() %}
+      <div>
+        <label class="label" for="f-col_{{ key }}">{{ _(label) }}</label>
+        <select id="f-col_{{ key }}" name="col_{{ key }}" class="input input-sm">
+          <option value="">—</option>
+          {% for i in range(width) %}<option value="{{ i }}" {{ "selected" if mapping.get(key) == i }}>{{ _("Cột") }} {{ i + 1 }}{% if rows|length > header and i < rows[header]|length and rows[header][i] %}: {{ rows[header][i]|string|truncate(18, true, "…") }}{% endif %}</option>{% endfor %}
+        </select>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="mt-4 flex justify-end">{{ ui.button(_("Áp dụng"), "secondary", size="sm", icon_name="refresh-cw") }}</div>
+  </div>
+</form>
+
+{% if not result.lines %}
+  {{ ui.alert(_("Chưa đọc được giao dịch nào. Kiểm tra dòng tiêu đề và cột Ngày, Tiền vào/Tiền ra (hoặc Số tiền ±)."), "warning", cls="mb-5") }}
+{% else %}
+  {{ ui.alert(_("Đọc được {n} giao dịch hợp lệ, {e} dòng lỗi, bỏ qua {s} dòng không có ngày (tổng cộng, chân trang).", n=result.valid|length, e=result.errors|length, s=result.skipped), "info", cls="mb-5") }}
+{% endif %}
+
+{% call ui.card(_("Xem trước"), flush=True) %}
+<div class="table-wrap max-h-[55vh]">
+  <table class="table table-compact table-sticky">
+    <thead><tr><th class="w-16">{{ _("Dòng") }}</th><th class="w-28">{{ _("Ngày") }}</th><th>{{ _("Diễn giải") }}</th><th class="w-32">{{ _("Tham chiếu") }}</th><th class="num w-32">{{ _("Tiền vào") }}</th><th class="num w-32">{{ _("Tiền ra") }}</th><th class="num w-36">{{ _("Số dư") }}</th></tr></thead>
+    <tbody>
+      {% for ln in result.lines[:300] %}
+      <tr class="{{ 'bg-rose-50/60 dark:bg-rose-500/5' if ln.error }}">
+        <td class="tabular-nums text-fg-3">{{ ln.row_no }}</td><td class="tabular-nums">{{ ln.date|date }}</td>
+        <td>{{ ln.description }}{% if ln.error %}<p class="field-error">{{ _(ln.error) }}</p>{% endif %}</td>
+        <td class="mono text-xs">{{ ln.reference }}</td><td class="num">{{ ln.money_in|money0 }}</td><td class="num">{{ ln.money_out|money0 }}</td>
+        <td class="num">{{ ln.balance|money if ln.balance is not none else "" }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="py-8 text-center text-fg-3">{{ _("Không có dữ liệu") }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endcall %}
+
+<form method="post" action="/bank/statements/import/{{ token }}" class="mt-5 flex justify-end gap-2">
+  {{ ui.csrf_field() }}
+  <input type="hidden" name="header_row" value="{{ header + 1 }}">
+  {% for key, col in mapping.items() %}<input type="hidden" name="col_{{ key }}" value="{{ col }}">{% endfor %}
+  {{ ui.link_button(_("Hủy"), "/bank/statements", "ghost") }}
+  {{ ui.button(_("Nhập {n} giao dịch", n=result.valid|length), icon_name="check", disabled=not result.valid) }}
+</form>
+{% endblock %}

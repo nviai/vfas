@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% import "charts.html" as charts %}
+{% block title %}{{ _("Tổng quan") }}{% endblock %}
+{% block content %}
+{% call ui.page_header(_(greeting.split(",")[0]) ~ ("," ~ greeting.split(",", 1)[1] if "," in greeting else ""), (company.name if company else "") ~ " · " ~ _("Số liệu đến hết ngày {d}", d=today|date)) %}
+  {% if can("cash.create") %}{{ ui.link_button(_("Phiếu thu"), "/cash/new?kind=PT", "secondary", icon_name="circle-arrow-down", kbd_hint="Alt+T", cls="max-sm:hidden") }}{% endif %}
+  {% if can("cash.create") %}{{ ui.link_button(_("Phiếu chi"), "/cash/new?kind=PC", "primary", icon_name="circle-arrow-up", kbd_hint="Alt+C") }}{% endif %}
+{% endcall %}
+
+{% if can_books %}
+<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+  {{ ui.stat_card(_("Tiền mặt & tiền gửi"), money, delta=money_delta, delta_label=_("so với cuối tháng trước"), icon_name="wallet", spark=(money_balances[-7:] if money_balances|length > 1 else None), href="/cash/book") }}
+  {{ ui.stat_card(_("Phải thu khách hàng"), receivable, icon_name="hand-coins", hint=_("Số dư Nợ TK 131 theo khách hàng"), href="/debts/receivables") }}
+  {{ ui.stat_card(_("Phải trả người bán"), payable, icon_name="coins", hint=_("Số dư Có TK 331 theo nhà cung cấp"), href="/debts/payables") }}
+  {{ ui.stat_card(_("Lợi nhuận lũy kế {y}", y=today.year), profit_ytd, icon_name="trending-up", hint=_("Doanh thu {v} · trước thuế TNDN", v=revenue_ytd|money), href="/reports/b02") }}
+</div>
+{% elif can_cash %}
+<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+  {{ ui.stat_card(_("Tồn quỹ tiền mặt"), cash, icon_name="wallet", href="/cash/book") }}
+</div>
+{% endif %}
+
+<div class="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-3">
+  {% if can_books %}
+  {% set chart_actions %}<a href="/bank/book" class="btn-ghost btn-xs">{{ _("Chi tiết") }}{{ ui.icon("arrow-right", "size-3.5") }}</a>{% endset %}
+  {% call ui.card(_("Dòng tiền"), _("Thu, chi tiền mặt và tiền gửi theo tháng (không gồm chuyển tiền nội bộ)"), actions=chart_actions, cls="xl:col-span-2") %}
+    {% if inflow|sum or outflow|sum %}
+      {{ charts.bar_chart(month_labels, [{"name": _("Thu"), "values": inflow, "slot": 1}, {"name": _("Chi"), "values": outflow, "slot": 2}], height=280, caption=_("Thu chi theo tháng")) }}
+      <dl class="mt-6 grid grid-cols-3 gap-4 border-t border-line pt-5">
+        {% set ti, to = inflow|sum, outflow|sum %}
+        <div><dt class="text-xs text-fg-3">{{ _("Tổng thu") }}</dt><dd class="mt-1 text-[15px] font-semibold tabular-nums">{{ ti|money }}</dd></div>
+        <div><dt class="text-xs text-fg-3">{{ _("Tổng chi") }}</dt><dd class="mt-1 text-[15px] font-semibold tabular-nums">{{ to|money }}</dd></div>
+        <div><dt class="text-xs text-fg-3">{{ _("Chênh lệch") }}</dt><dd class="mt-1 text-[15px] font-semibold tabular-nums {{ 'text-emerald-600 dark:text-emerald-400' if ti >= to else 'amount-neg' }}">{{ '+' if ti >= to }}{{ (ti - to)|money }}</dd></div>
+      </dl>
+    {% else %}
+      {{ ui.empty_state(_("Chưa có thu chi trong 12 tháng gần nhất"), "chart-column", _("Lập phiếu thu, phiếu chi hoặc nhập sổ quỹ từ Excel để xem dòng tiền.")) }}
+    {% endif %}
+  {% endcall %}
+  {% endif %}
+
+  <div class="space-y-5 {{ '' if can_books else 'xl:col-span-3' }}">
+    {% call ui.card(_("Việc cần làm"), flush=True) %}
+    {% if tasks %}
+    <ul class="divide-y divide-line">
+      {% for t in tasks %}
+      <li><a href="{{ t.href }}" class="flex items-center gap-3 px-4 py-3 hover:bg-surface-2 sm:px-5">
+        <span class="flex size-8 shrink-0 items-center justify-center rounded-lg {{ {'amber': 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300', 'blue': 'bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-300'}.get(t.tone, 'bg-surface-3 text-fg-2') }}">{{ ui.icon(t.icon) }}</span>
+        <span class="min-w-0 flex-1 truncate text-[13.5px]">{{ _(t.label) }}</span>
+        {% if t.count %}<span class="rounded-full bg-surface-3 px-2 py-0.5 text-xs font-semibold tabular-nums">{{ t.count }}</span>{% endif %}
+        {{ ui.icon("chevron-right", "size-4 text-fg-3") }}
+      </a></li>
+      {% endfor %}
+    </ul>
+    {% else %}
+      {{ ui.empty_state(_("Không có việc tồn đọng"), "circle-check", compact=True) }}
+    {% endif %}
+    {% endcall %}
+
+    {% if deadlines %}
+    {% call ui.card(_("Hạn nộp thuế, báo cáo"), flush=True) %}
+    <ul class="divide-y divide-line">
+      {% for d in deadlines %}
+      <li><a href="{{ d.url }}" class="flex items-start gap-3 px-4 py-3 hover:bg-surface-2 sm:px-5">
+        <span class="flex w-11 shrink-0 flex-col items-center rounded-lg border border-line bg-surface-2 py-1 leading-none">
+          <span class="text-[10px] font-medium text-fg-3 uppercase">T{{ d.due.month }}</span>
+          <span class="mt-0.5 text-[15px] font-semibold tabular-nums">{{ d.due.day }}</span>
+        </span>
+        <div class="min-w-0 flex-1">
+          <p class="text-[13.5px] {{ 'text-fg-3 line-through' if d.status == 'submitted' else 'text-fg' }}">{{ _(d.label) }}</p>
+          <p class="mt-0.5 text-xs">
+            {% if d.status == "submitted" %}<span class="text-emerald-600 dark:text-emerald-400">{{ _("Đã nộp") }}</span>
+            {% elif d.days < 0 %}<span class="font-medium text-rose-600 dark:text-rose-400">{{ _("Quá hạn {n} ngày", n=-d.days) }}</span>
+            {% elif d.days <= 7 %}<span class="font-medium text-amber-700 dark:text-amber-400">{{ _("Còn {n} ngày", n=d.days) }}</span>
+            {% else %}<span class="text-fg-3">{{ _("Còn {n} ngày", n=d.days) }}</span>{% endif %}
+          </p>
+        </div>
+      </a></li>
+      {% endfor %}
+    </ul>
+    {% endcall %}
+    {% endif %}
+  </div>
+</div>
+
+{% if can_books %}
+<div class="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2 xl:grid-cols-3">
+  {% call ui.card(_("Tồn tiền cuối tháng"), _("Tiền mặt + tiền gửi")) %}
+    {% if money_balances|length > 1 and (money_balances|max) != (money_balances|min) %}
+      {{ charts.line_chart(month_labels, [{"name": _("Tồn cuối tháng"), "values": money_balances, "slot": 3}], height=200, caption=_("Tồn tiền cuối tháng")) }}
+    {% else %}{{ ui.empty_state(_("Chưa đủ dữ liệu"), "chart-line", compact=True) }}{% endif %}
+  {% endcall %}
+  {% call ui.card(_("Chi phí lớn nhất"), _("Lũy kế năm {y}", y=today.year)) %}
+    {% if expense_items %}{{ charts.hbar_list(expense_items, slot=2) }}
+    {% else %}{{ ui.empty_state(_("Chưa có chi phí"), "receipt", compact=True) }}{% endif %}
+  {% endcall %}
+  {% call ui.card(_("Cơ cấu doanh thu"), _("Lũy kế năm {y}", y=today.year), cls="lg:col-span-2 xl:col-span-1") %}
+    {% if revenue_mix %}{{ charts.donut(revenue_mix, center_label=_("Doanh thu"), center_value=charts.compact(revenue_ytd), value_format="compact") }}
+    {% else %}{{ ui.empty_state(_("Chưa có doanh thu"), "chart-pie", compact=True) }}{% endif %}
+  {% endcall %}
+</div>
+{% endif %}
+
+{% set recent_actions %}<a href="/entries" class="btn-ghost btn-xs">{{ _("Xem tất cả") }}{{ ui.icon("arrow-right", "size-3.5") }}</a>{% endset %}
+{% call ui.card(_("Chứng từ gần đây"), actions=recent_actions if can_books else None, flush=True, cls="mt-5") %}
+{% if recent %}
+<div class="table-wrap">
+  <table class="table table-hover">
+    <tbody>
+      {% for e in recent %}
+      <tr class="is-link {{ 'is-muted' if e.status == 'cancelled' }}">
+        <td class="w-36"><a href="{{ e.url }}" class="doc-no hover:underline">{{ e.display_number }}</a></td>
+        <td class="w-28 tabular-nums text-fg-2 max-sm:hidden">{{ e.date|date }}</td>
+        <td class="max-w-0"><p class="truncate">{{ e.description or e.contact_name }}</p></td>
+        <td class="w-32 max-md:hidden">{{ ui.kind_badge(e.doc_type) }}</td>
+        <td class="num w-36 font-medium">{{ e.total|money }}</td>
+        <td class="w-32 max-sm:hidden">{{ ui.status_badge(e.status) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+  {% call ui.empty_state(_("Chưa có chứng từ nào"), "file-text", _("Bắt đầu bằng số dư đầu kỳ, rồi lập phiếu thu, phiếu chi hoặc nhập hóa đơn điện tử.")) %}
+    {% if can("opening.manage") %}{{ ui.link_button(_("Nhập số dư đầu kỳ"), "/opening", "secondary", icon_name="scale") }}{% endif %}
+    {% if can("cash.create") %}{{ ui.link_button(_("Lập phiếu thu"), "/cash/new?kind=PT", "primary", icon_name="plus") }}{% endif %}
+  {% endcall %}
+{% endif %}
+{% endcall %}
+{% endblock %}

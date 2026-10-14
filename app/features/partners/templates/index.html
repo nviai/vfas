@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Khách hàng, nhà cung cấp") }}{% endblock %}
+{% block content %}
+{% call ui.page_header(_("Khách hàng, nhà cung cấp"), _("Đối tượng công nợ, người nộp/nhận tiền và nhân viên"), breadcrumbs=breadcrumbs, icon_name="users") %}
+  {% if can("catalog.create") %}
+    {% call ui.dropdown(_("Thêm đối tượng"), icon_name="plus", variant="primary", size=None) %}
+      {{ ui.menu_item(_("Khách hàng"), "/partners/new?role=customer", "user") }}
+      {{ ui.menu_item(_("Nhà cung cấp"), "/partners/new?role=supplier", "truck") }}
+      {{ ui.menu_item(_("Nhân viên"), "/partners/new?role=employee", "briefcase") }}
+      {{ ui.menu_item(_("Đối tượng khác"), "/partners/new?role=other", "users") }}
+    {% endcall %}
+  {% endif %}
+{% endcall %}
+
+{{ ui.tabs([
+  {"key": "", "label": _("Tất cả"), "href": "/partners"},
+  {"key": "customer", "label": _("Khách hàng"), "href": "/partners?role=customer"},
+  {"key": "supplier", "label": _("Nhà cung cấp"), "href": "/partners?role=supplier"},
+  {"key": "employee", "label": _("Nhân viên"), "href": "/partners?role=employee"},
+], role, cls="mb-4") }}
+
+<div class="card">
+  <div class="border-b border-line p-3 sm:px-5">
+    {% call ui.filter_bar("/partners", reset_href="/partners", hx_target="#partner-results") %}
+      <input type="hidden" name="role" value="{{ role }}">
+      <div class="w-full sm:w-72">
+        {{ ui.input("q", None, q, "search", placeholder=_("Mã, tên, MST, điện thoại…"), prefix=ui.icon("search"), input_cls="input-sm") }}
+      </div>
+      {{ ui.select("show", None, [("active", _("Đang dùng")), ("all", _("Tất cả"))], show, input_cls="input-sm w-36") }}
+    {% endcall %}
+  </div>
+  <div id="partner-results">{% include "partners/_rows.html" %}</div>
+</div>
+{% endblock %}

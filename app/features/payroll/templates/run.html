@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Bảng lương tháng") }} {{ run.period_label }}{% endblock %}
+{% block content %}
+{% set editable = run.editable and can("payroll.create") %}
+{% call ui.page_header(_("Bảng lương tháng") ~ " " ~ run.period_label, _("{n} nhân viên · công chuẩn {d} ngày", n=lines|length, d=run.standard_days|qty), breadcrumbs=breadcrumbs, back="/payroll", badge=ui.status_badge(run.status)) %}
+  {% if can("payroll.export") %}
+  {% call ui.dropdown(_("In / xuất"), icon_name="printer", width="w-60") %}
+    {{ ui.menu_item(_("Bảng thanh toán tiền lương (PDF)"), "/payroll/runs/" ~ run.id ~ "/sheet.pdf", "file-text", attrs='target="_blank"') }}
+    {{ ui.menu_item(_("Bảng lương (Excel)"), "/payroll/runs/" ~ run.id ~ "/sheet.xlsx", "file-spreadsheet") }}
+    {{ ui.menu_item(_("Phiếu lương từng người (PDF)"), "/payroll/runs/" ~ run.id ~ "/payslips.pdf", "receipt", attrs='target="_blank"') }}
+  {% endcall %}
+  {% endif %}
+  {% if run.status == "posted" and can("payroll.post") and not (run.payment_entry and run.payment_entry.status != "cancelled") %}
+    {{ ui.button(_("Trả lương"), "primary", icon_name="wallet", type="button", attrs="@click=\"$dispatch('modal-open', 'pay')\"") }}
+  {% endif %}
+  {% if editable %}
+  {% call ui.dropdown(icon_name="ellipsis", aria_label=_("Thao tác khác"), width="w-64") %}
+    {{ ui.menu_post(_("Cập nhật theo hồ sơ nhân viên"), "/payroll/runs/" ~ run.id ~ "/refresh", "refresh-cw", confirm=_("Lấy lại lương, phụ cấp, người phụ thuộc từ hồ sơ hiện tại (giữ ngày công, thu nhập khác, tạm ứng)?")) }}
+    {% if can("payroll.manage") %}{{ ui.menu_sep() }}{{ ui.menu_post(_("Xóa bảng lương"), "/payroll/runs/" ~ run.id ~ "/delete", "trash", danger=True, confirm=_("Xóa bảng lương tháng này?")) }}{% endif %}
+  {% endcall %}
+  {% endif %}
+{% endcall %}
+
+{% if run.status == "posted" %}
+<div class="mb-5 flex flex-wrap items-center gap-x-5 gap-y-1 rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-2.5 text-[13px] text-emerald-900 dark:border-emerald-500/20 dark:bg-emerald-500/5 dark:text-emerald-200">
+  <span class="inline-flex items-center gap-1.5 font-medium">{{ ui.icon("lock", "size-3.5") }}{{ _("Đã ghi sổ – muốn sửa thì hủy chứng từ hạch toán lương (kỳ còn mở)") }}</span>
+  <a href="{{ run.entry.url }}" class="doc-no whitespace-nowrap underline-offset-2 hover:underline">{{ run.entry.number }}</a>
+  {% if run.payment_entry and run.payment_entry.status != "cancelled" %}
+    <span>· {{ _("Trả lương") }}: <a href="{{ run.payment_entry.url }}" class="doc-no whitespace-nowrap hover:underline">{{ run.payment_entry.display_number }}</a> {{ ui.status_badge(run.payment_entry.status) }}</span>
+  {% endif %}
+</div>
+{% endif %}
+
+<div class="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+  {{ ui.stat_card(_("Tổng thu nhập"), t.gross, icon_name="banknote") }}
+  {{ ui.stat_card(_("Bảo hiểm (NLĐ + DN)"), t.emp_insurance + t.er_insurance, icon_name="shield", hint=_("NLĐ {a} · DN {b}", a=t.emp_insurance|money, b=t.er_insurance|money)) }}
+  {{ ui.stat_card(_("Thuế TNCN khấu trừ"), t.pit, icon_name="percent") }}
+  {{ ui.stat_card(_("Thực lĩnh"), t.net_pay, icon_name="wallet") }}
+</div>
+
+<form method="post" action="/payroll/runs/{{ run.id }}" x-data="docForm()" @keydown="keys($event)">
+  {{ ui.csrf_field() }}
+  {% call ui.card(_("Chi tiết bảng lương"), _("Giảm trừ gia cảnh {s}/người, {d}/người phụ thuộc · biểu thuế {n} bậc · trần BHXH {c}", s=prm.self_deduction|money, d=prm.dependent_deduction|money, n=prm.brackets|length, c=(prm.cap_multiple * prm.base_salary)|money), flush=True) %}
+  {% if editable %}
+  <div class="flex flex-wrap items-end gap-3 border-b border-line px-4 py-3 sm:px-5">
+    {{ ui.input("standard_days", _("Công chuẩn"), run.standard_days|qty, input_cls="input-sm w-24 tabular-nums") }}
+    <p class="pb-1.5 text-xs text-fg-3">{{ _("Sửa ngày công, thu nhập khác (thưởng, làm thêm), trừ tạm ứng rồi bấm Lưu – phần mềm tính lại bảo hiểm và thuế.") }}</p>
+  </div>
+  {% endif %}
+  {% if not lines %}
+    {{ ui.empty_state(_("Không có nhân viên trong tháng này"), "users", compact=True) }}
+  {% else %}
+  <div class="table-wrap">
+    <table class="table table-compact">
+      <thead>
+        <tr>
+          <th class="min-w-40">{{ _("Nhân viên") }}</th>
+          <th class="num w-20">{{ _("Ngày công") }}</th>
+          <th class="num">{{ _("Lương theo công") }}</th>
+          <th class="num max-2xl:hidden">{{ _("Phụ cấp") }}</th>
+          <th class="num w-28">{{ _("Thu nhập khác") }}</th>
+          <th class="num">{{ _("Tổng thu nhập") }}</th>
+          <th class="num">{{ _("BH NLĐ") }}</th>
+          <th class="num max-2xl:hidden">{{ _("Thu nhập tính thuế") }}</th>
+          <th class="num">{{ _("Thuế TNCN") }}</th>
+          <th class="num w-28">{{ _("Trừ tạm ứng") }}</th>
+          <th class="num">{{ _("Thực lĩnh") }}</th>
+          <th class="num max-2xl:hidden">{{ _("BH DN") }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ln in lines %}
+        <tr>
+          <td>
+            <a href="/payroll/employees/{{ ln.employee_id }}" class="font-medium text-fg hover:underline">{{ ln.employee.full_name }}</a>
+            <p class="text-xs text-fg-3 whitespace-nowrap">{{ ln.employee.code }}{% if ln.contract_type != "long" %} · {{ _(contract_labels.get(ln.contract_type, ln.contract_type)) }}{% endif %}{% if not ln.is_resident %} · {{ _("không cư trú") }}{% endif %}{% if ln.dependents %} · {{ _("{n} NPT", n=ln.dependents) }}{% endif %}</p>
+          </td>
+          <td class="num">{% if editable %}<input name="days-{{ ln.id }}" value="{{ ln.days_worked|qty }}" class="input input-sm w-16 text-right tabular-nums" inputmode="decimal" aria-label="{{ _('Ngày công') }}">{% else %}{{ ln.days_worked|qty }}{% endif %}</td>
+          <td class="num">{{ ln.salary_by_days|money }}</td>
+          <td class="num max-2xl:hidden text-fg-2">{{ (ln.taxable_allowance + ln.nontaxable_allowance)|money0 }}</td>
+          <td class="num">{% if editable %}<div x-data="moneyInput({{ ln.other_income }})"><input type="text" inputmode="decimal" value="{{ ln.other_income|money0 }}" class="input input-sm input-num w-24" @input="onInput($event)" @blur="onBlur($event)" aria-label="{{ _('Thu nhập khác') }}"><input type="hidden" name="other-{{ ln.id }}" :value="value === null ? '' : value" value="{{ ln.other_income }}"></div>{% else %}{{ ln.other_income|money0 }}{% endif %}</td>
+          <td class="num font-medium">{{ ln.gross|money }}</td>
+          <td class="num text-fg-2">{{ ln.emp_insurance|money0 }}</td>
+          <td class="num max-2xl:hidden text-fg-2">{{ ln.assessable_income|money0 }}</td>
+          <td class="num">{{ ln.pit|money0 }}</td>
+          <td class="num">{% if editable %}<div x-data="moneyInput({{ ln.advance_deduction }})"><input type="text" inputmode="decimal" value="{{ ln.advance_deduction|money0 }}" class="input input-sm input-num w-24" @input="onInput($event)" @blur="onBlur($event)" aria-label="{{ _('Trừ tạm ứng') }}"><input type="hidden" name="advance-{{ ln.id }}" :value="value === null ? '' : value" value="{{ ln.advance_deduction }}"></div>{% else %}{{ ln.advance_deduction|money0 }}{% endif %}</td>
+          <td class="num font-semibold">{{ ln.net_pay|money }}</td>
+          <td class="num max-2xl:hidden text-fg-2">{{ ln.er_insurance|money0 }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr class="row-total">
+          <td>{{ _("Cộng") }}</td><td></td>
+          <td class="num">{{ t.salary_by_days|money }}</td>
+          <td class="num max-2xl:hidden">{{ (t.taxable_allowance + t.nontaxable_allowance)|money }}</td>
+          <td class="num">{{ t.other_income|money0 }}</td>
+          <td class="num">{{ t.gross|money }}</td>
+          <td class="num">{{ t.emp_insurance|money }}</td>
+          <td class="num max-2xl:hidden">{{ t.assessable_income|money }}</td>
+          <td class="num">{{ t.pit|money }}</td>
+          <td class="num">{{ t.advance_deduction|money0 }}</td>
+          <td class="num">{{ t.net_pay|money }}</td>
+          <td class="num max-2xl:hidden">{{ t.er_insurance|money }}</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  {% endif %}
+  {% endcall %}
+  {% if editable and lines %}
+  {% call ui.form_actions() %}
+    {{ ui.button(_("Lưu"), "secondary", icon_name="save", name="action", value="save", hotkey="save", kbd_hint="Ctrl+S") }}
+    {% if can("payroll.post") %}{{ ui.button(_("Lưu và ghi sổ"), "primary", icon_name="check", name="action", value="post", hotkey="post", kbd_hint="Ctrl+Enter", confirm=_("Ghi sổ chứng từ hạch toán lương tháng {p}?", p=run.period_label)) }}{% endif %}
+  {% endcall %}
+  {% endif %}
+</form>
+
+{% if run.status == "posted" and can("payroll.post") %}
+{% call ui.modal("pay", _("Trả lương tháng") ~ " " ~ run.period_label, description=_("Lập chứng từ nháp: Nợ 334 (từng nhân viên) / Có tiền mặt hoặc tiền gửi, số tiền = thực lĩnh. Kiểm tra rồi ghi sổ ở trang chứng từ.")) %}
+<form method="post" action="/payroll/runs/{{ run.id }}/pay" x-data="{ method: 'bank' }">
+  {{ ui.csrf_field() }}
+  <div class="space-y-4 px-5 pb-5">
+    <fieldset>
+      <legend class="label">{{ _("Hình thức") }}</legend>
+      <div class="segmented">
+        <label class="segment" :class="method === 'bank' && 'segment-active'"><input type="radio" name="method" value="bank" class="sr-only" x-model="method">{{ _("Chuyển khoản") }}</label>
+        <label class="segment" :class="method === 'cash' && 'segment-active'"><input type="radio" name="method" value="cash" class="sr-only" x-model="method">{{ _("Tiền mặt") }}</label>
+      </div>
+    </fieldset>
+    <div x-show="method === 'bank'">
+      {% if banks %}{% set bank_opts = [] %}{% for b in banks %}{% do bank_opts.append((b.id, b.label)) %}{% endfor %}{{ ui.select("bank_account_id", _("Tài khoản ngân hàng"), bank_opts, banks[0].id) }}
+      {% else %}<p class="text-[13px] text-amber-700 dark:text-amber-300">{{ _("Chưa có tài khoản ngân hàng – thêm ở Danh mục › Tài khoản ngân hàng.") }}</p>{% endif %}
+    </div>
+    {{ ui.date_input("date", _("Ngày trả"), today, required=True) }}
+    <p class="text-[13px] text-fg-2">{{ _("Tổng thực lĩnh") }}: <span class="font-semibold tabular-nums">{{ t.net_pay|money }}</span> đ</p>
+  </div>
+  <div class="flex justify-end gap-2 border-t border-line bg-surface-2 px-5 py-3">
+    {{ ui.button(_("Đóng"), "secondary", type="button", attrs="@click=\"$dispatch('modal-close')\"") }}
+    {{ ui.button(_("Lập chứng từ trả lương"), "primary", icon_name="wallet") }}
+  </div>
+</form>
+{% endcall %}
+{% endif %}
+{% endblock %}

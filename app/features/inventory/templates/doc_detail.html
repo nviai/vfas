@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _(kind_label) }} {{ doc.display_number }}{% endblock %}
+{% block content %}
+{% set receipt = kind == "receipt" %}
+{% set act_base = ("/entries/" ~ doc.entry_id) if receipt else ("/inventory/" ~ path ~ "/" ~ doc.id) %}
+{% set ident = doc.entry_id if receipt else doc.id %}
+{% call ui.page_header(_(kind_label) ~ " " ~ doc.display_number, doc.description or doc.warehouse.name, breadcrumbs=breadcrumbs,
+                       back="/inventory/" ~ path, badge=ui.status_badge(status)) %}
+  {{ ui.link_button(_("In phiếu"), "/inventory/" ~ path ~ "/" ~ ident ~ "/print.pdf", "secondary", icon_name="printer", target="_blank") }}
+  {% if status == "draft" %}
+    {% if can("inventory.create") %}{{ ui.link_button(_("Sửa"), "/inventory/" ~ path ~ "/" ~ ident ~ "/edit", "secondary", icon_name="pencil") }}{% endif %}
+    {% if can("inventory.post") %}
+    <form method="post" action="{{ act_base }}/post">{{ ui.csrf_field() }}{{ ui.button(_("Ghi sổ"), icon_name="check") }}</form>
+    {% endif %}
+  {% endif %}
+  {% if status == "posted" and can("inventory.cancel") or status == "draft" and can("inventory.create") %}
+  {% call ui.dropdown(icon_name="ellipsis", aria_label=_("Thao tác khác"), width="w-60") %}
+    {% if status == "posted" %}
+      {{ ui.menu_item(_("Hủy chứng từ…"), None, "ban", danger=True, attrs="@click=\"$dispatch('modal-open', 'cancel-doc')\"") }}
+    {% else %}
+      {{ ui.menu_post(_("Xóa nháp"), act_base ~ "/delete", "trash", danger=True, confirm=_("Xóa chứng từ nháp này?"), fields={"next": "/inventory/" ~ path}) }}
+    {% endif %}
+  {% endcall %}
+  {% endif %}
+{% endcall %}
+
+{% if status == "posted" %}
+<div class="mb-5 flex flex-wrap items-center gap-x-5 gap-y-1 rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-2.5 text-[13px] text-emerald-900 dark:border-emerald-500/20 dark:bg-emerald-500/5 dark:text-emerald-200">
+  <span class="inline-flex items-center gap-1.5 font-medium">{{ ui.icon("lock", "size-3.5") }}{{ _("Đã ghi sổ – không thể sửa số liệu") }}</span>
+  {% if doc.posted_at %}<span class="text-emerald-800/80 dark:text-emerald-300/80">{{ doc.posted_at|datetime }}</span>{% endif %}
+</div>
+{% elif status == "cancelled" %}
+  {{ ui.alert(_("Chứng từ đã hủy. Lý do: {r}", r=doc.cancel_reason or (entry.cancel_reason if entry else "")), "warning", cls="mb-5") }}
+{% endif %}
+{% if gv_pending %}
+  {% call ui.alert(_("Giá trị xuất kho sẽ được tính khi chạy tính giá xuất kho tháng {m}.", m=doc.date.strftime("%m/%Y")), "info", cls="mb-5") %}
+    {{ ui.link_button(_("Tính giá xuất kho"), "/inventory/costing", "secondary", size="sm", icon_name="calculator") }}
+  {% endcall %}
+{% endif %}
+
+<div class="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
+  <div class="min-w-0 space-y-5">
+    {% call ui.card(_("Thông tin chứng từ")) %}
+      {% set items = [(_("Ngày hạch toán"), doc.date|date)] %}
+      {% if receipt %}{% do items.append((_("Ngày chứng từ"), doc.doc_date|date)) %}{% endif %}
+      {% do items.append((_("Kho nhập") if receipt else _("Kho xuất"), doc.warehouse.name)) %}
+      {% if doc.to_warehouse %}{% do items.append((_("Kho nhận"), doc.to_warehouse.name)) %}{% endif %}
+      {% if doc.counter_account %}{% do items.append((_("TK Có (đối ứng)") if receipt else _("TK Nợ (đối ứng)"), doc.counter_account)) %}{% endif %}
+      {% if doc.partner %}{% do items.append((_("Đối tượng"), doc.partner.name)) %}{% endif %}
+      {% do items.append(({"receipt": _("Người giao hàng"), "issue": _("Người nhận hàng"), "transfer": _("Người vận chuyển")}[kind], doc.contact_name)) %}
+      {% if doc.ref_no %}{% do items.append((_("Theo chứng từ số"), doc.ref_no)) %}{% endif %}
+      {% do items.append((_("Số chứng từ gốc kèm theo"), doc.attached_docs)) %}
+      {{ ui.desc_list(items) }}
+    {% endcall %}
+
+    {% call ui.card(_("Vật tư, hàng hóa"), flush=True) %}
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr>
+          <th class="w-28">{{ _("Mã") }}</th><th>{{ _("Tên hàng") }}</th><th class="w-20">{{ _("ĐVT") }}</th>
+          <th class="num w-28">{{ _("Số lượng") }}</th><th class="num w-32">{{ _("Đơn giá") }}</th><th class="num w-36">{{ _("Thành tiền") }}</th>
+        </tr></thead>
+        <tbody>
+          {% for ln in doc.lines %}
+          {% set mv = (moves|selectattr("source_line_id", "equalto", ln.id)|selectattr("qty_out", ">", 0)|list or moves|selectattr("source_line_id", "equalto", ln.id)|list) %}
+          {% set amount = ln.amount if receipt else (mv[0].amount if mv else 0) %}
+          {% set price = ln.unit_price if receipt else (mv[0].unit_cost if mv else none) %}
+          <tr>
+            <td class="tabular-nums text-fg-2">{{ ln.item.code }}</td>
+            <td>{{ ln.description or ln.item.name }}</td>
+            <td class="text-fg-2">{{ ln.unit }}</td>
+            <td class="num">{{ ln.quantity|qty }}</td>
+            <td class="num">{{ price|qty(2) if price else "–" }}</td>
+            <td class="num font-medium">{% if amount %}{{ amount|money }}{% elif not receipt and status == "posted" %}<span class="text-xs text-amber-700 dark:text-amber-400">{{ _("Chưa tính giá") }}</span>{% else %}–{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot><tr class="row-total"><td colspan="3">{{ _("Cộng") }}</td><td class="num">{{ doc.total_qty|qty }}</td><td></td>
+          <td class="num">{{ (doc.total if receipt else moves|selectattr("qty_out", ">", 0)|sum(attribute="amount"))|money }}</td></tr></tfoot>
+      </table>
+    </div>
+    {% endcall %}
+
+    {% if entry %}
+    {% call ui.card(_("Định khoản"), flush=True) %}
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th class="w-28">{{ _("TK Nợ") }}</th><th class="w-28">{{ _("TK Có") }}</th><th>{{ _("Diễn giải") }}</th><th class="num w-36">{{ _("Số tiền") }}</th></tr></thead>
+        <tbody>
+          {% for l in entry.lines %}
+          <tr><td class="font-medium tabular-nums">{{ l.debit_account }}</td><td class="font-medium tabular-nums">{{ l.credit_account }}</td>
+              <td class="text-fg-2">{{ l.description }}</td><td class="num">{{ l.amount|money }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endcall %}
+    {% endif %}
+  </div>
+
+  <aside class="space-y-5">
+    <section class="card p-5">
+      <p class="text-[13px] font-medium text-fg-3">{{ _("Tổng số lượng") }}</p>
+      <p class="mt-1 text-3xl font-semibold tracking-tight tabular-nums">{{ doc.total_qty|qty }}</p>
+      {% if receipt %}
+      <p class="mt-3 text-[13px] font-medium text-fg-3">{{ _("Tổng tiền") }}</p>
+      <p class="mt-1 text-xl font-semibold tabular-nums">{{ doc.total|money }} <span class="text-sm font-normal text-fg-3">đ</span></p>
+      <p class="mt-2 text-[13px] text-fg-2 italic">{{ doc.total|words }}</p>
+      {% endif %}
+    </section>
+    {% if history %}{% call ui.card(_("Lịch sử")) %}{{ ui.timeline(history) }}{% endcall %}{% endif %}
+  </aside>
+</div>
+
+{% if status == "posted" %}
+{% call ui.modal("cancel-doc", _("Hủy chứng từ") ~ " " ~ doc.display_number, description=_("Chỉ hủy được khi kỳ còn mở. Hệ thống kiểm tra lại tồn kho sau khi hủy.")) %}
+<form method="post" action="{{ act_base }}/cancel">
+  {{ ui.csrf_field() }}
+  <div class="px-5 pb-5">{{ ui.textarea("reason", _("Lý do hủy"), rows=3, required=True) }}</div>
+  <div class="modal-footer">
+    {{ ui.button(_("Đóng"), "secondary", type="button", attrs="@click=\"$dispatch('modal-close')\"") }}
+    {{ ui.button(_("Hủy chứng từ"), "danger", icon_name="ban") }}
+  </div>
+</form>
+{% endcall %}
+{% endif %}
+{% endblock %}

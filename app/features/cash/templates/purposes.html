@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Mục đích thu, chi") }}{% endblock %}
+{% block content %}
+{{ ui.page_header(_("Mục đích thu, chi"), _("Danh sách để thủ quỹ chọn khi lập phiếu – mỗi mục đích gắn một tài khoản đối ứng."), breadcrumbs=breadcrumbs, back="/cash", icon_name="tags") }}
+<form method="post" action="/cash/purposes" x-data="docForm()" @keydown="keys($event)">
+  {{ ui.csrf_field() }}
+  <div class="grid grid-cols-1 gap-5 2xl:grid-cols-2">
+    {% for key, title in [("in", _("Mục đích thu")), ("out", _("Mục đích chi"))] %}
+    <div x-data='{ rows: {{ data[key]|tojson }} }'>
+      {% call ui.card(title, flush=True) %}
+      <input type="hidden" name="{{ key }}-count" :value="rows.length">
+      <div class="table-wrap">
+        <table class="table table-compact">
+          <thead><tr><th>{{ _("Mục đích") }}</th><th class="w-32">{{ _("TK đối ứng") }}</th><th class="w-40">{{ _("Gợi ý đối tượng") }}</th><th class="w-10"></th></tr></thead>
+          <tbody>
+            <template x-for="(r, i) in rows" :key="i">
+              <tr>
+                <td class="!px-1.5"><input class="input input-sm" :name="`{{ key }}-${i}-label`" x-model="r.label" aria-label="{{ _('Mục đích') }}"></td>
+                <td class="!px-1.5"><input class="input input-sm tabular-nums" :name="`{{ key }}-${i}-account`" x-model="r.account" aria-label="{{ _('TK đối ứng') }}"></td>
+                <td class="!px-1.5"><select class="input input-sm" :name="`{{ key }}-${i}-role`" x-model="r.role" aria-label="{{ _('Gợi ý đối tượng') }}">
+                  <option value="">—</option><option value="customer">{{ _("Khách hàng") }}</option><option value="supplier">{{ _("Nhà cung cấp") }}</option><option value="employee">{{ _("Nhân viên") }}</option>
+                </select></td>
+                <td class="!px-1 text-center"><button type="button" class="btn-ghost btn-xs btn-icon hover:text-rose-600" @click="rows.splice(i, 1)" aria-label="{{ _('Xóa dòng') }}">{{ ui.icon("trash", "size-3.5") }}</button></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+      <div class="border-t border-line px-4 py-2.5">
+        <button type="button" class="btn-ghost btn-sm text-primary" @click="rows.push({label: '', account: '', role: ''})">{{ ui.icon("plus") }}{{ _("Thêm mục đích") }}</button>
+      </div>
+      {% endcall %}
+    </div>
+    {% endfor %}
+  </div>
+  {% call ui.card(_("Phiếu in"), cls="mt-5") %}
+    {{ ui.input("cash_book_no", _("Quyển số (in trên phiếu thu, chi)"), book_no, cls="sm:max-w-xs") }}
+  {% endcall %}
+  {% call ui.form_actions() %}
+    <button type="submit" name="reset" value="1" class="btn-ghost mr-auto" data-confirm="{{ _('Khôi phục danh sách mục đích mặc định?') }}">{{ ui.icon("rotate-ccw") }}<span>{{ _("Khôi phục mặc định") }}</span></button>
+    {{ ui.link_button(_("Hủy bỏ"), "/cash", "ghost") }}
+    {{ ui.button(_("Lưu"), icon_name="check", hotkey="save", kbd_hint="Ctrl+S") }}
+  {% endcall %}
+</form>
+{% endblock %}

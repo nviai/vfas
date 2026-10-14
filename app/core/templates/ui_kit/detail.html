@@ -1,0 +1,76 @@
+{#- PATTERN (c) – Document detail: title + status + actions; details, journal entries, invoice; right column: amount, attachments, history. -#}
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ entry.number }}{% endblock %}
+{% block content %}
+{% call ui.page_header(_("Phiếu chi") ~ " " ~ entry.number, entry.description, breadcrumbs=[(_("Tiền"), "#"), (_("Phiếu thu, chi"), "/ui-kit/list"), (entry.number, None)],
+                       back="/ui-kit/list", badge=ui.status_badge(entry.status)) %}
+  {{ ui.link_button(_("In phiếu"), "#", "secondary", icon_name="printer") }}
+  {% call ui.dropdown(icon_name="ellipsis", aria_label=_("Thao tác khác"), width="w-60") %}
+    {{ ui.menu_item(_("Nhân bản thành nháp mới"), "#", "copy") }}
+    {{ ui.menu_item(_("Tạo chứng từ điều chỉnh"), "#", "undo-2") }}
+    {{ ui.menu_item(_("Xem nhật ký"), "#", "history") }}
+    {{ ui.menu_sep() }}
+    {{ ui.menu_item(_("Hủy chứng từ…"), None, "ban", danger=True, attrs="@click=\"$dispatch('modal-open', 'cancel-entry')\"") }}
+  {% endcall %}
+{% endcall %}
+
+<div class="mb-5 flex flex-wrap items-center gap-x-5 gap-y-1 rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-2.5 text-[13px] text-emerald-900 dark:border-emerald-500/20 dark:bg-emerald-500/5 dark:text-emerald-200">
+  <span class="inline-flex items-center gap-1.5 font-medium">{{ ui.icon("lock", "size-3.5") }}{{ _("Đã ghi sổ – không thể sửa số liệu") }}</span>
+  <span class="text-emerald-800/80 dark:text-emerald-300/80">{{ entry.posted_by }} · {{ entry.posted_at|datetime }}</span>
+</div>
+
+<div class="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
+  <div class="min-w-0 space-y-5">
+    {% call ui.card(_("Thông tin chứng từ")) %}
+      {{ ui.desc_list([
+        (_("Ngày hạch toán"), entry.date|date), (_("Ngày chứng từ"), entry.doc_date|date), (_("Số tham chiếu"), entry.ref_no),
+        (_("Đối tượng"), entry.partner), (_("Người nhận tiền"), entry.contact_name), (_("Địa chỉ"), entry.contact_address),
+        (_("Kèm theo"), entry.attachments_note), (_("Người lập"), entry.created_by), (_("Người ghi sổ"), entry.posted_by),
+      ]) }}
+    {% endcall %}
+
+    {% call ui.card(_("Định khoản"), flush=True) %}
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th class="w-24">{{ _("Tài khoản") }}</th><th>{{ _("Tên tài khoản") }}</th><th>{{ _("Diễn giải") }}</th><th class="num w-36">{{ _("Nợ") }}</th><th class="num w-36">{{ _("Có") }}</th></tr></thead>
+        <tbody>
+          {% for l in lines %}
+          <tr><td class="font-medium tabular-nums">{{ l.account }}</td><td class="text-fg-2">{{ l.account_name }}</td><td class="text-fg-2">{{ l.description }}</td>
+              <td class="num">{{ l.debit|money0 }}</td><td class="num">{{ l.credit|money0 }}</td></tr>
+          {% endfor %}
+        </tbody>
+        <tfoot><tr class="row-total"><td colspan="3">{{ _("Cộng") }}</td><td class="num">{{ lines|sum(attribute="debit")|money }}</td><td class="num">{{ lines|sum(attribute="credit")|money }}</td></tr></tfoot>
+      </table>
+    </div>
+    {% endcall %}
+
+    {% call ui.card(_("Hóa đơn GTGT đầu vào"), icon_name="receipt") %}
+      {{ ui.desc_list([(_("Ký hiệu"), vat.series), (_("Số hóa đơn"), vat.number), (_("Ngày hóa đơn"), vat.date|date), (_("Người bán"), vat.seller),
+                       (_("MST người bán"), vat.tax_code), (_("Thuế suất"), vat.rate), (_("Tiền hàng"), vat.amount|money), (_("Tiền thuế"), vat.vat|money)], cols="sm:grid-cols-2 lg:grid-cols-4") }}
+    {% endcall %}
+  </div>
+
+  <aside class="space-y-5">
+    <section class="card p-5">
+      <p class="text-[13px] font-medium text-fg-3">{{ _("Số tiền") }}</p>
+      <p class="mt-1 text-3xl font-semibold tracking-tight">{{ entry.amount|money }} <span class="text-base font-normal text-fg-3">đ</span></p>
+      <p class="mt-2 text-[13px] text-fg-2 italic">{{ entry.amount|words }}</p>
+    </section>
+    {% set upload %}<button type="button" class="btn-ghost btn-xs">{{ ui.icon("upload", "size-3.5") }}{{ _("Tải lên") }}</button>{% endset %}
+    {% call ui.card(_("Đính kèm"), actions=upload) %}{{ ui.attachment_list(attachments) }}{% endcall %}
+    {% call ui.card(_("Lịch sử")) %}{{ ui.timeline(history) }}{% endcall %}
+  </aside>
+</div>
+
+{% call ui.modal("cancel-entry", _("Hủy chứng từ") ~ " " ~ entry.number, description=_("Kỳ tháng 10/2026 còn mở nên có thể hủy. Hệ thống kiểm tra lại tồn quỹ sau khi hủy.")) %}
+<form method="post" action="#">
+  {{ ui.csrf_field() }}
+  <div class="px-5 pb-5">{{ ui.textarea("reason", _("Lý do hủy"), rows=3, required=True) }}</div>
+  <div class="flex justify-end gap-2 border-t border-line bg-surface-2 px-5 py-3">
+    {{ ui.button(_("Đóng"), "secondary", type="button", attrs="@click=\"$dispatch('modal-close')\"") }}
+    {{ ui.button(_("Hủy chứng từ"), "danger", icon_name="ban") }}
+  </div>
+</form>
+{% endcall %}
+{% endblock %}

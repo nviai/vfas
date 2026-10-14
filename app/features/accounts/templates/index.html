@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Hệ thống tài khoản") }}{% endblock %}
+{% block content %}
+{% call ui.page_header(_("Hệ thống tài khoản"), _("Theo Thông tư 133/2016/TT-BTC. Tài khoản tổng hợp không hạch toán trực tiếp – thêm tài khoản chi tiết khi cần."), breadcrumbs=breadcrumbs, icon_name="book-open") %}
+  {% if can("catalog.manage") %}
+    {{ ui.button(_("Thêm tài khoản chi tiết"), "primary", icon_name="plus", type="button", attrs="@click=\"$dispatch('modal-open', 'acc-new')\"") }}
+  {% endif %}
+{% endcall %}
+
+<div class="card">
+  <div class="border-b border-line p-3 sm:px-5">
+    {% call ui.filter_bar("/accounts", reset_href="/accounts", hx_target="#account-results") %}
+      <div class="w-full sm:w-72">
+        {{ ui.input("q", None, q, "search", placeholder=_("Số hoặc tên tài khoản…"), prefix=ui.icon("search"), input_cls="input-sm") }}
+      </div>
+      {{ ui.select("show", None, [("active", _("Đang dùng")), ("all", _("Tất cả"))], show, input_cls="input-sm w-36") }}
+    {% endcall %}
+  </div>
+  <div id="account-results">{% include "accounts/_rows.html" %}</div>
+</div>
+
+{% if can("catalog.manage") %}
+{% call ui.modal("acc-new", _("Thêm tài khoản chi tiết"), description=_("Ví dụ: 1121 → 11211 (Vietcombank), 6422 → 64221 (Lương văn phòng).")) %}
+<form method="post" action="/accounts" class="space-y-4 px-5 pb-5">
+  {{ ui.csrf_field() }}
+  {{ ui.combobox("parent_code", _("Tài khoản cha"), "/lookup/accounts", params={"postable": 0}, required=True, placeholder=_("Gõ số tài khoản…")) }}
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-[10rem_1fr]">
+    {{ ui.input("code", _("Số tài khoản"), "", required=True, input_cls="tabular-nums") }}
+    {{ ui.input("name", _("Tên tài khoản"), "", required=True) }}
+  </div>
+  <div class="modal-footer -mx-5 -mb-5">
+    {{ ui.button(_("Hủy"), "secondary", type="button", attrs="@click=\"$dispatch('modal-close')\"") }}
+    {{ ui.button(_("Thêm"), "primary", icon_name="plus") }}
+  </div>
+</form>
+{% endcall %}
+{% endif %}
+{% endblock %}

@@ -1,0 +1,71 @@
+{#- Action buttons + dialogs to cancel / adjust / edit the description.
+    Variables: entry, perm, period_open; optional: edit_url (edit draft), print_url, copy_url. Used inside the
+    page_header caller. -#}
+{% import "macros.html" as ui with context %}
+{% if print_url is defined and print_url %}{{ ui.link_button(_("In"), print_url, "secondary", icon_name="printer", attrs='target="_blank" rel="noopener"') }}{% endif %}
+{% if entry.is_draft %}
+  {% if edit_url is defined and edit_url and perm.create %}{{ ui.link_button(_("Sửa"), edit_url, "secondary", icon_name="pencil") }}{% endif %}
+  {% if perm.post %}
+  <form method="post" action="/entries/{{ entry.id }}/post">{{ ui.csrf_field() }}{{ ui.button(_("Ghi sổ"), "primary", icon_name="check", hotkey="post", kbd_hint="Ctrl+Enter") }}</form>
+  {% endif %}
+{% endif %}
+{% if perm.create or perm.cancel or perm.post or (copy_url is defined and copy_url) %}
+{% call ui.dropdown(icon_name="ellipsis", aria_label=_("Thao tác khác"), width="w-64") %}
+  {% if copy_url is defined and copy_url and perm.create %}{{ ui.menu_item(_("Nhân bản thành nháp mới"), copy_url, "copy") }}{% endif %}
+  {% if entry.is_posted and perm.post and period_open %}{{ ui.menu_item(_("Sửa diễn giải, người nộp/nhận…"), None, "pencil", attrs="@click=\"$dispatch('modal-open', 'entry-info')\"") }}{% endif %}
+  {% if entry.is_posted and perm.cancel %}
+    {{ ui.menu_item(_("Lập chứng từ điều chỉnh…"), None, "undo-2", attrs="@click=\"$dispatch('modal-open', 'entry-reverse')\"") }}
+    {% if period_open %}{{ ui.menu_sep() }}{{ ui.menu_item(_("Hủy chứng từ…"), None, "ban", danger=True, attrs="@click=\"$dispatch('modal-open', 'entry-cancel')\"") }}{% endif %}
+  {% endif %}
+  {% if entry.is_draft and perm.create %}
+    {{ ui.menu_sep() }}
+    {{ ui.menu_post(_("Xóa chứng từ nháp"), "/entries/" ~ entry.id ~ "/delete", "trash", danger=True, confirm=_("Xóa chứng từ nháp này? Không thể hoàn tác.")) }}
+  {% endif %}
+{% endcall %}
+{% endif %}
+
+{% if entry.is_posted and perm.cancel %}
+{% call ui.modal("entry-cancel", _("Hủy chứng từ") ~ " " ~ (entry.number or ""), description=_("Chứng từ đã hủy vẫn được lưu và hiển thị trong nhật ký. Phần mềm kiểm tra lại số dư tiền sau khi hủy.")) %}
+<form method="post" action="/entries/{{ entry.id }}/cancel">
+  {{ ui.csrf_field() }}
+  <div class="px-5 pb-5">{{ ui.textarea("reason", _("Lý do hủy"), rows=3, required=True) }}</div>
+  <div class="modal-footer">
+    {{ ui.button(_("Đóng"), "secondary", type="button", attrs="@click=\"$dispatch('modal-close')\"") }}
+    {{ ui.button(_("Hủy chứng từ"), "danger", icon_name="ban") }}
+  </div>
+</form>
+{% endcall %}
+{% call ui.modal("entry-reverse", _("Lập chứng từ điều chỉnh"), description=_("Tạo chứng từ nháp đảo ngược toàn bộ định khoản – dùng khi kỳ của chứng từ gốc đã khóa sổ. Bạn có thể sửa số tiền trước khi ghi sổ.")) %}
+<form method="post" action="/entries/{{ entry.id }}/reverse">
+  {{ ui.csrf_field() }}
+  <div class="space-y-4 px-5 pb-5">
+    {{ ui.date_input("date", _("Ngày hạch toán điều chỉnh"), today, required=True) }}
+    {{ ui.textarea("reason", _("Lý do"), rows=2) }}
+  </div>
+  <div class="modal-footer">
+    {{ ui.button(_("Đóng"), "secondary", type="button", attrs="@click=\"$dispatch('modal-close')\"") }}
+    {{ ui.button(_("Tạo nháp điều chỉnh"), "primary", icon_name="undo-2") }}
+  </div>
+</form>
+{% endcall %}
+{% endif %}
+{% if entry.is_posted and perm.post and period_open %}
+{% call ui.modal("entry-info", _("Sửa thông tin mô tả"), description=_("Chỉ sửa phần mô tả; số tiền, tài khoản, ngày không đổi được. Thay đổi được ghi vào nhật ký.")) %}
+<form method="post" action="/entries/{{ entry.id }}/info">
+  {{ ui.csrf_field() }}
+  <div class="space-y-4 px-5 pb-5">
+    {{ ui.input("description", _("Diễn giải"), entry.description) }}
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {{ ui.input("contact_name", _("Người nộp / nhận"), entry.contact_name) }}
+      {{ ui.input("ref_no", _("Số tham chiếu"), entry.ref_no) }}
+    </div>
+    {{ ui.input("contact_address", _("Địa chỉ"), entry.contact_address) }}
+    {{ ui.input("attached_docs", _("Kèm theo (số chứng từ gốc)"), entry.attached_docs, type="number", input_cls="w-32") }}
+  </div>
+  <div class="modal-footer">
+    {{ ui.button(_("Đóng"), "secondary", type="button", attrs="@click=\"$dispatch('modal-close')\"") }}
+    {{ ui.button(_("Lưu"), "primary", icon_name="check") }}
+  </div>
+</form>
+{% endcall %}
+{% endif %}

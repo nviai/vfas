@@ -1,0 +1,116 @@
+{% extends "cash/print/_layout.html" %}
+{% from "cash/print/_parts.html" import doc_header, book_footer, book_signatures %}
+{#- Money books S04a-DNN / S04b-DNN / S05-DNN.
+    Variables: book, detail (S04b/S05 have an offsetting account), s05, subtitles -#}
+{% block title %}{{ book.title }} – {{ period_label }}{% endblock %}
+{% block css %}
+  col.c-date { width: {{ '7%' if detail else '7.5%' }}; }
+  col.c-no { width: {{ '9%' if detail else '9.5%' }}; }
+  col.c-desc { width: {{ '26%' if detail else '30%' }}; }
+  col.c-acc { width: 5.5%; }
+  col.c-amt { width: 9.5%; }
+  col.c-note { width: {{ '8%' if detail else '7.5%' }}; }
+{% endblock %}
+{% block body %}
+{{ doc_header(company, book.code, issued) }}
+<p class="title">{{ book.title }}</p>
+{% for line in subtitles %}<p class="subtitle">{{ line }}</p>{% endfor %}
+<p class="subtitle i">{{ period_label }}</p>
+<p class="r i small" style="margin-top:1mm">Đơn vị tính: Đồng</p>
+
+<table class="book">
+  <colgroup>
+    <col class="c-date">
+    {% if s05 %}<col class="c-no"><col class="c-date">{% else %}<col class="c-date"><col class="c-no"><col class="c-no">{% endif %}
+    <col class="c-desc">
+    {% if detail %}<col class="c-acc">{% endif %}
+    <col class="c-amt"><col class="c-amt"><col class="c-amt"><col class="c-note">
+  </colgroup>
+  <thead>
+    {% if s05 %}
+    <tr>
+      <th rowspan="2">Ngày, tháng ghi sổ</th>
+      <th colspan="2">Chứng từ</th>
+      <th rowspan="2">Diễn giải</th>
+      <th rowspan="2">Tài khoản đối ứng</th>
+      <th colspan="3">Số tiền</th>
+      <th rowspan="2">Ghi chú</th>
+    </tr>
+    <tr><th>Số hiệu</th><th>Ngày, tháng</th><th>Thu (gửi vào)</th><th>Chi (rút ra)</th><th>Còn lại</th></tr>
+    <tr class="letters"><th>A</th><th>B</th><th>C</th><th>D</th><th>E</th><th>1</th><th>2</th><th>3</th><th>F</th></tr>
+    {% elif detail %}
+    <tr>
+      <th rowspan="2">Ngày, tháng ghi sổ</th>
+      <th rowspan="2">Ngày, tháng chứng từ</th>
+      <th colspan="2">Số hiệu chứng từ</th>
+      <th rowspan="2">Diễn giải</th>
+      <th rowspan="2">TK đối ứng</th>
+      <th colspan="2">Số phát sinh</th>
+      <th rowspan="2">Số tồn</th>
+      <th rowspan="2">Ghi chú</th>
+    </tr>
+    <tr><th>Thu</th><th>Chi</th><th>Nợ</th><th>Có</th></tr>
+    <tr class="letters"><th>A</th><th>B</th><th>C</th><th>D</th><th>E</th><th>F</th><th>1</th><th>2</th><th>3</th><th>G</th></tr>
+    {% else %}
+    <tr>
+      <th rowspan="2">Ngày, tháng ghi sổ</th>
+      <th rowspan="2">Ngày, tháng chứng từ</th>
+      <th colspan="2">Số hiệu chứng từ</th>
+      <th rowspan="2">Diễn giải</th>
+      <th colspan="3">Số tiền</th>
+      <th rowspan="2">Ghi chú</th>
+    </tr>
+    <tr><th>Thu</th><th>Chi</th><th>Thu</th><th>Chi</th><th>Tồn</th></tr>
+    <tr class="letters"><th>A</th><th>B</th><th>C</th><th>D</th><th>E</th><th>1</th><th>2</th><th>3</th><th>G</th></tr>
+    {% endif %}
+  </thead>
+  <tbody>
+    <tr class="opening">
+      <td></td><td></td><td></td>{% if not s05 %}<td></td>{% endif %}
+      <td class="label">{{ 'Số dư đầu kỳ' if s05 else 'Số tồn đầu kỳ' }}</td>
+      {% if detail %}<td></td>{% endif %}
+      <td></td><td></td><td class="num b">{{ book.opening|money }}</td><td></td>
+    </tr>
+    {% for row in book.rows %}
+    <tr>
+      <td class="date">{{ row.post_date|date }}</td>
+      {% if s05 %}
+      <td class="code">{{ row.number }}</td>
+      <td class="date">{{ (row.doc_date or row.post_date)|date }}</td>
+      {% else %}
+      <td class="date">{{ (row.doc_date or row.post_date)|date }}</td>
+      <td class="code">{{ row.receipt_no }}</td>
+      <td class="code">{{ row.payment_no }}</td>
+      {% endif %}
+      <td>{{ row.description }}</td>
+      {% if detail %}<td class="code">{{ row.contra }}</td>{% endif %}
+      <td class="num">{{ row.receipt|money0 }}</td>
+      <td class="num">{{ row.payment|money0 }}</td>
+      <td class="num">{{ row.balance|money }}</td>
+      <td class="small">{{ row.note }}</td>
+    </tr>
+    {% endfor %}
+    <tr class="summary">
+      <td></td><td></td><td></td>{% if not s05 %}<td></td>{% endif %}
+      <td class="label">Cộng phát sinh trong kỳ</td>
+      {% if detail %}<td></td>{% endif %}
+      <td class="num">{{ book.total_in|money }}</td>
+      <td class="num">{{ book.total_out|money }}</td>
+      <td></td><td></td>
+    </tr>
+    <tr class="summary">
+      <td></td><td></td><td></td>{% if not s05 %}<td></td>{% endif %}
+      <td class="label">{{ 'Số dư cuối kỳ' if s05 else 'Số tồn cuối kỳ' }}</td>
+      {% if detail %}<td></td>{% endif %}
+      <td></td><td></td>
+      <td class="num">{{ book.closing|money }}</td>
+      <td></td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="after-table">
+  {{ book_footer(company, total_pages) }}
+  {{ book_signatures(company) }}
+</div>
+{% endblock %}

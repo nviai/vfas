@@ -1,0 +1,63 @@
+{% import "macros.html" as ui with context %}
+{% macro page_url(p) %}/inventory/{{ path }}?page={{ p }}&status={{ status }}&q={{ q|urlencode }}{% endmacro %}
+{% if not docs %}
+  {% call ui.empty_state(_("Chưa có chứng từ nào") if not q else _("Không tìm thấy chứng từ phù hợp"), {"receipt": "arrow-down-circle", "issue": "arrow-up-circle", "transfer": "arrow-left-right"}[kind]) %}
+    {% if can("inventory.create") %}{{ ui.link_button(_(kind_label), "/inventory/" ~ path ~ "/new", "primary", icon_name="plus") }}{% endif %}
+  {% endcall %}
+{% else %}
+<div class="table-wrap max-md:hidden">
+  <table class="table table-hover">
+    <thead>
+      <tr>
+        <th class="w-36">{{ _("Số chứng từ") }}</th>
+        <th class="w-28">{{ _("Ngày") }}</th>
+        <th>{{ _("Diễn giải") }}</th>
+        <th class="w-44 max-lg:hidden">{{ _("Kho") }}</th>
+        <th class="num w-28">{{ _("Số lượng") }}</th>
+        {% if kind == "receipt" %}<th class="num w-36">{{ _("Thành tiền") }}</th>{% endif %}
+        <th class="w-32">{{ _("Trạng thái") }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for d in docs %}
+      <tr class="is-link {{ 'is-muted' if d.status == 'cancelled' }}">
+        <td><a href="{{ d.url }}" class="doc-no hover:underline">{{ d.number or _("Nháp #{id}", id=d.id) }}</a></td>
+        <td class="tabular-nums text-fg-2">{{ d.date|date }}</td>
+        <td class="max-w-0">
+          <p class="truncate text-fg">{{ d.description or (d.lines[0].description if d.lines else "") }}</p>
+          {% if d.contact_name %}<p class="truncate text-xs text-fg-3">{{ d.contact_name }}</p>{% endif %}
+        </td>
+        <td class="max-lg:hidden text-fg-2">{{ d.warehouse.name }}{% if d.to_warehouse %} → {{ d.to_warehouse.name }}{% endif %}</td>
+        <td class="num">{{ d.total_qty|qty }}</td>
+        {% if kind == "receipt" %}<td class="num font-medium">{{ d.total|money }}</td>{% endif %}
+        <td>{{ ui.status_badge(d.status) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<ul class="divide-y divide-line md:hidden">
+  {% for d in docs %}
+  <li>
+    <a href="{{ d.url }}" class="flex items-start gap-3 px-4 py-3 active:bg-surface-2">
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center gap-2">
+          <span class="doc-no text-[13px]">{{ d.number or _("Nháp") }}</span>
+          <span class="text-xs text-fg-3 tabular-nums">{{ d.date|date }}</span>
+        </div>
+        <p class="mt-0.5 truncate text-[13.5px] text-fg">{{ d.description or d.warehouse.name }}</p>
+        <div class="mt-1.5">{{ ui.status_badge(d.status) }}</div>
+      </div>
+      <span class="shrink-0 text-[14px] font-semibold tabular-nums">{{ d.total|money if kind == "receipt" else d.total_qty|qty }}</span>
+    </a>
+  </li>
+  {% endfor %}
+</ul>
+<div class="flex items-center justify-between border-t border-line px-4 py-3 text-[13px] sm:px-5">
+  <span class="text-fg-3">{{ _("Trang {page}", page=page) }}</span>
+  <div class="flex gap-1">
+    {% if page > 1 %}{{ ui.link_button(_("Trang trước"), page_url(page - 1), "secondary", size="sm", icon_name="chevron-left") }}{% endif %}
+    {% if has_next %}{{ ui.link_button(_("Trang sau"), page_url(page + 1), "secondary", size="sm", icon_right="chevron-right") }}{% endif %}
+  </div>
+</div>
+{% endif %}

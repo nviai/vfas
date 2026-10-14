@@ -1,0 +1,106 @@
+{#- AI assistant drawer content – returned by GET /ai/panel (docs/CONTRACTS.md section 3).
+    Variables: chat = {conversation_id, messages: [...], conversations: [{id, title, updated_at, active}], suggestions: [str],
+                       post_url (default /ai/chat), model_label, disabled_reason (string → shows a warning and locks the input), settings_url} -#}
+{% import "macros.html" as _ui with context %}
+{%- set c = chat if chat is defined and chat else {} -%}
+{%- set msgs = c.messages or [] -%}
+{%- set opts = {"postUrl": c.post_url or "/ai/chat", "conversationId": c.conversation_id, "historyCount": msgs|length} -%}
+<div x-data='aiChat({{ opts|tojson }})' class="flex min-h-0 flex-1 flex-col">
+  <div class="flex h-14 shrink-0 items-center gap-2 border-b border-line px-3 sm:px-4">
+    <span class="flex size-7 items-center justify-center rounded-lg bg-primary-soft text-primary-soft-fg">{{ _ui.icon("sparkles", "size-4") }}</span>
+    <div class="min-w-0 flex-1">
+      <p class="text-[14px] leading-tight font-semibold">{{ _("Trợ lý AI") }}</p>
+      {% if c.model_label %}<p class="truncate text-[11px] leading-tight text-fg-3">{{ c.model_label }}</p>{% endif %}
+    </div>
+    {% if c.conversations %}
+    <div class="relative" x-data="{ open: false }" @click.outside="open = false">
+      <button type="button" class="btn-ghost btn-sm btn-icon" @click="open = !open" aria-label="{{ _('Lịch sử hội thoại') }}" data-tooltip="{{ _('Lịch sử') }}">{{ _ui.icon("history") }}</button>
+      <div x-show="open" x-cloak x-transition.origin.top.right.duration.100ms class="menu absolute right-0 mt-1.5 w-72">
+        <div class="menu-label">{{ _("Hội thoại gần đây") }}</div>
+        <div class="max-h-80 overflow-y-auto">
+          {% for cv in c.conversations %}
+          <button type="button" class="menu-item h-auto py-2" hx-get="/ai/conversations/{{ cv.id }}" hx-target="#ai-history" hx-swap="innerHTML"
+                  @click="switchTo({{ cv.id }}); open = false">
+            <span class="min-w-0 flex-1"><span class="block truncate">{{ cv.title or _("Hội thoại") }}</span>
+              {% if cv.updated_at %}<span class="block text-xs text-fg-3">{{ cv.updated_at }}</span>{% endif %}</span>
+            {% if cv.active %}{{ _ui.icon("check", "size-3.5 text-primary") }}{% endif %}
+          </button>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+    <button type="button" class="btn-ghost btn-sm btn-icon" @click="newConversation()" aria-label="{{ _('Hội thoại mới') }}" data-tooltip="{{ _('Hội thoại mới') }}">{{ _ui.icon("square-pen") }}</button>
+    {% if not (chat is defined and chat.embedded) %}<button type="button" class="btn-ghost btn-sm btn-icon -mr-1" @click="aiOpen = false" aria-label="{{ _('Đóng') }}">{{ _ui.icon("x") }}</button>{% endif %}
+  </div>
+
+  <div x-ref="scroller" class="min-h-0 flex-1 overflow-y-auto px-4 py-5">
+    <div id="ai-history" class="space-y-5 empty:hidden">
+      {% for m in msgs %}{% include "partials/ai_message.html" %}{% endfor %}
+    </div>
+
+    <div class="space-y-5" :class="historyCount && messages.length ? 'mt-5' : ''">
+      <template x-for="(m, idx) in messages" :key="idx">
+        <div>
+          <template x-if="m.role === 'user'">
+            <div class="flex justify-end"><div class="max-w-[85%] rounded-2xl rounded-br-md bg-surface-3 px-3.5 py-2 text-[13.5px] whitespace-pre-wrap text-fg" x-text="m.text"></div></div>
+          </template>
+          <template x-if="m.role === 'assistant'">
+            <div class="flex gap-2.5">
+              <span class="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary-soft-fg">{{ _ui.icon("sparkles", "size-3.5") }}</span>
+              <div class="min-w-0 flex-1 space-y-2">
+                <div class="flex flex-wrap gap-1.5" x-show="m.tools.length">
+                  <template x-for="t in m.tools" :key="t.id">
+                    <span class="inline-flex h-6 max-w-full items-center gap-1.5 rounded-full border border-line bg-surface-2 px-2 text-xs text-fg-2">
+                      <svg x-show="t.status === 'running'" class="size-3 animate-spin text-fg-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                      <span x-show="t.status === 'done'" class="text-emerald-500">{{ _ui.icon("check", "size-3") }}</span>
+                      <span x-show="t.status === 'error'" class="text-rose-500">{{ _ui.icon("x", "size-3") }}</span>
+                      <span class="truncate"><span x-text="t.label || t.name"></span><template x-if="t.summary"><span class="text-fg-3"> · <span x-text="t.summary"></span></span></template></span>
+                      <template x-if="t.link"><a :href="t.link" class="font-medium text-primary hover:underline dark:text-brand-400">{{ _("Mở") }}</a></template>
+                    </span>
+                  </template>
+                </div>
+                <div class="prose-chat" x-show="m.html" x-html="m.html"></div>
+                <div class="prose-chat whitespace-pre-wrap" x-show="!m.html && (m.text || m.pending)">
+                  <span x-text="m.text"></span><span x-show="m.pending" class="ml-0.5 inline-block h-4 w-1.5 translate-y-0.5 animate-pulse rounded-sm bg-primary/70"></span>
+                </div>
+                <p x-show="m.stopped" class="text-xs text-fg-3">{{ _("Đã dừng.") }}</p>
+                <div x-show="m.error" class="alert-error py-2 text-[13px]">{{ _ui.icon("circle-alert", "mt-px size-4") }}<span x-text="m.error"></span></div>
+              </div>
+            </div>
+          </template>
+        </div>
+      </template>
+    </div>
+
+    <div x-show="empty" class="flex flex-col items-center pt-8 text-center">
+      <span class="mb-4 flex size-12 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-400 to-brand-700 text-white shadow-pop">{{ _ui.icon("sparkles", "size-6") }}</span>
+      <p class="text-[15px] font-semibold">{{ _("Hỏi về số liệu của công ty") }}</p>
+      <p class="mt-1 max-w-xs text-[13px] text-fg-3">{{ _("Trợ lý đọc sổ sách theo quyền của bạn và chỉ lập chứng từ ở trạng thái nháp.") }}</p>
+      {% set sugg = c.suggestions or [_("Tồn quỹ tiền mặt hôm nay là bao nhiêu?"), _("Khách hàng nào nợ quá hạn trên 30 ngày?"), _("Tóm tắt kết quả kinh doanh quý này"), _("Lập phiếu chi 2.500.000 tiền điện tháng này")] %}
+      <div class="mt-5 grid w-full gap-2">
+        {% for s in sugg %}
+        <button type="button" class="rounded-xl border border-line bg-surface px-3.5 py-2.5 text-left text-[13px] text-fg-2 transition hover:border-line-strong hover:bg-surface-2 hover:text-fg" @click="ask({{ s|tojson|forceescape }})">{{ s }}</button>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="shrink-0 border-t border-line p-3">
+    {% if c.disabled_reason %}
+      {% call _ui.alert(c.disabled_reason, "warning") %}{% if c.settings_url %}<a href="{{ c.settings_url }}" class="btn-secondary btn-xs">{{ _("Mở cài đặt AI") }}</a>{% endif %}{% endcall %}
+    {% else %}
+    <form @submit.prevent="send()" class="relative rounded-xl border border-line-strong bg-surface shadow-[0_1px_2px_rgb(16_24_40/0.04)] focus-within:border-brand-600 focus-within:shadow-[0_0_0_3px_var(--ui-ring)] dark:shadow-none">
+      <label for="ai-input" class="sr-only">{{ _("Câu hỏi") }}</label>
+      <textarea id="ai-input" x-ref="box" x-model="input" rows="1" @keydown="onKey($event)" @input="autosize($event)"
+        class="block max-h-44 w-full resize-none bg-transparent px-3.5 pt-3 pb-11 text-[13.5px] text-fg placeholder:text-fg-3 focus:outline-none"
+        placeholder="{{ _('Hỏi hoặc giao việc… (Enter để gửi, Shift+Enter xuống dòng)') }}"></textarea>
+      <div class="absolute right-2 bottom-2 flex items-center gap-1.5">
+        <button type="button" x-show="busy" x-cloak class="btn-secondary btn-xs" @click="stop()"><span class="size-2.5 rounded-[2px] bg-current" aria-hidden="true"></span>{{ _("Dừng") }}</button>
+        <button type="submit" x-show="!busy" class="btn-primary btn-sm btn-icon rounded-lg" :disabled="!input.trim()" aria-label="{{ _('Gửi') }}">{{ _ui.icon("arrow-up", "size-4", 2.2) }}</button>
+      </div>
+    </form>
+    <p class="mt-2 px-1 text-[11px] text-fg-3">{{ _("AI có thể sai. Chứng từ do AI lập luôn ở trạng thái nháp – bạn kiểm tra rồi mới ghi sổ.") }}</p>
+    {% endif %}
+  </div>
+</div>

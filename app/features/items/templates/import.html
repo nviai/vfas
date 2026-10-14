@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Nhập hàng hóa từ Excel") }}{% endblock %}
+{% block content %}
+{% set crumbs = [] %}{% for b in breadcrumbs %}{% do crumbs.append((_(b[0]), b[1])) %}{% endfor %}
+{{ ui.page_header(_("Nhập hàng hóa, dịch vụ từ Excel"), _("Cả file hợp lệ mới được ghi – có lỗi thì không dòng nào được thêm."), breadcrumbs=crumbs, back="/items", icon_name="upload") }}
+{% if result and result.errors %}
+  {% call ui.alert(_("File có {n} lỗi, chưa nhập dòng nào.", n=result.errors|length), "error", cls="mb-5") %}{% endcall %}
+  {% call ui.card(_("Lỗi"), flush=True, cls="mb-5") %}
+    <ul class="divide-y divide-line text-[13.5px]">{% for e in result.errors[:100] %}<li class="px-5 py-2 text-fg-2">{{ e }}</li>{% endfor %}</ul>
+  {% endcall %}
+{% endif %}
+<div class="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
+  <form method="post" action="/items/import" enctype="multipart/form-data" class="card self-start">
+    {{ ui.csrf_field() }}
+    <div class="card-body space-y-4">
+      <label class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-line bg-surface-2 px-6 py-10 text-center hover:border-line-strong">
+        {{ ui.icon("file-spreadsheet", "size-8 text-fg-3") }}
+        <span class="text-[14px] font-medium text-fg">{{ _("Chọn file .xlsx") }}</span>
+        <input type="file" name="file" accept=".xlsx" required class="mt-2 text-[13px]">
+      </label>
+    </div>
+    <div class="card-footer flex justify-end">{{ ui.button(_("Nhập"), "primary", icon_name="upload") }}</div>
+  </form>
+  {% call ui.card(_("Định dạng file")) %}
+    <p class="text-[13px] text-fg-2">{{ _("Dòng 1 là tiêu đề, dữ liệu từ dòng 2, theo thứ tự cột:") }}</p>
+    <ol class="mt-2 list-decimal space-y-0.5 pl-5 text-[13px] text-fg-2">{% for c in columns %}<li>{{ _(c) }}</li>{% endfor %}</ol>
+    <p class="mt-3 text-xs text-fg-3">{{ _("Loại: Hàng hóa, Nguyên vật liệu, Công cụ dụng cụ, Thành phẩm, Dịch vụ. Thuế suất: 0, 5, 8, 10, KCT, KKKNT.") }}</p>
+    <div class="mt-4">{{ ui.link_button(_("Tải file mẫu"), "/items/import/template.xlsx", "secondary", size="sm", icon_name="download") }}</div>
+  {% endcall %}
+</div>
+{% endblock %}

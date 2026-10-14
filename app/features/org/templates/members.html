@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Thành viên") }}{% endblock %}
+{% block content %}
+{% call ui.page_header(_("Thành viên"), _("Người được truy cập sổ sách của {name}", name=company.name if company else ""), breadcrumbs=breadcrumbs, icon_name="users") %}
+  {{ ui.button(_("Mời thành viên"), "primary", icon_name="user-plus", type="button", attrs="@click=\"$dispatch('modal-open', 'invite')\"") }}
+{% endcall %}
+
+{% if new_link %}
+  {% call ui.alert(_("Gửi đường link này cho người được mời (hết hạn sau 7 ngày). Link chỉ hiện một lần."), "success", title=_("Đã tạo lời mời"), cls="mb-5") %}
+    <div class="flex w-full max-w-2xl items-center gap-2" x-data="{ copied: false }">
+      <input class="input input-sm font-mono" readonly value="{{ new_link }}" x-ref="link" @focus="$el.select()">
+      <button type="button" class="btn-secondary btn-sm" @click="navigator.clipboard.writeText($refs.link.value); copied = true">
+        {{ ui.icon("copy", "size-3.5") }}<span data-on="{{ _('Đã chép') }}" data-off="{{ _('Chép') }}" x-text="copied ? $el.dataset.on : $el.dataset.off"></span>
+      </button>
+    </div>
+  {% endcall %}
+{% endif %}
+
+<div class="card mb-6">
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>{{ _("Người dùng") }}</th>
+          <th class="w-56">{{ _("Vai trò") }}</th>
+          <th class="w-40 max-md:hidden">{{ _("Đăng nhập gần nhất") }}</th>
+          <th class="w-32">{{ _("Trạng thái") }}</th>
+          <th class="w-10"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in members %}
+        <tr class="{{ 'is-muted' if not m.active }}">
+          <td>
+            <div class="flex items-center gap-3">
+              {{ ui.avatar(m.full_name or m.email, "size-8") }}
+              <div class="min-w-0">
+                <p class="truncate font-medium text-fg">{{ m.full_name }}{% if m.is_me %} <span class="text-xs text-fg-3">({{ _("bạn") }})</span>{% endif %}</p>
+                <p class="truncate text-xs text-fg-3">{{ m.email }}</p>
+              </div>
+            </div>
+          </td>
+          <td>
+            {% if not m.is_me %}
+            <form method="post" action="/members/{{ m.id }}/role" class="flex items-center gap-2">
+              {{ ui.csrf_field() }}
+              <select name="role" class="input input-sm" x-data @change="$el.form.requestSubmit()" aria-label="{{ _('Vai trò') }}">
+                {% for r, label in roles %}<option value="{{ r }}" {{ "selected" if r == m.role }}>{{ _(label) }}</option>{% endfor %}
+              </select>
+            </form>
+            {% else %}<span class="text-fg-2">{{ _(m.role_label) }}</span>{% endif %}
+          </td>
+          <td class="max-md:hidden tabular-nums text-fg-3">{{ m.last_login|datetime if m.last_login else "–" }}</td>
+          <td>{{ ui.status_badge("active" if m.active else "inactive") }}</td>
+          <td class="!pr-3 text-right">
+            {% if not m.is_me %}
+            {% call ui.dropdown(icon_name="ellipsis", variant="ghost", size="xs", width="w-52", aria_label=_("Thao tác")) %}
+              {% if m.active %}
+                {{ ui.menu_post(_("Khóa quyền truy cập"), "/members/" ~ m.id ~ "/toggle", "lock", danger=True, confirm=_("Khóa quyền truy cập của {email}?", email=m.email), fields={"active": "0"}) }}
+              {% else %}
+                {{ ui.menu_post(_("Mở lại quyền truy cập"), "/members/" ~ m.id ~ "/toggle", "unlock", fields={"active": "1"}) }}
+              {% endif %}
+            {% endcall %}
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if invitations %}
+{% call ui.card(_("Lời mời đang chờ"), flush=True) %}
+  <ul class="divide-y divide-line">
+    {% for inv in invitations %}
+    <li class="flex items-center justify-between gap-3 px-5 py-3">
+      <div class="min-w-0">
+        <p class="truncate font-medium text-fg">{{ inv.email }}</p>
+        <p class="text-xs text-fg-3">{{ _(roles|selectattr(0, "equalto", inv.role)|map(attribute=1)|first or inv.role) }} · {{ _("hết hạn") }} {{ inv.expires_at|datetime }}</p>
+      </div>
+      <form method="post" action="/invitations/{{ inv.id }}/revoke">
+        {{ ui.csrf_field() }}
+        {{ ui.button(_("Thu hồi"), "ghost", size="sm", icon_name="x") }}
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+{% endcall %}
+{% endif %}
+
+{% call ui.modal("invite", _("Mời thành viên"), description=_("Tạo đường link mời; người được mời đặt mật khẩu (nếu chưa có tài khoản) rồi vào thẳng công ty.")) %}
+<form method="post" action="/members/invite" class="space-y-4 px-5 pb-5">
+  {{ ui.csrf_field() }}
+  {{ ui.input("email", _("Email"), "", type="email", required=True) }}
+  {{ ui.select("role", _("Vai trò"), roles, "accountant") }}
+  <div class="rounded-lg border border-line bg-surface-2 p-3 text-[13px] text-fg-2">
+    <ul class="space-y-1">
+      <li><span class="font-medium">{{ _("Kế toán trưởng") }}:</span> {{ _("toàn quyền nghiệp vụ, khóa sổ, thành viên.") }}</li>
+      <li><span class="font-medium">{{ _("Kế toán viên") }}:</span> {{ _("lập, ghi sổ, hủy chứng từ; xem báo cáo, lương.") }}</li>
+      <li><span class="font-medium">{{ _("Thủ quỹ") }}:</span> {{ _("phiếu thu, phiếu chi, sổ quỹ, kiểm kê.") }}</li>
+      <li><span class="font-medium">{{ _("Chỉ xem") }}:</span> {{ _("xem sổ sách, báo cáo (kiểm toán, chủ sở hữu).") }}</li>
+    </ul>
+  </div>
+  <div class="modal-footer -mx-5 -mb-5">
+    {{ ui.button(_("Hủy"), "secondary", type="button", attrs="@click=\"$dispatch('modal-close')\"") }}
+    {{ ui.button(_("Tạo lời mời"), "primary", icon_name="send") }}
+  </div>
+</form>
+{% endcall %}
+{% endblock %}

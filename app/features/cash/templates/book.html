@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Sổ quỹ tiền mặt") }}{% endblock %}
+{% block content %}
+{% call ui.page_header(_("Sổ quỹ tiền mặt"), _("Mẫu {code} · {label}", code=book.code, label=period.tr(_)), breadcrumbs=breadcrumbs, icon_name="book-open") %}
+  {% if can_export %}{{ ui.report_toolbar(pdf_href="/cash/book.pdf?" ~ q, xlsx_href="/cash/book.xlsx?" ~ q) }}{% endif %}
+{% endcall %}
+
+{{ ui.tabs([
+  {"key": "s04a", "label": _("Sổ quỹ tiền mặt (S04a-DNN)"), "href": "/cash/book?form=s04a&" ~ period.query()},
+  {"key": "s04b", "label": _("Sổ chi tiết quỹ (S04b-DNN)"), "href": "/cash/book?form=s04b&" ~ period.query()},
+], form, cls="mb-4") }}
+
+<div class="card mb-5 flex flex-wrap items-end justify-between gap-3 p-3 sm:px-5">
+  {{ ui.period_selector(period, years=years, action="/cash/book", extra_hidden={"form": form}, modes=("month", "quarter", "year", "all", "custom")) }}
+  <dl class="flex flex-wrap gap-x-6 gap-y-1 text-[13px]">
+    <div><dt class="text-fg-3">{{ _("Tồn đầu kỳ") }}</dt><dd class="font-semibold tabular-nums">{{ book.opening|money }}</dd></div>
+    <div><dt class="text-fg-3">{{ _("Thu") }}</dt><dd class="font-semibold tabular-nums amount-in">{{ book.total_in|money }}</dd></div>
+    <div><dt class="text-fg-3">{{ _("Chi") }}</dt><dd class="font-semibold tabular-nums">{{ book.total_out|money }}</dd></div>
+    <div><dt class="text-fg-3">{{ _("Tồn cuối kỳ") }}</dt><dd class="font-semibold tabular-nums {{ 'amount-neg' if book.closing < 0 }}">{{ book.closing|money }}</dd></div>
+  </dl>
+</div>
+
+<div class="paper overflow-hidden">
+  <div class="table-wrap">
+    <div class="{{ 'min-w-[1100px]' if form == 's04b' else 'min-w-[1040px]' }} p-6 sm:p-10">
+      {{ ui.official_header(company, book.code) }}
+      {{ ui.report_title(book.title, period.print_label, extra=subtitle) }}
+      <table class="table table-report">
+        <thead>
+          <tr>
+            <th rowspan="2" class="w-[5.5rem]">Ngày, tháng ghi sổ</th>
+            <th rowspan="2" class="w-[5.5rem]">Ngày, tháng chứng từ</th>
+            <th colspan="2">Số hiệu chứng từ</th>
+            <th rowspan="2" class="min-w-[15rem]">Diễn giải</th>
+            {% if form == "s04b" %}
+            <th rowspan="2" class="w-16">TK đối ứng</th>
+            <th colspan="2">Số phát sinh</th>
+            <th rowspan="2" class="w-28">Số tồn</th>
+            {% else %}
+            <th colspan="3">Số tiền</th>
+            {% endif %}
+            <th rowspan="2" class="w-24">Ghi chú</th>
+          </tr>
+          <tr>
+            <th class="w-[6.5rem]">Thu</th><th class="w-[6.5rem]">Chi</th>
+            {% if form == "s04b" %}<th class="w-28">Nợ</th><th class="w-28">Có</th>{% else %}<th class="w-28">Thu</th><th class="w-28">Chi</th><th class="w-28">Tồn</th>{% endif %}
+          </tr>
+          <tr class="italic">
+            {% for c in (["A", "B", "C", "D", "E", "F", "1", "2", "3", "G"] if form == "s04b" else ["A", "B", "C", "D", "E", "1", "2", "3", "G"]) %}<th>{{ c }}</th>{% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td></td><td></td><td></td><td></td>
+            <td class="font-semibold italic">Số tồn đầu kỳ</td>
+            {% if form == "s04b" %}<td></td>{% endif %}
+            <td></td><td></td><td class="num font-semibold">{{ book.opening|money }}</td><td></td>
+          </tr>
+          {% for r in book.rows %}
+          <tr>
+            <td class="text-center tabular-nums">{{ r.post_date|date }}</td>
+            <td class="text-center tabular-nums">{{ (r.doc_date or r.post_date)|date }}</td>
+            <td class="text-center">{% if r.receipt_no %}<a href="{{ r.url }}" class="doc-no hover:underline">{{ r.receipt_no }}</a>{% endif %}</td>
+            <td class="text-center">{% if r.payment_no %}<a href="{{ r.url }}" class="doc-no hover:underline">{{ r.payment_no }}</a>{% endif %}</td>
+            <td>{{ r.description }}</td>
+            {% if form == "s04b" %}<td class="text-center tabular-nums">{{ r.contra }}</td>{% endif %}
+            <td class="num">{{ r.receipt|money0 }}</td>
+            <td class="num">{{ r.payment|money0 }}</td>
+            <td class="num {{ 'amount-neg' if r.balance < 0 }}">{{ r.balance|money }}</td>
+            <td class="text-xs">{{ r.note }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="{{ 10 if form == 's04b' else 9 }}" class="py-8 text-center text-fg-3">Không có phát sinh trong kỳ</td></tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr class="row-total">
+            <td colspan="5">Cộng phát sinh trong kỳ</td>
+            {% if form == "s04b" %}<td></td>{% endif %}
+            <td class="num">{{ book.total_in|money }}</td><td class="num">{{ book.total_out|money }}</td><td></td><td></td>
+          </tr>
+          <tr class="row-total">
+            <td colspan="5">Số tồn cuối kỳ</td>
+            {% if form == "s04b" %}<td></td>{% endif %}
+            <td></td><td></td><td class="num">{{ book.closing|money }}</td><td></td>
+          </tr>
+        </tfoot>
+      </table>
+      <p class="mt-4 text-[13px]">- Ngày mở sổ: {{ company.start_date|date }}</p>
+      {{ ui.signature_block([("Người ghi sổ", "(Ký, họ tên)", company.preparer), ("Kế toán trưởng", "(Ký, họ tên)", company.chief_accountant), ("Người đại diện theo pháp luật", "(Ký, họ tên, đóng dấu)", company.legal_rep)], "Ngày ..... tháng ..... năm ..........") }}
+    </div>
+  </div>
+</div>
+{% endblock %}

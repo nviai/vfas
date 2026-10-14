@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Sổ tiền gửi ngân hàng") }}{% endblock %}
+{% block content %}
+{% call ui.page_header(_("Sổ tiền gửi ngân hàng"), _("Mẫu S05-DNN · {label}", label=period.tr(_)), breadcrumbs=breadcrumbs, icon_name="book-text") %}
+  {% if can_export and bank %}{{ ui.report_toolbar(pdf_href="/bank/book.pdf?" ~ q, xlsx_href="/bank/book.xlsx?" ~ q) }}{% endif %}
+{% endcall %}
+
+{% if not banks %}
+  {% call ui.card() %}
+    {% call ui.empty_state(_("Chưa có tài khoản ngân hàng"), "landmark", _("Mỗi tài khoản ngân hàng có một sổ tiền gửi riêng.")) %}
+      {{ ui.link_button(_("Thêm tài khoản"), "/bank-accounts", "primary", icon_name="plus") }}
+    {% endcall %}
+  {% endcall %}
+{% else %}
+<div class="card mb-5 flex flex-wrap items-end justify-between gap-3 p-3 sm:px-5">
+  <div class="flex flex-wrap items-end gap-3">
+    <form method="get" action="/bank/book" x-data>
+      <input type="hidden" name="mode" value="{{ period.mode }}">
+      {% if period.mode == "month" %}<input type="hidden" name="month" value="{{ period.start.strftime('%Y-%m') }}">{% endif %}
+      {% if period.year %}<input type="hidden" name="year" value="{{ period.year }}">{% endif %}
+      {% if period.quarter %}<input type="hidden" name="quarter" value="{{ period.quarter }}">{% endif %}
+      {% if period.mode == "custom" %}<input type="hidden" name="start" value="{{ period.start.isoformat() }}"><input type="hidden" name="end" value="{{ period.end.isoformat() }}">{% endif %}
+      <label class="label" for="f-bank">{{ _("Tài khoản") }}</label>
+      <select id="f-bank" name="bank_account_id" class="input input-sm w-60" @change="$el.form.submit()">
+        {% for b in banks %}<option value="{{ b.id }}" {{ "selected" if bank and b.id == bank.id }}>{{ b.label }}</option>{% endfor %}
+      </select>
+    </form>
+    {{ ui.period_selector(period, years=years, action="/bank/book", extra_hidden={"bank_account_id": bank.id}, modes=("month", "quarter", "year", "all", "custom")) }}
+  </div>
+  <dl class="flex flex-wrap gap-x-6 gap-y-1 text-[13px]">
+    <div><dt class="text-fg-3">{{ _("Dư đầu kỳ") }}</dt><dd class="font-semibold tabular-nums">{{ book.opening|money }}</dd></div>
+    <div><dt class="text-fg-3">{{ _("Gửi vào") }}</dt><dd class="font-semibold tabular-nums amount-in">{{ book.total_in|money }}</dd></div>
+    <div><dt class="text-fg-3">{{ _("Rút ra") }}</dt><dd class="font-semibold tabular-nums">{{ book.total_out|money }}</dd></div>
+    <div><dt class="text-fg-3">{{ _("Còn lại") }}</dt><dd class="font-semibold tabular-nums {{ 'amount-neg' if book.closing < 0 }}">{{ book.closing|money }}</dd></div>
+  </dl>
+</div>
+
+<div class="paper overflow-hidden">
+  <div class="table-wrap">
+    <div class="min-w-[1040px] p-6 sm:p-10">
+      {{ ui.official_header(company, "S05-DNN") }}
+      {{ ui.report_title(book.title, period.print_label) }}
+      <div class="-mt-3 mb-4 space-y-0.5 text-[13px]">{% for line in info_lines %}<p>{{ line }}</p>{% endfor %}</div>
+      <table class="table table-report">
+        <thead>
+          <tr>
+            <th rowspan="2" class="w-[5.5rem]">Ngày, tháng ghi sổ</th>
+            <th colspan="2">Chứng từ</th>
+            <th rowspan="2" class="min-w-[15rem]">Diễn giải</th>
+            <th rowspan="2" class="w-16">Tài khoản đối ứng</th>
+            <th colspan="3">Số tiền</th>
+            <th rowspan="2" class="w-24">Ghi chú</th>
+          </tr>
+          <tr><th class="w-[6.5rem]">Số hiệu</th><th class="w-[5.5rem]">Ngày, tháng</th><th class="w-28">Thu (gửi vào)</th><th class="w-28">Chi (rút ra)</th><th class="w-28">Còn lại</th></tr>
+          <tr class="italic">{% for c in ["A", "B", "C", "D", "E", "1", "2", "3", "F"] %}<th>{{ c }}</th>{% endfor %}</tr>
+        </thead>
+        <tbody>
+          <tr><td></td><td></td><td></td><td class="font-semibold italic">Số dư đầu kỳ</td><td></td><td></td><td></td><td class="num font-semibold">{{ book.opening|money }}</td><td></td></tr>
+          {% for r in book.rows %}
+          <tr>
+            <td class="text-center tabular-nums">{{ r.post_date|date }}</td>
+            <td class="text-center"><a href="{{ r.url }}" class="doc-no hover:underline">{{ r.number }}</a></td>
+            <td class="text-center tabular-nums">{{ (r.doc_date or r.post_date)|date }}</td>
+            <td>{{ r.description }}</td>
+            <td class="text-center tabular-nums">{{ r.contra }}</td>
+            <td class="num">{{ r.receipt|money0 }}</td>
+            <td class="num">{{ r.payment|money0 }}</td>
+            <td class="num {{ 'amount-neg' if r.balance < 0 }}">{{ r.balance|money }}</td>
+            <td class="text-xs">{{ r.note }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="9" class="py-8 text-center text-fg-3">Không có phát sinh trong kỳ</td></tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr class="row-total"><td colspan="5">Cộng phát sinh trong kỳ</td><td class="num">{{ book.total_in|money }}</td><td class="num">{{ book.total_out|money }}</td><td></td><td></td></tr>
+          <tr class="row-total"><td colspan="5">Số dư cuối kỳ</td><td></td><td></td><td class="num">{{ book.closing|money }}</td><td></td></tr>
+        </tfoot>
+      </table>
+      <p class="mt-4 text-[13px]">- Ngày mở sổ: {{ company.start_date|date }}</p>
+      {{ ui.signature_block([("Người ghi sổ", "(Ký, họ tên)", company.preparer), ("Kế toán trưởng", "(Ký, họ tên)", company.chief_accountant), ("Người đại diện theo pháp luật", "(Ký, họ tên, đóng dấu)", company.legal_rep)], "Ngày ..... tháng ..... năm ..........") }}
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

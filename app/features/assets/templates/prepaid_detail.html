@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ p.code }} – {{ p.name }}{% endblock %}
+{% block content %}
+{% call ui.page_header(p.code ~ " · " ~ p.name, _(p.kind_label), breadcrumbs=breadcrumbs, back="/prepaid", badge=ui.status_badge("active" if p.is_active else "inactive")) %}
+  {% if can("assets.manage") %}
+  <form method="post" action="/prepaid/{{ p.id }}">
+    {{ ui.csrf_field() }}
+    {% if p.is_active %}<input type="hidden" name="action" value="stop">{{ ui.button(_("Dừng phân bổ"), "secondary", icon_name="ban", confirm=_("Dừng phân bổ từ tháng này (báo hỏng, mất)?")) }}
+    {% else %}<input type="hidden" name="action" value="resume">{{ ui.button(_("Phân bổ tiếp"), "secondary", icon_name="zap") }}{% endif %}
+  </form>
+  {% endif %}
+{% endcall %}
+
+<div class="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_20rem]">
+  <div class="min-w-0 space-y-5">
+    {% if can("assets.manage") %}
+    <form method="post" action="/prepaid/{{ p.id }}" class="card" x-data="docForm()" @keydown="keys($event)">
+      {{ ui.csrf_field() }}
+      {% include "assets/_prepaid_fields.html" %}
+      <div class="card-footer flex justify-end">{{ ui.button(_("Lưu thay đổi"), "primary", icon_name="check", hotkey="save", kbd_hint="Ctrl+S") }}</div>
+    </form>
+    {% endif %}
+    {% call ui.card(_("Lịch phân bổ"), flush=True) %}
+      <div class="table-wrap max-h-96 overflow-y-auto">
+        <table class="table table-compact table-sticky">
+          <thead><tr><th class="w-24">{{ _("Tháng") }}</th><th class="num">{{ _("Số phân bổ") }}</th><th class="w-36">{{ _("Chứng từ") }}</th></tr></thead>
+          <tbody>
+            {% set done = {} %}{% for h in history %}{% if h.posted %}{% do done.update({(h.year, h.month): h.entry}) %}{% endif %}{% endfor %}
+            {% for m, amt in schedule %}{% set ent = done.get((m.year, m.month)) %}
+            <tr class="{{ 'font-medium' if ent else 'text-fg-2' }}"><td class="tabular-nums">{{ m.strftime("%m/%Y") }}</td><td class="num">{{ amt|money }}</td>
+              <td>{% if ent %}<a href="{{ ent.url }}" class="doc-no whitespace-nowrap hover:underline">{{ ent.number }}</a>{% endif %}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endcall %}
+  </div>
+  <aside class="space-y-5">
+    <section class="card p-5">
+      <p class="text-[13px] font-medium text-fg-3">{{ _("Còn phải phân bổ") }}</p>
+      <p class="mt-1 text-3xl font-semibold tracking-tight tabular-nums">{{ remaining|money }} <span class="text-base font-normal text-fg-3">đ</span></p>
+      {{ ui.progress(allocated, p.amount, "brand", cls="mt-4") }}
+      <dl class="mt-4 space-y-2 text-[13px]">
+        <div class="flex justify-between gap-3"><dt class="text-fg-3">{{ _("Giá trị") }}</dt><dd class="tabular-nums">{{ p.amount|money }}</dd></div>
+        <div class="flex justify-between gap-3"><dt class="text-fg-3">{{ _("Đã phân bổ") }}</dt><dd class="tabular-nums">{{ allocated|money }}</dd></div>
+      </dl>
+    </section>
+    {% if entry %}
+    {% call ui.card(_("Chứng từ ghi tăng"), flush=True) %}
+      <a href="{{ entry.url }}" class="flex items-center gap-3 px-5 py-3 hover:bg-surface-2">{{ ui.kind_badge(entry.doc_type) }}<span class="doc-no whitespace-nowrap flex-1">{{ entry.display_number }}</span><span class="tabular-nums text-[13px]">{{ entry.total|money }}</span></a>
+    {% endcall %}
+    {% endif %}
+  </aside>
+</div>
+{% endblock %}

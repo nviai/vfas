@@ -1,0 +1,101 @@
+{#- PATTERN (e) – Dashboard: stat cards, 12-month cash flow, to-dos, tax filing deadlines, breakdown, recent documents.
+    Chart colors follow the entity: inflow = slot 1, outflow = slot 2 – keep this on every page. -#}
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% import "charts.html" as charts %}
+{% block title %}{{ _("Tổng quan") }}{% endblock %}
+{% block content %}
+{% call ui.page_header(_("Chào buổi sáng, Minh Anh"), _("Thứ Tư, 14/10/2026 · Số liệu đến hết hôm nay")) %}
+  <div class="segmented">
+    <a href="#" class="segment segment-active">{{ _("Tháng này") }}</a><a href="#" class="segment">{{ _("Quý") }}</a><a href="#" class="segment">{{ _("Năm") }}</a>
+  </div>
+{% endcall %}
+
+<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+  {{ ui.stat_card(_("Tiền mặt & tiền gửi"), 1381340000, delta=8.4, delta_label=_("so với tháng 9"), icon_name="wallet", spark=balance[-7:], href="#") }}
+  {{ ui.stat_card(_("Phải thu khách hàng"), 311000000, delta=-4.1, good="down", delta_label=_("so với tháng 9"), icon_name="hand-coins", href="#") }}
+  {{ ui.stat_card(_("Phải trả người bán"), 203750000, delta=10.6, good="down", delta_label=_("so với tháng 9"), icon_name="coins", href="#") }}
+  {{ ui.stat_card(_("Lợi nhuận lũy kế 2026"), 416480000, hint=_("Trước thuế TNDN, chưa kết chuyển tháng 10"), icon_name="trending-up", href="#") }}
+</div>
+
+<div class="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-3">
+  {% set chart_actions %}<a href="#" class="btn-ghost btn-xs">{{ _("Chi tiết") }}{{ ui.icon("arrow-right", "size-3.5") }}</a>{% endset %}
+  {% call ui.card(_("Dòng tiền"), _("Thu, chi tiền mặt và tiền gửi 12 tháng gần nhất"), actions=chart_actions, cls="xl:col-span-2") %}
+    {{ charts.bar_chart(months, [{"name": _("Thu"), "values": inflow, "slot": 1}, {"name": _("Chi"), "values": outflow, "slot": 2}], height=300, caption=_("Thu chi theo tháng")) }}
+    <dl class="mt-6 grid grid-cols-3 gap-4 border-t border-line pt-5">
+      {% set ti, to = inflow|sum, outflow|sum %}
+      <div><dt class="text-xs text-fg-3">{{ _("Tổng thu 12 tháng") }}</dt><dd class="mt-1 text-[15px] font-semibold tabular-nums">{{ ti|money }}</dd></div>
+      <div><dt class="text-xs text-fg-3">{{ _("Tổng chi 12 tháng") }}</dt><dd class="mt-1 text-[15px] font-semibold tabular-nums">{{ to|money }}</dd></div>
+      <div><dt class="text-xs text-fg-3">{{ _("Chênh lệch") }}</dt><dd class="mt-1 text-[15px] font-semibold tabular-nums {{ 'text-emerald-600 dark:text-emerald-400' if ti >= to else 'amount-neg' }}">{{ '+' if ti >= to }}{{ (ti - to)|money }}</dd></div>
+    </dl>
+  {% endcall %}
+
+  <div class="space-y-5">
+    {% call ui.card(_("Việc cần làm"), flush=True) %}
+    <ul class="divide-y divide-line">
+      {% for t in tasks %}
+      <li><a href="{{ t.href }}" class="flex items-center gap-3 px-4 py-3 hover:bg-surface-2 sm:px-5">
+        <span class="flex size-8 shrink-0 items-center justify-center rounded-lg {{ {'amber': 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300', 'blue': 'bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-300'}.get(t.tone, 'bg-surface-3 text-fg-2') }}">{{ ui.icon(t.icon) }}</span>
+        <span class="min-w-0 flex-1 truncate text-[13.5px]">{{ t.label }}</span>
+        {% if t.count %}<span class="rounded-full bg-surface-3 px-2 py-0.5 text-xs font-semibold tabular-nums">{{ t.count }}</span>{% endif %}
+        {{ ui.icon("chevron-right", "size-4 text-fg-3") }}
+      </a></li>
+      {% endfor %}
+    </ul>
+    {% endcall %}
+
+    {% call ui.card(_("Hạn nộp thuế, báo cáo"), flush=True) %}
+    <ul class="divide-y divide-line">
+      {% for d in deadlines %}
+      <li class="flex items-start gap-3 px-4 py-3 sm:px-5">
+        <span class="flex w-11 shrink-0 flex-col items-center rounded-lg border border-line bg-surface-2 py-1 leading-none">
+          <span class="text-[10px] font-medium text-fg-3 uppercase">T{{ d.due.month }}</span>
+          <span class="mt-0.5 text-[15px] font-semibold tabular-nums">{{ d.due.day }}</span>
+        </span>
+        <div class="min-w-0 flex-1">
+          <p class="text-[13.5px] {{ 'text-fg-3 line-through' if d.status == 'submitted' else 'text-fg' }}">{{ d.label }}</p>
+          <p class="mt-0.5 text-xs">
+            {% if d.status == "submitted" %}<span class="text-emerald-600 dark:text-emerald-400">{{ _("Đã nộp") }}</span>
+            {% elif d.days <= 7 %}<span class="font-medium text-amber-700 dark:text-amber-400">{{ _("Còn {n} ngày", n=d.days) }}</span>
+            {% else %}<span class="text-fg-3">{{ _("Còn {n} ngày", n=d.days) }}</span>{% endif %}
+          </p>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% endcall %}
+  </div>
+</div>
+
+<div class="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2 xl:grid-cols-3">
+  {% call ui.card(_("Tồn tiền cuối tháng"), _("Tiền mặt + tiền gửi")) %}
+    {{ charts.line_chart(months, [{"name": _("Tồn cuối tháng"), "values": balance, "slot": 1}], height=200, caption=_("Tồn tiền cuối tháng")) }}
+  {% endcall %}
+  {% call ui.card(_("Chi phí lớn nhất"), _("Lũy kế năm 2026")) %}
+    {{ charts.hbar_list(expenses) }}
+  {% endcall %}
+  {% call ui.card(_("Cơ cấu doanh thu"), _("Lũy kế năm 2026"), cls="lg:col-span-2 xl:col-span-1") %}
+    {{ charts.donut(revenue_mix, center_label=_("Doanh thu"), center_value="2,24 tỷ", value_format="compact") }}
+  {% endcall %}
+</div>
+
+{% set recent_actions %}<a href="/ui-kit/list" class="btn-ghost btn-xs">{{ _("Xem tất cả") }}{{ ui.icon("arrow-right", "size-3.5") }}</a>{% endset %}
+{% call ui.card(_("Chứng từ gần đây"), actions=recent_actions, flush=True, cls="mt-5") %}
+<div class="table-wrap">
+  <table class="table table-hover">
+    <tbody>
+      {% for e in recent %}
+      <tr class="is-link">
+        <td class="w-36"><a href="/ui-kit/detail" class="doc-no hover:underline">{{ e.number or _("Nháp") }}</a></td>
+        <td class="w-28 tabular-nums text-fg-2 max-sm:hidden">{{ e.date|date }}</td>
+        <td class="max-w-0"><p class="truncate">{{ e.description }}</p></td>
+        <td class="w-32 max-md:hidden">{{ ui.kind_badge(e.doc_type) }}</td>
+        <td class="num w-36 font-medium">{{ e.amount|money }}</td>
+        <td class="w-32 max-sm:hidden">{{ ui.status_badge(e.status) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endcall %}
+{% endblock %}

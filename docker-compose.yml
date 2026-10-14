@@ -1,0 +1,66 @@
+# VFAS behind Traefik (Traefik terminates HTTPS; the app exposes a single port).
+#
+#   cp .env.example .env      # then edit SECRET_KEY
+#   docker compose up -d --build
+#   docker compose exec vfas python -m app.cli create-admin --email admin@congty.vn --full-name "Director"
+#
+# PostgreSQL instead of SQLite: uncomment DATABASE_URL and run `docker compose --profile postgres up -d`.
+
+services:
+  vfas:
+    build: .
+    image: vfas:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATA_DIR: /data
+      TZ: Asia/Ho_Chi_Minh
+      # Trust X-Forwarded-* only from Traefik on the Docker network (real client IP for brute-force throttling and audit logs).
+      FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-172.16.0.0/12}
+      # DATABASE_URL: postgresql+psycopg://vfas:${POSTGRES_PASSWORD:-}@db:5432/vfas
+    volumes:
+      - vfas-data:/data
+      - ./backups:/backups
+    ports:
+      - "127.0.0.1:8000:8000"   # host-only; Traefik reaches the app over the network below
+    mem_limit: 700m
+    # Hardening: read-only root filesystem (data goes to /data), drop all Linux capabilities.
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks: [default, proxy]
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.vfas.rule=Host(`${APP_DOMAIN:-vfas.example.com}`)
+      - traefik.http.routers.vfas.entrypoints=websecure
+      - traefik.http.routers.vfas.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}
+      - traefik.http.services.vfas.loadbalancer.server.port=8000
+      # Per-IP rate and concurrency limits at the proxy (brute force, signup spam, overload)
+      - traefik.http.middlewares.vfas-rl.ratelimit.average=20
+      - traefik.http.middlewares.vfas-rl.ratelimit.burst=60
+      - traefik.http.middlewares.vfas-inflight.inflightreq.amount=30
+      - traefik.http.routers.vfas.middlewares=vfas-rl,vfas-inflight
+
+  db:
+    image: postgres:16-alpine
+    profiles: ["postgres"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: vfas
+      POSTGRES_USER: vfas
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}   # required in .env when using the postgres profile
+    volumes:
+      - vfas-pg:/var/lib/postgresql/data
+    mem_limit: 256m
+    security_opt: ["no-new-privileges:true"]
+
+volumes:
+  vfas-data:
+  vfas-pg:
+
+networks:
+  proxy:
+    external: true   # Traefik's network; create with: docker network create proxy

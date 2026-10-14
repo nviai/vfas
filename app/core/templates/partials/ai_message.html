@@ -1,0 +1,25 @@
+{#- A single stored message (server-rendered). Variables: m = {role, html (sanitized), text, tools: [{name, label, status, summary, link}]} -#}
+{% import "macros.html" as _ui with context %}
+{% if m.role == "user" %}
+<div class="flex justify-end" data-ai-message>
+  <div class="max-w-[85%] rounded-2xl rounded-br-md bg-surface-3 px-3.5 py-2 text-[13.5px] whitespace-pre-wrap text-fg">{{ m.text or m.content }}</div>
+</div>
+{% else %}
+<div class="flex gap-2.5" data-ai-message>
+  <span class="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary-soft-fg">{{ _ui.icon("sparkles", "size-3.5") }}</span>
+  <div class="min-w-0 flex-1 space-y-2">
+    {% if m.tools %}
+    <div class="flex flex-wrap gap-1.5">
+      {% for t in m.tools %}
+      <span class="inline-flex h-6 max-w-full items-center gap-1.5 rounded-full border border-line bg-surface-2 px-2 text-xs text-fg-2">
+        {{ _ui.icon("x" if t.status == "error" else "check", "size-3 " ~ ("text-rose-500" if t.status == "error" else "text-emerald-500")) }}
+        <span class="truncate">{{ t.label or t.name }}{% if t.summary %} · <span class="text-fg-3">{{ t.summary }}</span>{% endif %}</span>
+        {% if t.link %}<a href="{{ t.link }}" class="font-medium text-primary hover:underline dark:text-brand-400">{{ _("Mở") }}</a>{% endif %}
+      </span>
+      {% endfor %}
+    </div>
+    {% endif %}
+    <div class="prose-chat">{{ m.html|safe if m.html else (m.text or m.content) }}</div>
+  </div>
+</div>
+{% endif %}

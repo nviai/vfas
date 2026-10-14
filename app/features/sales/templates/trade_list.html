@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _(title) }}{% endblock %}
+{% block content %}
+{% set crumbs = [] %}{% for b in breadcrumbs %}{% do crumbs.append((_(b[0]), b[1])) %}{% endfor %}
+{% call ui.page_header(_(title), _(subtitle), breadcrumbs=crumbs, icon_name=cfg.icon) %}
+  {% if can(cfg.perm ~ ".export") %}
+    {{ ui.link_button(_("Xuất Excel"), cfg.base ~ "/export.xlsx?kind=" ~ kind ~ "&q=" ~ (f.q|urlencode) ~ "&status=" ~ f.status ~ "&start=" ~ (f.start.isoformat() if f.start else "") ~ "&end=" ~ (f.end.isoformat() if f.end else ""), "secondary", icon_name="file-spreadsheet", cls="max-sm:hidden") }}
+  {% endif %}
+  {% if can(cfg.perm ~ ".create") %}
+    {% if cfg.module == "purchases" and kind == cfg.main_kind %}
+      {{ ui.link_button(_("Nhập hóa đơn XML"), "/einvoices", "secondary", icon_name="file-up", cls="max-sm:hidden") }}
+    {% endif %}
+    {{ ui.link_button(_("Tạo mới"), cfg.base ~ "/new?kind=" ~ kind, "primary", icon_name="plus") }}
+  {% endif %}
+{% endcall %}
+
+{% set base_q = "q=" ~ (f.q|urlencode) ~ "&start=" ~ (f.start.isoformat() if f.start else "") ~ "&end=" ~ (f.end.isoformat() if f.end else "") ~ "&payment=" ~ f.payment %}
+{{ ui.tabs([
+  {"key": "", "label": _("Tất cả"), "href": "?" ~ base_q},
+  {"key": "draft", "label": _("Nháp"), "href": "?status=draft&" ~ base_q},
+  {"key": "posted", "label": _("Đã ghi sổ"), "href": "?status=posted&" ~ base_q},
+  {"key": "cancelled", "label": _("Đã hủy"), "href": "?status=cancelled&" ~ base_q},
+], f.status, cls="mb-4") }}
+
+<div class="card">
+  <div class="border-b border-line p-3 sm:px-5">
+    {% call ui.filter_bar(cfg.kind_path(kind), reset_href=cfg.kind_path(kind), hx_target="#trade-results") %}
+      <input type="hidden" name="status" value="{{ f.status }}">
+      <div class="w-full sm:w-72">
+        <label class="sr-only" for="f-q">{{ _("Tìm") }}</label>
+        {{ ui.input("q", None, f.q, "search", placeholder=_("Số chứng từ, đối tượng, số hóa đơn, MST…"), prefix=ui.icon("search"), input_cls="input-sm") }}
+      </div>
+      {{ ui.select("payment", None, [("credit", _("Ghi nợ")), ("cash", _("Tiền mặt")), ("bank", _("Chuyển khoản"))], f.payment, placeholder=_("Mọi hình thức"), input_cls="input-sm w-40") }}
+      <div class="flex items-center gap-1.5">
+        <input type="date" name="start" value="{{ f.start.isoformat() if f.start else '' }}" class="input input-sm w-36 tabular-nums" aria-label="{{ _('Từ ngày') }}">
+        <span class="text-fg-3">–</span>
+        <input type="date" name="end" value="{{ f.end.isoformat() if f.end else '' }}" class="input input-sm w-36 tabular-nums" aria-label="{{ _('Đến ngày') }}">
+      </div>
+    {% endcall %}
+  </div>
+  <div id="trade-results">{% include "sales/_trade_results.html" %}</div>
+</div>
+{% endblock %}

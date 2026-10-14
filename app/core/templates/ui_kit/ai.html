@@ -1,0 +1,19 @@
+{#- PATTERN (h) – AI assistant: right-hand drawer lazy-loaded via GET /ai/panel (partials/ai_chat.html). This page opens the drawer itself for demonstration. -#}
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Trợ lý AI") }}{% endblock %}
+{% block content %}
+<div x-init="$nextTick(() => openAi())"></div>
+{% call ui.page_header(_("Trợ lý AI"), _("Drawer chat stream qua SSE, chip trạng thái công cụ, chỉ lập chứng từ nháp."), breadcrumbs=[(_("Design system"), "/ui-kit"), (_("Trợ lý AI"), None)]) %}
+  {{ ui.button(_("Mở trợ lý"), icon_name="sparkles", type="button", attrs='@click="openAi()"', kbd_hint="Ctrl+J") }}
+{% endcall %}
+<div class="grid max-w-3xl grid-cols-1 gap-5">
+  {% call ui.card(_("Giao thức"), icon_name="plug") %}
+  <ul class="list-disc space-y-1.5 pl-5 text-[13.5px] text-fg-2">
+    <li><code class="mono">GET /ai/panel</code> → {{ _("HTML partial (include partials/ai_chat.html với biến chat)") }}</li>
+    <li><code class="mono">POST /ai/chat</code> → <code class="mono">text/event-stream</code>: meta, token, tool, done, error</li>
+    <li><code class="mono">GET /ai/conversations/{id}</code> → {{ _("HTML các tin nhắn (partials/ai_message.html)") }}</li>
+  </ul>
+  {% endcall %}
+</div>
+{% endblock %}

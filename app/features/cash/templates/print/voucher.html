@@ -1,0 +1,82 @@
+{% extends "cash/print/_layout.html" %}
+{% block title %}{{ title }} {{ number or '' }}{% endblock %}
+{% block page_size %}size: A5 landscape; margin: 7mm 9mm 6mm 10mm;{% endblock %}
+{% block page_extra %}@bottom-right { content: none; }{% endblock %}
+{% block css %}
+  html { font-size: 10pt; line-height: 1.28; }
+  .doc-head { margin-bottom: 1mm; }
+  .doc-head .left { width: 60%; }
+  .doc-head .right { width: 40%; }
+  .head-block { width: 100%; border-collapse: collapse; margin-top: 1.5mm; }
+  .head-block td { vertical-align: top; padding: 0; }
+  .head-block .center { width: 62%; text-align: center; padding-left: 20%; }
+  .head-block .meta { width: 38%; padding-left: 8mm; }
+  .head-block .meta p { line-height: 1.35; }
+  .vtitle { font-size: 15pt; font-weight: bold; letter-spacing: .5pt; }
+  .lines { margin-top: 2.5mm; }
+  .lines p { margin: 0 0 1.2mm 0; }
+  .lines .lbl { white-space: nowrap; }
+  .lines .val { font-weight: bold; }
+  .signatures .name { padding-top: 13mm; }
+  .signatures td { font-size: 9.5pt; padding: 0 1mm; }
+  .received { margin-top: 2mm; }
+  .received p { margin: 0 0 .8mm 0; }
+{% endblock %}
+{% block body %}
+{% if watermark %}<div class="watermark">{{ watermark }}</div>{% endif %}
+<table class="doc-head">
+  <tr>
+    <td class="left">
+      <p><span class="b">Đơn vị:</span> {{ company.name }}</p>
+      <p><span class="b">Địa chỉ:</span> {{ company.address }}</p>
+    </td>
+    <td class="right">
+      <p class="form-code">Mẫu số {{ code }}</p>
+      <p class="issued">{{ issued }}</p>
+    </td>
+  </tr>
+</table>
+
+<table class="head-block">
+  <tr>
+    <td class="center">
+      <p class="vtitle">{{ title }}</p>
+      <p class="i">Ngày {{ '%02d' % doc_date.day }} tháng {{ '%02d' % doc_date.month }} năm {{ doc_date.year }}</p>
+    </td>
+    <td class="meta">
+      <p>Quyển số: {{ book_no or '..........' }}</p>
+      <p>Số: <span class="b">{{ number or '..........' }}</span></p>
+      <p>Nợ: <span class="b">{{ debit_accounts or '..........' }}</span></p>
+      <p>Có: <span class="b">{{ credit_accounts or '..........' }}</span></p>
+    </td>
+  </tr>
+</table>
+
+<div class="lines">
+  <p><span class="lbl">Họ và tên người {{ 'nộp' if is_receipt else 'nhận' }} tiền:</span> <span class="val">{{ entry.contact_name }}</span></p>
+  <p><span class="lbl">Địa chỉ:</span> {{ entry.contact_address or '' }}</p>
+  <p><span class="lbl">Lý do {{ 'nộp' if is_receipt else 'chi' }}:</span> {{ entry.description }}</p>
+  <p><span class="lbl">Số tiền:</span> <span class="val">{{ entry.total|money }}</span> đồng
+     &nbsp;&nbsp;<span class="i">(Viết bằng chữ):</span> <span class="i b">{{ amount_words }}</span></p>
+  <p><span class="lbl">Kèm theo:</span> {{ '%02d' % entry.attached_docs if entry.attached_docs else '.....' }} &nbsp;Chứng từ gốc{% if entry.ref_no %}: {{ entry.ref_no }}{% else %}.{% endif %}</p>
+</div>
+
+<p class="date-line" style="margin-top:1mm">Ngày {{ '%02d' % doc_date.day }} tháng {{ '%02d' % doc_date.month }} năm {{ doc_date.year }}</p>
+<table class="signatures">
+  <tr>
+    {% for role, hint, _name in signers %}
+    <td style="width:20%"><p class="role">{{ role }}</p><p class="hint">{{ hint }}</p></td>
+    {% endfor %}
+  </tr>
+  <tr>
+    {% for _role, _hint, name in signers %}<td class="name">{{ name or '' }}</td>{% endfor %}
+  </tr>
+</table>
+
+<div class="received">
+  <p>Đã nhận đủ số tiền (viết bằng chữ): ..............................................................................................................................................</p>
+  <p>+ Tỷ giá ngoại tệ (vàng bạc, đá quý): ......................................................................</p>
+  <p>+ Số tiền quy đổi: .......................................................................................................</p>
+  <p class="i small">(Liên gửi ra ngoài phải đóng dấu)</p>
+</div>
+{% endblock %}

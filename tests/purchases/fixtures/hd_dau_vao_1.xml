@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<HDon>
+  <DLHDon Id="data">
+    <TTChung>
+      <PBan>2.1.0</PBan>
+      <THDon>HÓA ĐƠN GIÁ TRỊ GIA TĂNG</THDon>
+      <KHMSHDon>1</KHMSHDon>
+      <KHHDon>C26TVP</KHHDon>
+      <SHDon>00000457</SHDon>
+      <NLap>2026-03-10</NLap>
+      <DVTTe>VND</DVTTe>
+      <TGia>1</TGia>
+      <HTTToan>TM/CK</HTTToan>
+      <MSTTCGP>0101243150</MSTTCGP>
+    </TTChung>
+    <NDHDon>
+      <NBan>
+        <Ten>CÔNG TY TNHH VĂN PHÒNG PHẨM SÀI GÒN</Ten>
+        <MST>0301234567</MST>
+        <DChi>12 Lê Lợi, Quận 1, TP. Hồ Chí Minh</DChi>
+      </NBan>
+      <NMua>
+        <Ten>CÔNG TY TNHH CÔNG NGHỆ THÔNG MINH NVIAI</Ten>
+        <MST>0000000001</MST>
+        <DChi>TP. Hồ Chí Minh</DChi>
+        <HVTNMHang>Phạm Văn Lập</HVTNMHang>
+      </NMua>
+      <DSHHDVu>
+        <HHDVu><TChat>1</TChat><STT>1</STT><MHHDVu>GIAY-A4</MHHDVu><THHDVu>Giấy in A4 Double A</THHDVu><DVTinh>Ram</DVTinh><SLuong>20</SLuong><DGia>75000</DGia><ThTien>1500000</ThTien><TSuat>8%</TSuat></HHDVu>
+        <HHDVu><TChat>1</TChat><STT>2</STT><MHHDVu>MUC-IN</MHHDVu><THHDVu>Mực in laser</THHDVu><DVTinh>Hộp</DVTinh><SLuong>3</SLuong><DGia>333333</DGia><ThTien>999999</ThTien><TSuat>10%</TSuat></HHDVu>
+        <HHDVu><TChat>3</TChat><STT>3</STT><THHDVu>Chiết khấu thương mại</THHDVu><ThTien>100000</ThTien><TSuat>8%</TSuat></HHDVu>
+        <HHDVu><TChat>4</TChat><STT>4</STT><THHDVu>Giao hàng tận nơi</THHDVu></HHDVu>
+      </DSHHDVu>
+      <TToan>
+        <THTTLTSuat>
+          <LTSuat><TSuat>8%</TSuat><ThTien>1400000</ThTien><TThue>112000</TThue></LTSuat>
+          <LTSuat><TSuat>10%</TSuat><ThTien>999999</ThTien><TThue>100000</TThue></LTSuat>
+        </THTTLTSuat>
+        <TgTCThue>2399999</TgTCThue>
+        <TgTThue>212000</TgTThue>
+        <TgTTTBSo>2611999</TgTTTBSo>
+        <TgTTTBChu>Hai triệu sáu trăm mười một nghìn chín trăm chín mươi chín đồng</TgTTTBChu>
+      </TToan>
+    </NDHDon>
+  </DLHDon>
+  <MCCQT>00ABC1234567890DEF</MCCQT>
+  <DSCKS><NBan><Signature xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo/></Signature></NBan></DSCKS>
+</HDon>

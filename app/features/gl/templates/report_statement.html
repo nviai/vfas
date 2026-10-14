@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% import "gl/_macros.html" as gm with context %}
+{% block title %}{{ _(report_title) }}{% endblock %}
+{% block content %}
+{% call ui.page_header(_(report_title), _("Mẫu {c} · Thông tư 133/2016/TT-BTC", c=st.code), breadcrumbs=breadcrumbs, icon_name="chart-column") %}
+  {% for k, label in [("b01a", "B01a"), ("b02", "B02"), ("b03", "B03"), ("b09", "B09")] %}
+    {{ ui.link_button(label, "/reports/" ~ k ~ "?" ~ period.query(), "primary" if k == kind else "ghost", size="sm") }}
+  {% endfor %}
+{% endcall %}
+
+{{ gm.report_bar(period, years, "/reports/" ~ kind) }}
+
+{% for w in st.warnings %}{{ ui.alert(_(w), "warning", cls="mb-4") }}{% endfor %}
+{% if kind == "b01a" and not st.warnings %}
+<div class="mb-4 flex items-center gap-2 text-[13px] text-emerald-700 dark:text-emerald-400">{{ ui.icon("circle-check") }}{{ _("Tổng tài sản (200) = Tổng nguồn vốn (500)") }}</div>
+{% endif %}
+
+<div class="paper overflow-hidden">
+  <div class="table-wrap">
+    <div class="min-w-[760px] p-6 sm:p-10">
+      {{ ui.official_header(company, st.code) }}
+      {{ ui.report_title(st.title, subtitle) }}
+      <table class="table table-report">
+        <thead>
+          <tr><th>CHỈ TIÊU</th><th class="w-16">Mã số</th><th class="w-20">Thuyết minh</th><th class="w-40">{{ st.current_label }}</th><th class="w-40">{{ st.previous_label }}</th></tr>
+          <tr class="italic"><th>A</th><th>B</th><th>C</th><th>1</th><th>2</th></tr>
+        </thead>
+        <tbody>
+          {% for r in st.rows %}
+          {% set heading = not r.line.code[:1].isdigit() %}
+          <tr class="{{ 'font-semibold' if r.line.level < 2 }} {{ 'bg-surface-2/60' if r.line.level == 0 and not heading }}">
+            <td style="padding-left: {{ 0.5 + (r.line.level == 2) * 1.2 }}rem">{{ r.line.name }}</td>
+            <td class="text-center tabular-nums">{{ '' if heading else r.line.code }}</td>
+            <td class="text-center">{{ r.line.note }}</td>
+            <td class="num">{% if not heading %}{{ gm.paren(r.current) }}{% endif %}</td>
+            <td class="num">{% if not heading %}{{ gm.paren(r.previous) }}{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {{ gm.signatures(company) }}
+    </div>
+  </div>
+</div>
+{% endblock %}

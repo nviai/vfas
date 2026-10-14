@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Tổng hợp nhập – xuất – tồn") }}{% endblock %}
+{% block content %}
+{% set period_hidden = {"mode": period.mode, "month": period.start.strftime("%Y-%m"), "year": period.year or period.start.year, "quarter": period.quarter or "", "start": period.start.isoformat(), "end": period.end.isoformat()} %}
+{% call ui.page_header(_("Tổng hợp nhập – xuất – tồn"), _("Mẫu {c} · bảng tổng hợp chi tiết vật liệu, dụng cụ, sản phẩm, hàng hóa", c=form_code), breadcrumbs=breadcrumbs, icon_name="boxes") %}
+  {% if can("inventory.export") %}{{ ui.report_toolbar(pdf_href="/inventory/summary.pdf?" ~ qs, xlsx_href="/inventory/summary.xlsx?" ~ qs) }}{% endif %}
+{% endcall %}
+
+<div class="card mb-5 space-y-3 p-3 sm:px-5">
+  <form method="get" action="/inventory/summary" class="flex flex-wrap items-end gap-3">
+    {% for k, v in period_hidden.items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+    <div>
+      <label class="label" for="f-wh">{{ _("Kho") }}</label>
+      <select id="f-wh" name="warehouse_id" class="input input-sm w-48">
+        <option value="">{{ _("Tất cả các kho") }}</option>
+        {% for w in warehouses %}<option value="{{ w.id }}" {{ "selected" if wh and w.id == wh.id }}>{{ w.name }}</option>{% endfor %}
+      </select>
+    </div>
+    {{ ui.checkbox("by_warehouse", _("Chi tiết theo kho"), by_wh, cls="pb-1.5") }}
+    <button class="btn-secondary btn-sm" type="submit">{{ ui.icon("filter", "size-3.5") }}<span>{{ _("Chọn") }}</span></button>
+  </form>
+  {{ ui.period_selector(period, action="/inventory/summary", extra_hidden={"warehouse_id": wh.id if wh else "", "by_warehouse": "1" if by_wh else ""}) }}
+</div>
+
+{% if s.pending %}
+  {% call ui.alert(_("Có {n} dòng xuất trong kỳ chưa tính giá – giá trị xuất, tồn chưa đầy đủ.", n=s.pending), "warning", cls="mb-4") %}
+    {{ ui.link_button(_("Tính giá xuất kho"), "/inventory/costing", "secondary", size="sm", icon_name="calculator") }}
+  {% endcall %}
+{% endif %}
+
+{% if s.by_account and not wh %}
+<div class="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+  {% for acc, val in s.by_account.items() %}
+  <div class="card p-4">
+    <div class="flex items-center justify-between">
+      <p class="text-[13px] font-medium text-fg-3">{{ _("Tồn cuối kỳ TK {a}", a=acc) }}</p>
+      {% if gl.get(acc) == val %}{{ ui.badge(_("Khớp sổ cái"), "green", dot=True) }}{% else %}{{ ui.badge(_("Lệch sổ cái"), "amber", dot=True) }}{% endif %}
+    </div>
+    <p class="mt-2 text-xl font-semibold tabular-nums">{{ val|money }}</p>
+    <p class="mt-1 text-xs text-fg-3">{{ _("Sổ cái") }}: <span class="tabular-nums">{{ gl.get(acc, 0)|money }}</span></p>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="paper overflow-hidden">
+  <div class="table-wrap">
+    <div class="min-w-[1100px] p-6 sm:p-10">
+      {{ ui.official_header(company, form_code) }}
+      {{ ui.report_title(title, period.label, extra=("Kho: " ~ wh.name) if wh else None) }}
+      {% if not s.rows %}
+        {{ ui.empty_state(_("Không có phát sinh trong kỳ"), "boxes", compact=True) }}
+      {% else %}
+      <table class="table table-report">
+        <thead>
+          <tr><th rowspan="2" class="w-10">STT</th><th rowspan="2" class="w-24">Mã</th><th rowspan="2" style="min-width:15rem">Tên vật liệu, dụng cụ, sản phẩm, hàng hóa</th><th rowspan="2" class="w-14">ĐVT</th>
+              <th colspan="2">Tồn đầu kỳ</th><th colspan="2">Nhập trong kỳ</th><th colspan="2">Xuất trong kỳ</th><th colspan="2">Tồn cuối kỳ</th></tr>
+          <tr><th class="w-20">SL</th><th class="w-28">Thành tiền</th><th class="w-20">SL</th><th class="w-28">Thành tiền</th><th class="w-20">SL</th><th class="w-28">Thành tiền</th><th class="w-20">SL</th><th class="w-28">Thành tiền</th></tr>
+        </thead>
+        <tbody>
+          {% for r in s.rows %}
+          <tr>
+            <td class="text-center tabular-nums">{{ loop.index }}</td>
+            <td><a class="text-inherit hover:underline" href="/inventory/ledger?item_id={{ r.item.id }}{% if r.warehouse %}&warehouse_id={{ r.warehouse.id }}{% elif wh %}&warehouse_id={{ wh.id }}{% endif %}&mode=custom&start={{ period.start.isoformat() }}&end={{ period.end.isoformat() }}">{{ r.item.code }}</a></td>
+            <td>{{ r.item.name }}{% if r.warehouse %} <span class="text-fg-3">· {{ r.warehouse.name }}</span>{% endif %}</td>
+            <td class="text-center">{{ r.item.unit }}</td>
+            <td class="num">{{ r.opening_qty|qty if r.opening_qty else "" }}</td><td class="num">{{ r.opening_val|money0 }}</td>
+            <td class="num">{{ r.in_qty|qty if r.in_qty else "" }}</td><td class="num">{{ r.in_val|money0 }}</td>
+            <td class="num">{{ r.out_qty|qty if r.out_qty else "" }}</td><td class="num">{{ r.out_val|money0 }}</td>
+            <td class="num">{{ r.closing_qty|qty if r.closing_qty else "" }}</td><td class="num font-medium">{{ r.closing_val|money0 }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot><tr class="row-total"><td></td><td></td><td class="text-center">Cộng</td><td></td>
+          <td></td><td class="num">{{ s.total("opening_val")|money }}</td><td></td><td class="num">{{ s.total("in_val")|money }}</td>
+          <td></td><td class="num">{{ s.total("out_val")|money }}</td><td></td><td class="num">{{ s.total("closing_val")|money }}</td></tr></tfoot>
+      </table>
+      {% endif %}
+      {{ ui.signature_block([("Người lập biểu", "(Ký, họ tên)", company.preparer), ("Kế toán trưởng", "(Ký, họ tên)", company.chief_accountant), ("Người đại diện theo pháp luật", "(Ký, họ tên, đóng dấu)", company.legal_rep)], "Ngày ..... tháng ..... năm ..........") }}
+    </div>
+  </div>
+</div>
+{% endblock %}

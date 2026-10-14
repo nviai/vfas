@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ e.display_number }}{% endblock %}
+{% block content %}
+{{ ui.page_header(e.doc_type_label ~ " " ~ e.display_number, e.description, breadcrumbs=breadcrumbs, back=back, badge=ui.status_badge(e.status)) }}
+{% if e.status == "cancelled" %}
+  {{ ui.alert(_("Chứng từ đã hủy") ~ (": " ~ e.cancel_reason if e.cancel_reason else ""), "warning", cls="mb-5") }}
+{% endif %}
+{% set can_entry_cancel = can(e.doc_type == "LG" and "payroll.cancel" or "assets.cancel") %}
+{% set can_entry_post = can(e.doc_type == "LG" and "payroll.post" or "assets.post") %}
+{% include "assets/_entry_card.html" %}
+{% endblock %}

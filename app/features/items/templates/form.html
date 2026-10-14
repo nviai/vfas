@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ it.name if it else _("Thêm hàng hóa, dịch vụ") }}{% endblock %}
+{% block content %}
+{% set crumbs = [] %}{% for b in breadcrumbs %}{% do crumbs.append((_(b[0]), b[1])) %}{% endfor %}
+{% set f = form %}
+{% macro v(name, default="") %}{%- set x = (f.get(name) if f is mapping else f|attr(name)) if f else none -%}{{ default if x is none or x == "" else x }}{% endmacro %}
+{{ ui.page_header(it.name if it else _("Thêm hàng hóa, dịch vụ"), (it.code ~ " · " ~ _(kinds[it.kind])) if it else _("Mã để trống sẽ tự cấp theo loại (HH0001, DV0001…)."),
+                  breadcrumbs=crumbs, back="/items", icon_name="package",
+                  badge=(ui.status_badge("active" if it.is_active else "inactive") if it else none)) }}
+{% set editable = can("catalog.manage") if it else can("catalog.create") %}
+<form method="post" action="{{ '/items/' ~ it.id if it else '/items' }}" class="card" x-data='{ kind: {{ v('kind', 'goods')|string|tojson }} }'>
+  {{ ui.csrf_field() }}
+  <fieldset {% if not editable %}disabled{% endif %} class="card-body divide-y divide-line">
+    {% call ui.form_section(_("Thông tin chung")) %}
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-[10rem_1fr]">
+        {{ ui.input("code", _("Mã"), v("code"), errors=errors, input_cls="tabular-nums") }}
+        {{ ui.input("name", _("Tên"), v("name"), errors=errors, required=True) }}
+      </div>
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {{ ui.select("kind", _("Loại"), kinds.items()|list, v("kind", "goods"), attrs="x-model=\"kind\"") }}
+        {{ ui.input("unit", _("Đơn vị tính"), v("unit"), placeholder=_("Cái, Chiếc, Giờ, Gói…")) }}
+        {{ ui.select("vat_rate", _("Thuế suất GTGT mặc định"), vat_rates.items()|list, v("vat_rate", "10")) }}
+      </div>
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {{ ui.input("sale_price", _("Đơn giá bán (chưa thuế)"), v("sale_price", "")|string|replace(".00", ""), input_cls="tabular-nums text-right", attrs='inputmode="decimal"') }}
+        {{ ui.input("purchase_price", _("Đơn giá mua (chưa thuế)"), v("purchase_price", "")|string|replace(".00", ""), input_cls="tabular-nums text-right", attrs='inputmode="decimal"') }}
+      </div>
+    {% endcall %}
+    {% call ui.form_section(_("Tài khoản hạch toán"), _("Để trống sẽ dùng mặc định theo loại: hàng hóa 156/5111, nguyên vật liệu 152, công cụ 153, thành phẩm 155/5112, dịch vụ 5113.")) %}
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div x-show="kind !== 'service'">{{ ui.combobox("stock_account", _("TK kho"), "/lookup/accounts", value=v("stock_account"), value_label=v("stock_account"), params={"postable": 1, "prefix": "15"}) }}</div>
+        {{ ui.combobox("revenue_account", _("TK doanh thu"), "/lookup/accounts", value=v("revenue_account"), value_label=v("revenue_account"), params={"postable": 1, "prefix": "511,711"}) }}
+        {{ ui.combobox("cogs_account", _("TK giá vốn"), "/lookup/accounts", value=v("cogs_account", "632"), value_label=v("cogs_account", "632"), params={"postable": 1, "prefix": "632"}) }}
+        {{ ui.combobox("expense_account", _("TK chi phí khi mua (dịch vụ)"), "/lookup/accounts", value=v("expense_account"), value_label=v("expense_account"), params={"postable": 1, "prefix": "6,242,811"}) }}
+      </div>
+      {{ ui.textarea("note", _("Ghi chú"), v("note"), rows=2) }}
+      {% if it %}{{ ui.select("is_active", _("Trạng thái"), [("1", _("Đang dùng")), ("0", _("Ngừng dùng"))], "1" if it.is_active else "0", cls="sm:w-56") }}{% endif %}
+    {% endcall %}
+  </fieldset>
+  {% if editable %}
+  <div class="card-footer flex justify-end gap-2">
+    {{ ui.link_button(_("Hủy"), "/items", "secondary") }}
+    {{ ui.button(_("Lưu"), "primary", icon_name="check", hotkey="save", kbd_hint="Ctrl+S") }}
+  </div>
+  {% endif %}
+</form>
+{% endblock %}

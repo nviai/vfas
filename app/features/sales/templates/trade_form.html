@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% from "sales/_trade_grid.html" import trade_grid with context %}
+{% block title %}{{ _(title) }}{% endblock %}
+{% block content %}
+{% set crumbs = [] %}{% for b in breadcrumbs %}{% do crumbs.append((_(b[0]), b[1])) %}{% endfor %}
+{% set is_sale = cfg.module == "sales" %}
+<form method="post" action="{{ cfg.base ~ ('/' ~ entry.id if entry else '') }}" x-data="docForm()" @keydown="keys($event)" novalidate>
+  {{ ui.csrf_field() }}
+  <input type="hidden" name="kind" value="{{ kind }}">
+  <input type="hidden" name="original_entry_id" value="{{ form.get('original_entry_id') or '' }}">
+  {% call ui.page_header(_(title) ~ (" " ~ entry.display_number if entry else ""),
+                         _("Ghi nhận doanh thu, thuế GTGT đầu ra và công nợ phải thu.") if is_sale and kind == "sale"
+                         else _("Ghi giảm doanh thu, thuế GTGT đầu ra và công nợ.") if is_sale
+                         else _("Ghi nhận hàng hóa, dịch vụ mua vào, thuế GTGT đầu vào và công nợ phải trả.") if kind == "purchase"
+                         else _("Ghi giảm hàng mua, thuế GTGT đầu vào và công nợ phải trả."),
+                         breadcrumbs=crumbs, back=(cfg.base ~ "/" ~ entry.id) if entry else cfg.kind_path(kind),
+                         badge=ui.status_badge("draft")) %}
+    {% if not is_sale and not entry %}{{ ui.link_button(_("Nhập từ XML"), "/einvoices", "secondary", icon_name="file-up", cls="max-sm:hidden") }}{% endif %}
+  {% endcall %}
+
+  {% if errors %}
+    {{ ui.alert(_("Kiểm tra lại các ô được đánh dấu."), "error", cls="mb-5") }}
+  {% endif %}
+  {% if form.get("original_entry_id") %}
+    {{ ui.alert(_("Lập từ chứng từ gốc. Sửa số lượng, số tiền theo hàng trả lại hoặc khoản giảm giá thực tế."), "info", cls="mb-5") }}
+  {% endif %}
+
+  <div class="space-y-5">
+    {% call ui.card(_(cfg.partner_label)) %}
+    <div class="grid grid-cols-1 gap-4 lg:grid-cols-3" x-data='{ address: {{ (form.get('address') or '')|tojson }}, tax: {{ (form.get('tax_code') or '')|tojson }} }'
+         @combobox-select="if ($event.detail.extra) { address = $event.detail.extra.address || address; tax = $event.detail.extra.tax_code || tax }">
+      {{ ui.combobox("partner_id", _(cfg.partner_label), url="/lookup/partners", params={"role": cfg.partner_role},
+                     value=form.get("partner_id") or "", value_label=form.get("partner_label") or form.get("partner_name") or "",
+                     errors=errors, allow_free=True, placeholder=_("Mã, tên hoặc MST… (gõ tên mới để thêm)"), cls="lg:col-span-2") }}
+      <div>
+        <label class="label" for="f-tax_code">{{ _("Mã số thuế") }}</label>
+        <input id="f-tax_code" name="tax_code" class="input tabular-nums" x-model="tax">
+      </div>
+      <div class="lg:col-span-2">
+        <label class="label" for="f-address">{{ _("Địa chỉ") }}</label>
+        <input id="f-address" name="address" class="input" x-model="address">
+      </div>
+      {{ ui.input("contact_name", _("Người mua hàng") if is_sale else _("Người giao hàng"), form.get("contact_name") or "", errors=errors) }}
+    </div>
+    {% endcall %}
+
+    {% call ui.card(_("Chứng từ, hóa đơn")) %}
+    <div class="grid grid-cols-2 gap-4 lg:grid-cols-6" x-data='{ method: {{ (form.get('payment_method') or 'credit')|tojson }} }'>
+      {{ ui.date_input("date", _("Ngày hạch toán"), form.get("date"), errors=errors, required=True) }}
+      {{ ui.date_input("invoice_date", _("Ngày hóa đơn"), form.get("invoice_date"), errors=errors) }}
+      {{ ui.input("invoice_template", _("Mẫu số"), form.get("invoice_template") or "", errors=errors, input_cls="tabular-nums", placeholder="1") }}
+      {{ ui.input("invoice_series", _("Ký hiệu"), form.get("invoice_series") or "", errors=errors, input_cls="uppercase tabular-nums", placeholder="C26TAA") }}
+      {{ ui.input("invoice_no", _("Số hóa đơn"), form.get("invoice_no") or "", errors=errors, input_cls="tabular-nums") }}
+      {{ ui.date_input("due_date", _("Hạn thanh toán"), form.get("due_date"), errors=errors, hint=_("Trống: theo hạn của đối tượng")) }}
+      <div class="col-span-2 lg:col-span-4">
+        {{ ui.radio_group("payment_method", _("Hình thức thanh toán"), [("credit", _("Bán chịu") if cfg.module == "sales" else _("Mua chịu")), ("cash", _("Tiền mặt")), ("bank", _("Chuyển khoản"))], form.get("payment_method") or "credit", attrs="@change=\"method = $event.target.value\"") }}
+        <p class="hint" x-text='{ credit: {{ _(cfg.payment_labels.credit)|tojson }}, cash: {{ _(cfg.payment_labels.cash)|tojson }}, bank: {{ _(cfg.payment_labels.bank)|tojson }} }[method]'></p>
+      </div>
+      <div class="col-span-2" x-show="method === 'bank'" x-cloak>
+        {{ ui.select("bank_account_id", _("Tài khoản ngân hàng"), banks, form.get("bank_account_id")|string if form.get("bank_account_id") else none, errors=errors, placeholder=_("Chọn tài khoản…")) }}
+      </div>
+    </div>
+    {% endcall %}
+
+    {% call ui.card(_("Hàng hóa, dịch vụ"), _("Giá chưa thuế. Thuế suất 8% áp dụng theo NĐ 174/2025 đến hết 31/12/2026.")) %}
+      {% if errors.get("lines") %}{{ ui.alert(_(errors.get("lines")), "error", cls="mb-3") }}{% endif %}
+      {{ trade_grid(cfg, lines, rates) }}
+    {% endcall %}
+
+    {% call ui.card(_("Diễn giải")) %}
+      <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {{ ui.input("description", _("Diễn giải chứng từ"), form.get("description") or "", errors=errors, placeholder=_("Để trống sẽ tự đặt theo đối tượng và số hóa đơn")) }}
+        {{ ui.input("note", _("Ghi chú nội bộ"), form.get("note") or "", errors=errors) }}
+      </div>
+    {% endcall %}
+  </div>
+
+  {% call ui.form_actions() %}
+    {{ ui.link_button(_("Hủy bỏ"), (cfg.base ~ "/" ~ entry.id) if entry else cfg.kind_path(kind), "ghost") }}
+    {{ ui.button(_("Lưu nháp"), "secondary", name="action", value="save", hotkey="save", kbd_hint="Ctrl+S") }}
+    {% if can(cfg.perm ~ ".post") %}
+      {{ ui.button(_("Lưu và ghi sổ"), icon_name="check", name="action", value="post", hotkey="post", kbd_hint="Ctrl+Enter") }}
+    {% endif %}
+  {% endcall %}
+</form>
+{% endblock %}

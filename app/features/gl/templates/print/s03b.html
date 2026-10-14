@@ -1,0 +1,62 @@
+{% extends "gl/print/_base.html" %}
+{% import "gl/print/_base.html" as p %}
+{% block title %}{{ title }}{% endblock %}
+{% block page_size %}size: A4 landscape; margin: 12mm 10mm 14mm 12mm;{% endblock %}
+{% block body %}
+{{ p.head(company, form_code, issued) }}
+<p class="title">{{ title }}</p>
+<p class="subtitle">{{ subtitle }}</p>
+<p class="c" style="margin-top:1mm">Tên tài khoản: <b>{{ book.account_name }}</b> – Số hiệu: <b>{{ book.account }}</b>{% if book.partner_name %} – Đối tượng: <b>{{ book.partner_name }}</b>{% endif %}{% if book.bank_label %} – Tài khoản ngân hàng: <b>{{ book.bank_label }}</b>{% endif %}</p>
+<p class="unit">Đơn vị tính: Đồng Việt Nam</p>
+{% set od, oc = book.opening_split %}
+{% set cd, cc = book.closing_split %}
+{% if detailed %}
+<table class="book">
+  <colgroup><col style="width:8%"><col style="width:10%"><col style="width:8%"><col style="width:30%"><col style="width:7%"><col span="4" style="width:9.25%"></colgroup>
+  <thead>
+    <tr><th rowspan="2">Ngày, tháng ghi sổ</th><th colspan="2">Chứng từ</th><th rowspan="2">Diễn giải</th><th rowspan="2">TK đối ứng</th><th colspan="2">Số phát sinh</th><th colspan="2">Số dư</th></tr>
+    <tr><th>Số hiệu</th><th>Ngày, tháng</th><th>Nợ</th><th>Có</th><th>Nợ</th><th>Có</th></tr>
+    <tr class="letters"><th>A</th><th>B</th><th>C</th><th>D</th><th>E</th><th>1</th><th>2</th><th>3</th><th>4</th></tr>
+  </thead>
+  <tbody>
+    <tr class="b"><td></td><td></td><td></td><td>- Số dư đầu kỳ</td><td></td><td></td><td></td><td class="num">{{ od|money0 }}</td><td class="num">{{ oc|money0 }}</td></tr>
+    {% for r in book.rows %}
+    <tr>
+      <td class="c">{{ r.date|date }}</td><td class="c">{{ r.number or "" }}</td><td class="c">{{ (r.doc_date or r.date)|date }}</td>
+      <td>{{ r.description }}</td><td class="c">{{ r.contra or "" }}</td>
+      <td class="num">{{ r.debit|money0 }}</td><td class="num">{{ r.credit|money0 }}</td>
+      <td class="num">{{ r.balance|money0 if r.balance > 0 }}</td><td class="num">{{ (-r.balance)|money0 if r.balance < 0 }}</td>
+    </tr>
+    {% endfor %}
+    <tr class="b"><td></td><td></td><td></td><td>- Cộng số phát sinh</td><td></td><td class="num">{{ book.total_debit|money }}</td><td class="num">{{ book.total_credit|money }}</td><td></td><td></td></tr>
+    <tr class="b"><td></td><td></td><td></td><td>- Số dư cuối kỳ</td><td></td><td></td><td></td><td class="num">{{ cd|money0 }}</td><td class="num">{{ cc|money0 }}</td></tr>
+  </tbody>
+</table>
+{% else %}
+<table class="book">
+  <colgroup><col style="width:8%"><col style="width:10%"><col style="width:8%"><col style="width:33%"><col style="width:6%"><col style="width:6%"><col style="width:7%"><col style="width:11%"><col style="width:11%"></colgroup>
+  <thead>
+    <tr><th rowspan="2">Ngày, tháng ghi sổ</th><th colspan="2">Chứng từ</th><th rowspan="2">Diễn giải</th><th colspan="2">Nhật ký chung</th><th rowspan="2">Số hiệu TK đối ứng</th><th colspan="2">Số tiền</th></tr>
+    <tr><th>Số hiệu</th><th>Ngày, tháng</th><th>Trang sổ</th><th>STT dòng</th><th>Nợ</th><th>Có</th></tr>
+    <tr class="letters"><th>A</th><th>B</th><th>C</th><th>D</th><th>E</th><th>G</th><th>H</th><th>1</th><th>2</th></tr>
+  </thead>
+  <tbody>
+    <tr class="b"><td></td><td></td><td></td><td>- Số dư đầu kỳ</td><td></td><td></td><td></td><td class="num">{{ od|money0 }}</td><td class="num">{{ oc|money0 }}</td></tr>
+    <tr><td></td><td></td><td></td><td class="i">- Số phát sinh trong kỳ</td><td></td><td></td><td></td><td></td><td></td></tr>
+    {% for r in book.rows %}
+    <tr>
+      <td class="c">{{ r.date|date }}</td><td class="c">{{ r.number or "" }}</td><td class="c">{{ (r.doc_date or r.date)|date }}</td>
+      <td>{{ r.description }}</td><td class="c"></td><td class="c">{{ r.nkc_stt or "" }}</td><td class="c">{{ r.contra or "" }}</td>
+      <td class="num">{{ r.debit|money0 }}</td><td class="num">{{ r.credit|money0 }}</td>
+    </tr>
+    {% endfor %}
+    <tr class="b"><td></td><td></td><td></td><td>- Cộng số phát sinh trong kỳ</td><td></td><td></td><td></td><td class="num">{{ book.total_debit|money }}</td><td class="num">{{ book.total_credit|money }}</td></tr>
+    <tr class="b"><td></td><td></td><td></td><td>- Số dư cuối kỳ</td><td></td><td></td><td></td><td class="num">{{ cd|money0 }}</td><td class="num">{{ cc|money0 }}</td></tr>
+    <tr><td></td><td></td><td></td><td>- Cộng lũy kế từ đầu năm</td><td></td><td></td><td></td><td class="num">{{ book.ytd_debit|money }}</td><td class="num">{{ book.ytd_credit|money }}</td></tr>
+  </tbody>
+</table>
+<p class="book-note">- Sổ này có {{ total_pages or "......" }} trang, đánh số từ trang số 01 đến trang {{ "%02d"|format(total_pages) if total_pages else "......" }}</p>
+<p class="book-note">- Ngày mở sổ: {{ company.start_date|date }}</p>
+{% endif %}
+{{ p.signatures(company, left="Người ghi sổ", date_label=date_label) }}
+{% endblock %}

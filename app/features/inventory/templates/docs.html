@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _(title) }}{% endblock %}
+{% block content %}
+{% set subtitles = {"receipt": _("Nhập thành phẩm, hàng thừa, nhập khác. Hàng mua về được nhập kho tự động từ chứng từ mua hàng."),
+                    "issue": _("Xuất dùng cho quản lý, bán hàng, sản xuất. Giá trị xuất tính khi chạy tính giá cuối tháng."),
+                    "transfer": _("Chuyển hàng giữa các kho, không phát sinh bút toán.")} %}
+{% call ui.page_header(_(title), subtitles[kind], breadcrumbs=breadcrumbs, icon_name={"receipt": "arrow-down-circle", "issue": "arrow-up-circle", "transfer": "arrow-left-right"}[kind]) %}
+  {% if can("inventory.create") %}
+    {{ ui.link_button(_(kind_label), "/inventory/" ~ path ~ "/new", "primary", icon_name="plus") }}
+  {% endif %}
+{% endcall %}
+
+{{ ui.tabs([
+  {"key": "", "label": _("Tất cả"), "href": "/inventory/" ~ path},
+  {"key": "draft", "label": _("Nháp"), "href": "/inventory/" ~ path ~ "?status=draft"},
+  {"key": "posted", "label": _("Đã ghi sổ"), "href": "/inventory/" ~ path ~ "?status=posted"},
+  {"key": "cancelled", "label": _("Đã hủy"), "href": "/inventory/" ~ path ~ "?status=cancelled"},
+], status, cls="mb-4") }}
+
+<div class="card">
+  <div class="border-b border-line p-3 sm:px-5">
+    {% call ui.filter_bar("/inventory/" ~ path, reset_href="/inventory/" ~ path, hx_target="#doc-results") %}
+      <input type="hidden" name="status" value="{{ status }}">
+      <div class="w-full sm:w-72">
+        {{ ui.input("q", None, q, "search", placeholder=_("Số chứng từ, diễn giải, người giao/nhận…"), prefix=ui.icon("search"), input_cls="input-sm") }}
+      </div>
+    {% endcall %}
+  </div>
+  <div id="doc-results">{% include "inventory/_doc_rows.html" %}</div>
+</div>
+{% endblock %}

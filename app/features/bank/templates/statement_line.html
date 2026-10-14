@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Giao dịch sao kê") }}{% endblock %}
+{% block content %}
+{{ ui.page_header(_("Giao dịch ngày {d}", d=sl.date|date), bank.label, breadcrumbs=breadcrumbs, back="/bank/statements?bank_account_id=" ~ sl.bank_account_id, icon_name="git-compare",
+                  badge=ui.status_badge(sl.status if sl.status != "ignored" else "inactive")) }}
+<div class="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
+  <div class="min-w-0 space-y-5">
+    {% call ui.card(_("Trên sao kê")) %}
+      {{ ui.desc_list([(_("Ngày"), sl.date|date), (_("Số tham chiếu"), sl.reference), (_("Tiền vào") if sl.incoming else _("Tiền ra"), sl.amount|money),
+                       (_("Số dư"), sl.balance|money if sl.balance is not none else ""), (_("Diễn giải"), sl.description)], cols="sm:grid-cols-2") }}
+    {% endcall %}
+    {% if matched %}
+      {% call ui.alert(_("Đã khớp với {n} – {d}.", n=matched.display_number, d=matched.description), "success") %}
+        {{ ui.link_button(_("Xem chứng từ"), matched.url, "secondary", size="sm") }}
+        {% if can("bank.reconcile") %}<form method="post" action="/bank/statements/lines/{{ sl.id }}/unmatch">{{ ui.csrf_field() }}{{ ui.button(_("Bỏ khớp"), "ghost", size="sm", icon_name="x") }}</form>{% endif %}
+      {% endcall %}
+    {% else %}
+    {% call ui.card(_("Chứng từ có thể khớp"), _("Cùng tài khoản, cùng số tiền, trong vòng 60 ngày"), flush=True) %}
+      {% if candidates %}
+      <ul class="divide-y divide-line">
+        {% for ln, e in candidates %}
+        <li class="flex items-center gap-3 px-5 py-3">
+          <div class="min-w-0 flex-1"><a href="{{ e.url }}" class="doc-no hover:underline">{{ e.display_number }}</a> <span class="text-xs text-fg-3 tabular-nums">{{ e.date|date }}</span>
+            <p class="truncate text-[13px] text-fg-2">{{ ln.description or e.description }}</p></div>
+          <span class="tabular-nums">{{ ln.amount|money }}</span>
+          {% if can("bank.reconcile") %}<form method="post" action="/bank/statements/lines/{{ sl.id }}/match">{{ ui.csrf_field() }}<input type="hidden" name="journal_line_id" value="{{ ln.id }}">{{ ui.button(_("Khớp"), "secondary", size="sm", icon_name="link") }}</form>{% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+        <p class="px-5 py-4 text-[13px] text-fg-3">{{ _("Không có chứng từ phù hợp. Lập chứng từ mới từ giao dịch này.") }}</p>
+      {% endif %}
+    {% endcall %}
+    {% endif %}
+  </div>
+  <aside class="space-y-5">
+    {% if not matched and can("bank.create") %}
+    {% call ui.card(_("Lập chứng từ"), icon_name="file-plus") %}
+      <p class="text-[13px] text-fg-2">{{ _("Tạo {k} nháp với số tiền và ngày của giao dịch.", k=(_("thu tiền gửi") if sl.incoming else _("chi tiền gửi"))) }}
+        {% if suggestion %}{{ _("TK đối ứng gợi ý theo luật \"{kw}\": {acc}.", kw=suggestion.keyword, acc=suggestion.account) }}{% endif %}</p>
+      <form method="post" action="/bank/statements/lines/{{ sl.id }}/draft" class="mt-3">{{ ui.csrf_field() }}{{ ui.button(_("Lập chứng từ nháp"), "primary", size="sm", icon_name="file-plus") }}</form>
+    {% endcall %}
+    {% endif %}
+  </aside>
+</div>
+{% endblock %}

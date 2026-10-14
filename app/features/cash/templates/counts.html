@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Kiểm kê quỹ") }}{% endblock %}
+{% block content %}
+{% call ui.page_header(_("Kiểm kê quỹ"), _("Bảng kiểm kê quỹ (mẫu 08a-TT) · đếm tiền theo mệnh giá, đối chiếu tồn sổ"), breadcrumbs=breadcrumbs, icon_name="calculator") %}
+  {% if can("cashcount.manage") %}{{ ui.link_button(_("Kiểm kê mới"), "/cash/counts/new", "primary", icon_name="plus") }}{% endif %}
+{% endcall %}
+
+<div class="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+  {{ ui.stat_card(_("Tồn quỹ trên sổ hôm nay"), balance, icon_name="wallet", href="/cash/book") }}
+  {% if rows %}{{ ui.stat_card(_("Lần kiểm kê gần nhất"), rows[0].cc.count_date|date, unit="", money_value=False, icon_name="calendar", hint=rows[0].cc.number, href="/cash/counts/" ~ rows[0].cc.id) }}{% endif %}
+</div>
+
+<div class="card">
+{% if not rows %}
+  {% call ui.empty_state(_("Chưa có lần kiểm kê nào"), "calculator", _("Nên kiểm kê quỹ định kỳ (cuối ngày, cuối tháng) và khi bàn giao quỹ.")) %}
+    {% if can("cashcount.manage") %}{{ ui.link_button(_("Kiểm kê ngay"), "/cash/counts/new", "primary", icon_name="plus") }}{% endif %}
+  {% endcall %}
+{% else %}
+  <div class="table-wrap">
+    <table class="table table-hover">
+      <thead><tr><th class="w-36">{{ _("Số") }}</th><th class="w-32">{{ _("Ngày") }}</th><th class="num">{{ _("Tồn sổ") }}</th><th class="num">{{ _("Thực tế") }}</th><th class="num">{{ _("Chênh lệch") }}</th><th class="w-44">{{ _("Xử lý") }}</th></tr></thead>
+      <tbody>
+        {% for r in rows %}{% set cc = r.cc %}
+        <tr class="is-link">
+          <td><a href="/cash/counts/{{ cc.id }}" class="doc-no hover:underline">{{ cc.number }}</a></td>
+          <td class="tabular-nums text-fg-2">{{ cc.count_date|date }}{% if cc.count_time %} {{ cc.count_time }}{% endif %}</td>
+          <td class="num">{{ cc.book_balance|money }}</td>
+          <td class="num">{{ cc.actual_total|money }}</td>
+          <td class="num {{ 'amount-neg' if cc.difference < 0 }}">{{ ('+' if cc.difference > 0 else '') ~ (cc.difference|money) if cc.difference else '0' }}</td>
+          <td>
+            {% if cc.difference == 0 %}{{ ui.badge(_("Khớp"), "green", dot=True) }}
+            {% elif r.remaining == 0 %}{{ ui.badge(_("Đã xử lý"), "green", dot=True) }}
+            {% else %}{{ ui.badge(_("Chờ xử lý"), "amber", dot=True) }}{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}
+</div>
+{% endblock %}

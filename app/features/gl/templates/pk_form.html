@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% import "gl/_pk_grid.html" as g with context %}
+{% set editing = entry is not none %}
+{% block title %}{{ _("Sửa phiếu kế toán") if editing else _("Phiếu kế toán mới") }}{% endblock %}
+{% block content %}
+<form method="post" action="{{ '/entries/' ~ entry.id ~ '/edit' if editing else '/entries' }}" x-data="docForm()" @keydown="keys($event)" novalidate>
+  {{ ui.csrf_field() }}
+  {% call ui.page_header(_("Sửa phiếu kế toán") if editing else _("Phiếu kế toán mới"),
+                         _("Bút toán tổng hợp: mỗi dòng một cặp Nợ/Có. Số chứng từ được cấp khi ghi sổ."),
+                         breadcrumbs=breadcrumbs, back=("/entries/" ~ entry.id if editing else "/entries"), badge=ui.status_badge("draft")) %}
+  {% endcall %}
+
+  {% if errors %}
+    {{ ui.alert(errors.get("lines") or errors.get("vat") or _("Kiểm tra lại các ô được đánh dấu."), "error", title=_("Chưa lưu được"), cls="mb-5") }}
+  {% endif %}
+
+  <div class="space-y-5">
+    {% call ui.card(_("Thông tin chung")) %}
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {{ ui.date_input("date", _("Ngày hạch toán"), values.date, required=True, errors=errors) }}
+      {{ ui.date_input("doc_date", _("Ngày chứng từ"), values.doc_date, errors=errors) }}
+      {{ ui.input("ref_no", _("Số tham chiếu"), values.ref_no, placeholder=_("Số hóa đơn, hợp đồng…")) }}
+      {{ ui.input("attached_docs", _("Kèm theo (chứng từ gốc)"), values.attached_docs, type="number", errors=errors, input_cls="tabular-nums") }}
+      {{ ui.input("description", _("Diễn giải"), values.description, required=True, errors=errors, cls="sm:col-span-2 lg:col-span-4", hint=_("Dòng mới tự lấy diễn giải này.")) }}
+    </div>
+    {% endcall %}
+
+    {% call ui.card(_("Định khoản"), _("Mỗi dòng ghi Nợ một tài khoản, Có một tài khoản. TK 131, 331, 141 bắt buộc chọn đối tượng; TK 112x chọn tài khoản ngân hàng.")) %}
+      {{ g.pk_grid(lines, bank_items) }}
+    {% endcall %}
+
+    {% set has_vat = vat.get("has_vat") %}
+    <section class="card" x-data="{ on: {{ 'true' if has_vat else 'false' }} }">
+      <div class="card-header">
+        <div><h2 class="card-title">{{ _("Hóa đơn GTGT") }}</h2><p class="card-subtitle">{{ _("Khai báo nếu chứng từ có hóa đơn để lên bảng kê và tờ khai thuế GTGT.") }}</p></div>
+        <label class="flex items-center gap-2 text-[13px]"><input type="checkbox" name="has_vat" value="1" class="checkbox" x-model="on" {{ "checked" if has_vat }}>{{ _("Có hóa đơn") }}</label>
+      </div>
+      <div class="card-body grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4" x-show="on" x-cloak>
+        {{ ui.select("vat_direction", _("Loại"), [("in", _("Đầu vào (mua)")), ("out", _("Đầu ra (bán)"))], vat.get("vat_direction") or "in") }}
+        {{ ui.input("vat_invoice_series", _("Ký hiệu"), vat.get("vat_invoice_series", ""), placeholder="C26TAA") }}
+        {{ ui.input("vat_invoice_no", _("Số hóa đơn"), vat.get("vat_invoice_no", ""), input_cls="tabular-nums") }}
+        {{ ui.date_input("vat_invoice_date", _("Ngày hóa đơn"), vat.get("vat_invoice_date") or values.date) }}
+        {{ ui.input("vat_partner_name", _("Tên người bán / mua"), vat.get("vat_partner_name", ""), cls="sm:col-span-2") }}
+        {{ ui.input("vat_partner_tax_code", _("Mã số thuế"), vat.get("vat_partner_tax_code", ""), input_cls="tabular-nums") }}
+        {{ ui.select("vat_rate", _("Thuế suất"), [("10", "10%"), ("8", "8%"), ("5", "5%"), ("0", "0%"), ("KCT", _("Không chịu thuế")), ("KKKNT", _("Không kê khai, tính nộp"))], vat.get("vat_rate") or "10") }}
+        {{ ui.money_input("vat_goods_amount", _("Tiền hàng chưa thuế"), vat.get("vat_goods_amount") or None) }}
+        {{ ui.money_input("vat_amount", _("Tiền thuế GTGT"), vat.get("vat_amount") or None) }}
+      </div>
+    </section>
+  </div>
+
+  {% call ui.form_actions() %}
+    <span class="mr-auto hidden text-xs text-fg-3 md:inline">{{ ui.kbd("Ctrl+S") }} {{ _("lưu nháp") }} · {{ ui.kbd("Ctrl+Enter") }} {{ _("lưu và ghi sổ") }}</span>
+    {{ ui.link_button(_("Hủy bỏ"), "/entries/" ~ entry.id if editing else "/entries", "ghost") }}
+    {{ ui.button(_("Lưu nháp"), "secondary", name="action", value="save", hotkey="save") }}
+    {% if can("journal.post") %}{{ ui.button(_("Lưu và ghi sổ"), icon_name="check", name="action", value="post", hotkey="post", kbd_hint="Ctrl+Enter") }}{% endif %}
+  {% endcall %}
+</form>
+{% endblock %}

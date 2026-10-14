@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Báo cáo lương, BH, TNCN") }}{% endblock %}
+{% block content %}
+{% set period_label = (_("Tháng {m}/{y}", m="%02d"|format(month), y=year)) if month else _("Năm {y}", y=year) %}
+{% call ui.page_header(_("Báo cáo lương, BH, TNCN"), period_label ~ " · " ~ _("chỉ gồm bảng lương đã ghi sổ"), breadcrumbs=breadcrumbs, icon_name="file-spreadsheet") %}
+  {% if can("payroll.export") %}{{ ui.report_toolbar(xlsx_href="/payroll/reports.xlsx?year=" ~ year ~ "&month=" ~ month ~ "&tab=" ~ tab) }}{% endif %}
+{% endcall %}
+
+<div class="card mb-5 p-3 sm:px-5">
+  <form method="get" action="/payroll/reports" class="flex flex-wrap items-end gap-2">
+    <input type="hidden" name="tab" value="{{ tab }}">
+    <div><label class="label" for="f-year">{{ _("Năm") }}</label><input id="f-year" type="number" name="year" value="{{ year }}" class="input input-sm w-24 tabular-nums"></div>
+    <div><label class="label" for="f-month">{{ _("Tháng") }}</label>
+      <select id="f-month" name="month" class="input input-sm w-32"><option value="0">{{ _("Cả năm") }}</option>{% for m in range(1, 13) %}<option value="{{ m }}" {{ "selected" if m == month }}>{{ "%02d"|format(m) }}</option>{% endfor %}</select></div>
+    <button class="btn-secondary btn-sm" type="submit">{{ _("Xem") }}</button>
+  </form>
+</div>
+
+{{ ui.tabs([
+  {"key": "pit", "label": _("Thuế TNCN"), "href": "/payroll/reports?tab=pit&year=" ~ year ~ "&month=" ~ month, "icon": "percent"},
+  {"key": "insurance", "label": _("Bảo hiểm, KPCĐ"), "href": "/payroll/reports?tab=insurance&year=" ~ year ~ "&month=" ~ month, "icon": "shield"},
+], tab, cls="mb-4") }}
+
+<div class="card">
+{% if not rows %}
+  {{ ui.empty_state(_("Chưa có bảng lương đã ghi sổ trong kỳ"), "file-spreadsheet") }}
+{% elif tab == "insurance" %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr><th rowspan="2">{{ _("Nhân viên") }}</th><th colspan="3" class="text-center">{{ _("Người lao động") }}</th><th colspan="4" class="text-center">{{ _("Doanh nghiệp") }}</th><th rowspan="2" class="num">{{ _("Tổng") }}</th></tr>
+        <tr><th class="num">BHXH</th><th class="num">BHYT</th><th class="num">BHTN</th><th class="num">BHXH</th><th class="num">BHYT</th><th class="num">BHTN</th><th class="num">KPCĐ</th></tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr><td><p class="font-medium">{{ r.employee.full_name }}</p><p class="text-xs text-fg-3">{{ r.employee.code }}</p></td>
+          <td class="num">{{ r.emp_bhxh|money0 }}</td><td class="num">{{ r.emp_bhyt|money0 }}</td><td class="num">{{ r.emp_bhtn|money0 }}</td>
+          <td class="num">{{ r.er_bhxh|money0 }}</td><td class="num">{{ r.er_bhyt|money0 }}</td><td class="num">{{ r.er_bhtn|money0 }}</td><td class="num">{{ r.er_kpcd|money0 }}</td>
+          <td class="num font-medium">{{ (r.emp_insurance + r.er_insurance)|money }}</td></tr>
+        {% endfor %}
+      </tbody>
+      <tfoot><tr class="row-total"><td>{{ _("Cộng") }}</td>
+        <td class="num">{{ tot.emp_bhxh|money }}</td><td class="num">{{ tot.emp_bhyt|money }}</td><td class="num">{{ tot.emp_bhtn|money }}</td>
+        <td class="num">{{ tot.er_bhxh|money }}</td><td class="num">{{ tot.er_bhyt|money }}</td><td class="num">{{ tot.er_bhtn|money }}</td><td class="num">{{ tot.er_kpcd|money }}</td>
+        <td class="num">{{ (tot.emp_insurance + tot.er_insurance)|money }}</td></tr></tfoot>
+    </table>
+  </div>
+{% else %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>{{ _("Nhân viên") }}</th><th class="max-md:hidden">{{ _("MST") }}</th><th class="num">{{ _("Thu nhập chịu thuế") }}</th><th class="num max-lg:hidden">{{ _("BH bắt buộc") }}</th><th class="num max-lg:hidden">{{ _("Giảm trừ gia cảnh") }}</th><th class="num">{{ _("Thu nhập tính thuế") }}</th><th class="num">{{ _("Thuế đã khấu trừ") }}</th></tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr><td><p class="font-medium">{{ r.employee.full_name }}</p><p class="text-xs text-fg-3">{{ r.employee.code }}</p></td>
+          <td class="max-md:hidden tabular-nums text-fg-2">{{ r.employee.partner.tax_code or "–" }}</td>
+          <td class="num">{{ r.taxable_income|money }}</td><td class="num max-lg:hidden text-fg-2">{{ r.emp_insurance|money0 }}</td>
+          <td class="num max-lg:hidden text-fg-2">{{ (r.self_deduction + r.dependent_deduction)|money0 }}</td>
+          <td class="num">{{ r.assessable_income|money0 }}</td><td class="num font-medium">{{ r.pit|money0 }}</td></tr>
+        {% endfor %}
+      </tbody>
+      <tfoot><tr class="row-total"><td>{{ _("Cộng") }}</td><td class="max-md:hidden"></td><td class="num">{{ tot.taxable_income|money }}</td><td class="num max-lg:hidden">{{ tot.emp_insurance|money }}</td><td class="num max-lg:hidden">{{ (tot.self_deduction + tot.dependent_deduction)|money }}</td><td class="num">{{ tot.assessable_income|money }}</td><td class="num">{{ tot.pit|money }}</td></tr></tfoot>
+    </table>
+  </div>
+{% endif %}
+</div>
+<p class="mt-3 text-[13px] text-fg-3">{{ _("Số liệu tham khảo khi lập tờ khai 05/KK-TNCN và quyết toán 05/QTT-TNCN; đối chiếu với HTKK trước khi nộp.") }}</p>
+{% endblock %}

@@ -1,0 +1,50 @@
+{% extends "assets/print/_layout.html" %}
+{% block title %}Phiếu lương tháng {{ run.period_label }}{% endblock %}
+{% block page_size %}size: A4 portrait; margin: 10mm 12mm 12mm 12mm;{% endblock %}
+{% block css %}
+  .slip { border: .8pt solid #000; padding: 4mm 5mm; margin-bottom: 6mm; page-break-inside: avoid; }
+  .slip h2 { font-size: 12pt; text-align: center; margin: 0 0 1mm; }
+  .slip .meta { display: flex; justify-content: space-between; font-size: 9.5pt; margin-bottom: 2mm; }
+  .slip table { width: 100%; border-collapse: collapse; font-size: 9.5pt; }
+  .slip td { padding: .7mm 0; border-bottom: .4pt dotted #999; }
+  .slip td.v { text-align: right; white-space: nowrap; }
+  .slip tr.total td { font-weight: bold; border-bottom: none; border-top: .8pt solid #000; padding-top: 1.2mm; }
+  .cols { display: flex; gap: 6mm; }
+  .cols > div { flex: 1; }
+  .head { font-size: 9pt; color: #333; margin-bottom: 1mm; }
+{% endblock %}
+{% block body %}
+{% for ln in lines %}
+<div class="slip">
+  <p class="head">{{ company.name }}{% if company.tax_code %} – MST {{ company.tax_code }}{% endif %}</p>
+  <h2>PHIẾU LƯƠNG THÁNG {{ "%02d"|format(run.month) }}/{{ run.year }}</h2>
+  <div class="meta">
+    <span><b>{{ ln.employee.full_name }}</b> ({{ ln.employee.code }}){% if ln.employee.department %} – {{ ln.employee.department }}{% endif %}</span>
+    <span>Ngày công: {{ ln.days_worked|qty }}/{{ run.standard_days|qty }} · Người phụ thuộc: {{ ln.dependents }}</span>
+  </div>
+  <div class="cols">
+    <div>
+      <table>
+        <tr><td>Lương theo hợp đồng</td><td class="v">{{ ln.base_salary|money }}</td></tr>
+        <tr><td>Lương theo ngày công</td><td class="v">{{ ln.salary_by_days|money }}</td></tr>
+        <tr><td>Phụ cấp chịu thuế</td><td class="v">{{ ln.taxable_allowance|money }}</td></tr>
+        <tr><td>Phụ cấp không chịu thuế</td><td class="v">{{ ln.nontaxable_allowance|money }}</td></tr>
+        <tr><td>Thu nhập khác</td><td class="v">{{ ln.other_income|money }}</td></tr>
+        <tr class="total"><td>Tổng thu nhập</td><td class="v">{{ ln.gross|money }}</td></tr>
+      </table>
+    </div>
+    <div>
+      <table>
+        <tr><td>BHXH (người lao động)</td><td class="v">{{ ln.emp_bhxh|money }}</td></tr>
+        <tr><td>BHYT (người lao động)</td><td class="v">{{ ln.emp_bhyt|money }}</td></tr>
+        <tr><td>BHTN (người lao động)</td><td class="v">{{ ln.emp_bhtn|money }}</td></tr>
+        <tr><td>Thuế TNCN (thu nhập tính thuế {{ ln.assessable_income|money }})</td><td class="v">{{ ln.pit|money }}</td></tr>
+        <tr><td>Trừ tạm ứng</td><td class="v">{{ ln.advance_deduction|money }}</td></tr>
+        <tr class="total"><td>THỰC LĨNH</td><td class="v">{{ ln.net_pay|money }}</td></tr>
+      </table>
+    </div>
+  </div>
+  <p class="i small" style="margin-top:1.5mm">Bằng chữ: {{ ln.net_pay|words }}</p>
+</div>
+{% endfor %}
+{% endblock %}

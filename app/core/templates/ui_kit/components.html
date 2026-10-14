@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% import "charts.html" as charts %}
+{% block title %}{{ _("Thành phần") }}{% endblock %}
+
+{% macro page_url(p) %}#trang-{{ p }}{% endmacro %}
+
+{% macro demo(title, code=None) -%}
+<section class="card">
+  <div class="card-header"><h2 class="card-title">{{ title }}</h2>{% if code %}<code class="mono text-fg-3">{{ code }}</code>{% endif %}</div>
+  <div class="card-body">{{ caller() }}</div>
+</section>
+{%- endmacro %}
+
+{% block content %}
+{% call ui.page_header(_("Thành phần"), _("Mọi macro trong macros.html và charts.html, dùng dữ liệu giả."), breadcrumbs=[(_("Design system"), "/ui-kit"), (_("Thành phần"), None)]) %}
+  {{ ui.button(_("Thông báo"), "secondary", icon_name="bell", type="button", attrs='@click="toast(\'Đã lưu chứng từ PC2026-0043\', \'success\')"') }}
+  {{ ui.button(_("Hỏi xác nhận"), "danger", icon_name="trash", type="button", attrs='@click="uiConfirm(\'Hủy chứng từ PC2026-0042? Thao tác được ghi vào nhật ký.\', {danger: true, title: \'Hủy chứng từ\', confirmLabel: \'Hủy chứng từ\'}).then(ok => toast(ok ? \'Đã hủy\' : \'Đã bỏ qua\', ok ? \'success\' : \'info\'))"') }}
+{% endcall %}
+
+<div class="grid grid-cols-1 items-start gap-5 xl:grid-cols-2">
+
+  {% call demo(_("Nút"), "ui.button · ui.link_button · ui.icon_button") %}
+  <div class="space-y-4">
+    <div class="flex flex-wrap items-center gap-2">
+      {{ ui.button(_("Ghi sổ"), icon_name="check", type="button", kbd_hint="Ctrl+Enter") }}
+      {{ ui.button(_("Lưu nháp"), "secondary", type="button") }}
+      {{ ui.button(_("Gợi ý"), "soft", icon_name="sparkles", type="button") }}
+      {{ ui.button(_("Bỏ qua"), "ghost", type="button") }}
+      {{ ui.button(_("Hủy chứng từ"), "danger", icon_name="ban", type="button") }}
+      {{ ui.button(_("Xóa"), "danger-ghost", icon_name="trash", type="button") }}
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      {{ ui.button(_("Lớn"), size="lg", type="button") }}
+      {{ ui.button(_("Vừa"), type="button") }}
+      {{ ui.button(_("Nhỏ"), size="sm", type="button") }}
+      {{ ui.button(_("Rất nhỏ"), size="xs", type="button") }}
+      {{ ui.button(_("Vô hiệu"), "secondary", type="button", disabled=True) }}
+      {{ ui.icon_button("printer", _("In phiếu")) }}
+      {{ ui.icon_button("download", _("Tải xuống"), variant="secondary") }}
+      {{ ui.icon_button("ellipsis", _("Thêm")) }}
+    </div>
+  </div>
+  {% endcall %}
+
+  {% call demo(_("Badge & trạng thái"), "ui.badge · ui.status_badge · ui.kind_badge") %}
+  <div class="space-y-3">
+    <div class="flex flex-wrap gap-2">
+      {% for s in ["draft", "posted", "cancelled", "locked", "open", "overdue", "matched", "unmatched", "paid", "partial"] %}{{ ui.status_badge(s) }}{% endfor %}
+    </div>
+    <div class="flex flex-wrap gap-2">
+      {% for k in ["PT", "PC", "BC", "BN", "PK", "BH", "MH", "NK", "XK", "KH", "LG", "KC"] %}{{ ui.kind_badge(k) }}{% endfor %}
+    </div>
+    <div class="flex flex-wrap gap-2">
+      {% for c in ["gray", "brand", "green", "amber", "red", "blue", "violet"] %}{{ ui.badge(c|capitalize, c) }}{% endfor %}
+      {{ ui.badge(_("TT133"), "brand", icon_name="badge-check") }}
+    </div>
+  </div>
+  {% endcall %}
+
+  {% call demo(_("Trường nhập liệu"), "ui.input · ui.select · ui.textarea · ui.date_input · ui.money_input") %}
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    {{ ui.input("demo_name", _("Người nộp tiền"), "Nguyễn Văn Tâm", required=True, hint=_("Tự gợi ý từ danh mục đối tượng.")) }}
+    {{ ui.input("demo_tax", _("Mã số thuế"), "031764514", errors={"demo_tax": "Mã số thuế phải có 10 hoặc 13 chữ số."}) }}
+    {{ ui.date_input("demo_date", _("Ngày hạch toán"), today, required=True) }}
+    {{ ui.money_input("demo_amount", _("Số tiền"), 12500000, hint=_("Gõ tắt: 2tr, 500k, 1,5tr")) }}
+    {{ ui.select("demo_vat", _("Thuế suất"), [("10", "10%"), ("8", "8% (NĐ 174/2025)"), ("5", "5%"), ("0", "0%"), ("KCT", "Không chịu thuế")], "8") }}
+    {{ ui.input("demo_search", _("Có tiền tố"), "", placeholder=_("Tìm…"), prefix=ui.icon("search")) }}
+    {{ ui.textarea("demo_desc", _("Diễn giải"), "Thanh toán tiền điện tháng 9/2026", rows=2, cls="sm:col-span-2") }}
+    {{ ui.password_input("demo_pw", _("Mật khẩu"), required=False) }}
+    {{ ui.input("demo_ro", _("Chỉ đọc"), "PC2026-0042", readonly=True, hint=_("Số được cấp khi ghi sổ.")) }}
+  </div>
+  {% endcall %}
+
+  {% call demo(_("Combobox tra cứu"), "ui.combobox – GET /lookup/*") %}
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    {{ ui.combobox("demo_account", _("Tài khoản"), url=lookup_base ~ "/accounts", value="6422", value_label="6422 – Chi phí quản lý doanh nghiệp", local_filter=True, required=True) }}
+    {{ ui.combobox("demo_partner", _("Đối tượng"), url=lookup_base ~ "/partners", local_filter=True, placeholder=_("Mã, tên hoặc MST…"), hint=_("Chọn xong sẽ tự điền địa chỉ (sự kiện combobox-select).")) }}
+    {{ ui.combobox("demo_contact", _("Người nhận (gõ tự do)"), url=lookup_base ~ "/partners", allow_free=True, local_filter=True, value="Nguyễn Văn Tâm") }}
+    {{ ui.combobox("demo_vatrate", _("Danh sách tĩnh"), items=[{"value": "month", "label": "Khai theo tháng"}, {"value": "quarter", "label": "Khai theo quý"}], value="quarter", value_label="Khai theo quý") }}
+  </div>
+  {% endcall %}
+
+  {% call demo(_("Lựa chọn"), "ui.checkbox · ui.switch · ui.radio_group") %}
+  <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+    <div class="space-y-3">
+      {{ ui.checkbox("demo_c1", _("Đã nhận đủ chứng từ gốc"), True) }}
+      {{ ui.checkbox("demo_c2", _("In kèm liên 2"), hint=_("Liên giao cho người nộp tiền.")) }}
+      {{ ui.switch("demo_sw", _("Chặn âm quỹ"), True, hint=_("Kiểm tra cả chứng từ ghi lùi ngày.")) }}
+    </div>
+    <div class="space-y-4">
+      {{ ui.radio_group("demo_period", _("Kỳ khai thuế"), [("month", _("Tháng")), ("quarter", _("Quý"))], "month") }}
+      {{ ui.radio_group("demo_pay", _("Thanh toán"), [{"value": "cash", "label": _("Tiền mặt"), "hint": "Nợ 1111"}, {"value": "credit", "label": _("Ghi nợ"), "hint": "Nợ 131"}], "credit", style="cards") }}
+    </div>
+  </div>
+  {% endcall %}
+
+  {% call demo(_("Thông báo"), "ui.alert · toast() · uiConfirm()") %}
+  <div class="space-y-3">
+    {{ ui.alert(_("Đã ghi sổ phiếu chi PC2026-0042."), "success") }}
+    {{ ui.alert(_("Ghi sổ làm tồn quỹ âm: ngày 01/04/2023, sau dòng 3 tồn quỹ còn -1.000.000."), "error", title=_("Không thể ghi sổ")) }}
+    {% call ui.alert(_("Tháng 9/2026 chưa khóa sổ sau 14 ngày."), "warning", dismissible=True) %}{{ ui.link_button(_("Khóa sổ"), "#", "secondary", size="xs") }}{% endcall %}
+    {{ ui.alert(_("Từ 01/7/2026 doanh nghiệp siêu nhỏ có thể áp dụng TT58/2026."), "info") }}
+  </div>
+  {% endcall %}
+
+  {% call demo(_("Thẻ số liệu"), "ui.stat_card") %}
+  <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+    {{ ui.stat_card(_("Tiền mặt"), 99000000, delta=12.4, delta_label=_("so với tháng trước"), icon_name="wallet", spark=[72, 80, 77, 85, 91, 88, 99]) }}
+    {{ ui.stat_card(_("Phải trả người bán"), 421600000, delta=6.2, good="down", delta_label=_("so với tháng trước"), icon_name="coins") }}
+    {{ ui.stat_card(_("Lợi nhuận lũy kế"), -38250000, hint=_("Từ 01/01/2026"), icon_name="trending-down") }}
+    {{ ui.stat_card(_("Chứng từ nháp"), "5", unit=None, money_value=False, hint=_("Chờ ghi sổ"), icon_name="file-text", href="#") }}
+  </div>
+  {% endcall %}
+
+  {% call demo(_("Tab, nút phân đoạn, phân trang"), "ui.tabs · ui.pagination") %}
+  <div class="space-y-5">
+    {{ ui.tabs([{"key": "all", "label": _("Tất cả"), "href": "#", "count": 184}, {"key": "draft", "label": _("Nháp"), "href": "#", "count": 5}, {"key": "posted", "label": _("Đã ghi sổ"), "href": "#", "count": 176}, {"key": "cancelled", "label": _("Đã hủy"), "href": "#", "count": 3}], "all") }}
+    <div class="segmented"><button type="button" class="segment segment-active">{{ _("Tháng") }}</button><button type="button" class="segment">{{ _("Quý") }}</button><button type="button" class="segment">{{ _("Năm") }}</button></div>
+    <div class="-mx-4 -mb-4 sm:-mx-5 sm:-mb-5">{{ ui.pagination(3, 16, page_url, total=184) }}</div>
+  </div>
+  {% endcall %}
+
+  {% call demo(_("Menu, hộp thoại, ngăn kéo"), "ui.dropdown · ui.modal · ui.drawer") %}
+  <div class="flex flex-wrap items-center gap-2">
+    {% call ui.dropdown(_("Thao tác"), icon_name="ellipsis") %}
+      {{ ui.menu_label(_("Chứng từ")) }}
+      {{ ui.menu_item(_("In phiếu"), "#", "printer", kbd_hint="Ctrl+P") }}
+      {{ ui.menu_item(_("Nhân bản"), "#", "copy") }}
+      {{ ui.menu_item(_("Tạo điều chỉnh"), "#", "undo-2") }}
+      {{ ui.menu_sep() }}
+      {{ ui.menu_post(_("Hủy chứng từ"), "#", "ban", danger=True, confirm=_("Hủy chứng từ này?")) }}
+    {% endcall %}
+    {{ ui.button(_("Mở hộp thoại"), "secondary", icon_name="square-pen", type="button", attrs="@click=\"$dispatch('modal-open', 'demo-modal')\"") }}
+    {{ ui.button(_("Mở ngăn kéo"), "secondary", icon_name="panel-left", type="button", attrs="@click=\"$dispatch('drawer-open', 'demo-drawer')\"") }}
+  </div>
+  {% call ui.modal("demo-modal", _("Hủy chứng từ"), description=_("Chứng từ đã ghi sổ chỉ có thể hủy khi kỳ còn mở. Lý do được ghi vào nhật ký.")) %}
+    <div class="space-y-4 px-5 pb-5">
+      {{ ui.textarea("reason", _("Lý do hủy"), rows=3, required=True, placeholder=_("Ví dụ: nhập trùng với PC2026-0041")) }}
+    </div>
+    <div class="flex justify-end gap-2 border-t border-line bg-surface-2 px-5 py-3">
+      {{ ui.button(_("Đóng"), "secondary", type="button", attrs="@click=\"$dispatch('modal-close')\"") }}
+      {{ ui.button(_("Hủy chứng từ"), "danger", type="button") }}
+    </div>
+  {% endcall %}
+  {% call ui.drawer("demo-drawer", _("Lọc nâng cao"), description=_("Áp dụng cho danh sách chứng từ")) %}
+    <div class="space-y-4 p-5">
+      {{ ui.combobox("f_account", _("Tài khoản"), url=lookup_base ~ "/accounts", local_filter=True) }}
+      {{ ui.combobox("f_partner", _("Đối tượng"), url=lookup_base ~ "/partners", local_filter=True) }}
+      {{ ui.select("f_status", _("Trạng thái"), [("draft", _("Nháp")), ("posted", _("Đã ghi sổ")), ("cancelled", _("Đã hủy"))], placeholder=_("Tất cả")) }}
+    </div>
+  {% endcall %}
+  {% endcall %}
+
+  {% call demo(_("Trạng thái rỗng, đang tải, tiến độ"), "ui.empty_state · ui.skeleton · ui.progress") %}
+  <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+    <div class="rounded-lg border border-dashed border-line-strong">
+      {% call ui.empty_state(_("Chưa có chứng từ"), "receipt", _("Tạo phiếu thu đầu tiên hoặc nhập từ Excel."), compact=True) %}{{ ui.link_button(_("Tạo phiếu thu"), "#", "primary", size="sm", icon_name="plus") }}{% endcall %}
+    </div>
+    <div class="space-y-5">
+      {{ ui.skeleton(4) }}
+      <div><div class="mb-1.5 flex justify-between text-[13px]"><span class="text-fg-2">{{ _("Đã đối chiếu") }}</span><span class="tabular-nums">142/154</span></div>{{ ui.progress(142, 154, "green") }}</div>
+    </div>
+  </div>
+  {% endcall %}
+
+  {% call demo(_("Mô tả, lịch sử, đính kèm"), "ui.desc_list · ui.timeline · ui.attachment_list") %}
+  <div class="space-y-6">
+    {{ ui.desc_list([(_("Số chứng từ"), "PC2026-0042"), (_("Ngày hạch toán"), today|date), (_("Số tiền"), 2200000|money ~ " đ"), (_("Người nhận"), "Nguyễn Văn Tâm"), (_("Kèm theo"), "01 hóa đơn GTGT"), (_("Ghi chú"), none)]) }}
+    {{ ui.timeline([{"at": "02/10/2026 15:42", "actor": "Nguyễn Thị Minh Anh", "action": _("đã ghi sổ"), "icon": "check"}, {"at": "02/10/2026 10:58", "actor": _("Trợ lý AI"), "action": _("đã lập nháp"), "detail": _("Từ hóa đơn XML 00012873"), "icon": "sparkles"}]) }}
+    {{ ui.attachment_list([{"name": "HD_00012873.pdf", "size": "182 KB", "href": "#", "kind": "pdf"}, {"name": "HD_00012873.xml", "size": "14 KB", "href": "#", "kind": "xml"}]) }}
+  </div>
+  {% endcall %}
+
+  {% call demo(_("Phím tắt, chọn kỳ"), "ui.kbd · ui.period_selector") %}
+  <div class="space-y-5">
+    <p class="flex flex-wrap items-center gap-3 text-[13px] text-fg-2">{{ ui.kbd("Ctrl+K") }} {{ _("tìm kiếm") }} {{ ui.kbd("Ctrl+Enter") }} {{ _("ghi sổ") }} {{ ui.kbd("Alt+T") }} {{ _("phiếu thu") }}</p>
+    {{ ui.period_selector({"mode": "quarter", "start": today.replace(month=7, day=1), "end": today.replace(month=9, day=30), "quarter": 3, "year": 2026}, action="#") }}
+  </div>
+  {% endcall %}
+</div>
+
+<h2 class="mt-10 mb-4 text-base font-semibold">{{ _("Biểu đồ") }} <span class="ml-1 text-[13px] font-normal text-fg-3">charts.bar_chart · line_chart · donut · hbar_list · sparkline</span></h2>
+<div class="grid grid-cols-1 items-start gap-5 xl:grid-cols-2">
+  {% set months = ["T11/25", "T12/25", "T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10"] %}
+  {% call ui.card(_("Thu, chi tiền theo tháng"), _("Tiền mặt + tiền gửi, 12 tháng gần nhất")) %}
+    {{ charts.bar_chart(months, [{"name": _("Thu"), "values": [182000000, 240000000, 156000000, 128000000, 205000000, 231000000, 198000000, 264000000, 247000000, 289000000, 312000000, 176000000], "slot": 1}, {"name": _("Chi"), "values": [151000000, 198000000, 172000000, 140000000, 167000000, 188000000, 214000000, 203000000, 226000000, 241000000, 259000000, 148000000], "slot": 2}], caption=_("Thu chi theo tháng")) }}
+  {% endcall %}
+  {% call ui.card(_("Tồn tiền cuối tháng"), _("Một chuỗi – không cần chú giải")) %}
+    {{ charts.line_chart(months, [{"name": _("Tồn cuối tháng"), "values": [812000000, 854000000, 838000000, 826000000, 864000000, 907000000, 891000000, 952000000, 973000000, 1021000000, 1074000000, 1102000000], "slot": 1}], caption=_("Tồn tiền cuối tháng")) }}
+  {% endcall %}
+  {% call ui.card(_("Cơ cấu doanh thu"), _("Năm 2026")) %}
+    {{ charts.donut([{"label": _("Dịch vụ tư vấn"), "value": 1240000000, "slot": 1}, {"label": _("Thuê bao phần mềm"), "value": 684000000, "slot": 2}, {"label": _("Bán thiết bị"), "value": 318000000, "slot": 3}], center_label=_("Tổng"), center_value="2,24 tỷ") }}
+  {% endcall %}
+  {% call ui.card(_("Chi phí lớn nhất"), _("Theo tài khoản, năm 2026")) %}
+    {{ charts.hbar_list([{"label": "6422 – Chi phí quản lý doanh nghiệp", "value": 512340000}, {"label": "632 – Giá vốn hàng bán", "value": 286150000}, {"label": "6421 – Chi phí bán hàng", "value": 148900000}, {"label": "635 – Chi phí tài chính", "value": 22400000}]) }}
+  {% endcall %}
+</div>
+
+<h2 class="mt-10 mb-4 text-base font-semibold">{{ _("Bảng dữ liệu") }} <span class="ml-1 text-[13px] font-normal text-fg-3">.table · .table-wrap · .num · .row-total</span></h2>
+{% call ui.card(flush=True) %}
+<div class="table-wrap">
+  <table class="table table-hover">
+    <thead><tr><th>{{ _("Số") }}</th><th>{{ _("Ngày") }}</th><th>{{ _("Diễn giải") }}</th><th class="num">{{ _("Thu") }}</th><th class="num">{{ _("Chi") }}</th><th class="num">{{ _("Tồn") }}</th></tr></thead>
+    <tbody>
+      <tr class="is-muted"><td></td><td></td><td>{{ _("Tồn đầu kỳ") }}</td><td></td><td></td><td class="num">85.420.000</td></tr>
+      <tr class="is-link"><td class="doc-no">PT2026-0030</td><td class="tabular-nums">24/09/2026</td><td>Rút tiền gửi nhập quỹ</td><td class="num amount-in">50.000.000</td><td class="num"></td><td class="num">135.420.000</td></tr>
+      <tr class="is-link"><td class="doc-no">PC2026-0042</td><td class="tabular-nums">02/10/2026</td><td>Thanh toán tiền điện tháng 9</td><td class="num"></td><td class="num amount-out">2.200.000</td><td class="num">133.220.000</td></tr>
+    </tbody>
+    <tfoot><tr class="row-total"><td colspan="3">{{ _("Cộng phát sinh") }}</td><td class="num">50.000.000</td><td class="num">2.200.000</td><td class="num">133.220.000</td></tr></tfoot>
+  </table>
+</div>
+{% endcall %}
+{% endblock %}

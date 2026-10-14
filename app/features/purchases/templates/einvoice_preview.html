@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Xem trước hóa đơn") }}{% endblock %}
+{% block content %}
+{% set crumbs = [] %}{% for b in breadcrumbs %}{% do crumbs.append((_(b[0]), b[1])) %}{% endfor %}
+{{ ui.page_header(_("Xem trước hóa đơn điện tử"), _("{n} hóa đơn đọc được, {k} hóa đơn có thể nhập.", n=prev.rows|length, k=prev.importable),
+                  breadcrumbs=crumbs, back="/einvoices", icon_name="file-check") }}
+
+{% if prev.errors %}
+  {% call ui.alert(_("Không đọc được {n} file:", n=prev.errors|length), "error", cls="mb-5") %}
+    <ul class="list-disc space-y-0.5 pl-5 text-[13px]">{% for e in prev.errors[:20] %}<li>{{ e }}</li>{% endfor %}</ul>
+  {% endcall %}
+{% endif %}
+
+<form method="post" action="/einvoices/{{ prev.token }}/confirm" x-data="{ all: true }">
+  {{ ui.csrf_field() }}
+  <div class="card">
+    <div class="flex flex-wrap items-end gap-4 border-b border-line p-4 sm:px-5">
+      {{ ui.select("purchase_account", _("TK mặc định cho dòng mua chưa khớp hàng hóa"), purchase_accounts, "6422", cls="w-full sm:w-80") }}
+      {{ ui.select("sales_account", _("TK doanh thu mặc định"), sales_accounts, "5113", cls="w-full sm:w-72") }}
+    </div>
+    {% if not prev.rows %}
+      {{ ui.empty_state(_("Không có hóa đơn nào"), "file-x") }}
+    {% else %}
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr>
+          <th class="w-10"><input type="checkbox" class="checkbox" x-model="all" @change="$root.querySelectorAll('input[name=keys]:not(:disabled)').forEach(c => c.checked = all)" aria-label="{{ _('Chọn tất cả') }}"></th>
+          <th class="w-28">{{ _("Chiều") }}</th><th class="w-40">{{ _("Hóa đơn") }}</th><th class="w-28">{{ _("Ngày") }}</th>
+          <th>{{ _("Người bán / người mua") }}</th><th class="num w-36">{{ _("Tiền hàng") }}</th><th class="num w-32">{{ _("Thuế") }}</th>
+          <th class="num w-36 max-lg:hidden">{{ _("Tổng thanh toán") }}</th><th class="w-44">{{ _("Trạng thái") }}</th>
+        </tr></thead>
+        <tbody>
+          {% for r in prev.rows %}
+          <tr class="{{ 'is-muted' if r.status != 'new' }}">
+            <td><input type="checkbox" class="checkbox" name="keys" value="{{ r.key }}" {% if r.status == 'new' %}checked{% else %}disabled{% endif %} aria-label="{{ r.ref }}"></td>
+            <td>{% if r.direction == "in" %}{{ ui.badge(_("Mua vào"), "violet", icon_name="arrow-down-circle") }}{% elif r.direction == "out" %}{{ ui.badge(_("Bán ra"), "brand", icon_name="arrow-up-circle") }}{% else %}{{ ui.badge(_("Không xác định"), "gray") }}{% endif %}</td>
+            <td class="tabular-nums"><p class="font-medium text-fg">{{ r.ref }}</p><p class="text-xs text-fg-3">{{ r.filename }}</p></td>
+            <td class="tabular-nums text-fg-2">{{ r.date|date }}</td>
+            <td class="max-w-0"><p class="truncate text-fg">{{ r.partner }}</p><p class="text-xs text-fg-3">{% if r.tax_code %}MST {{ r.tax_code }} · {% endif %}{{ _("{n} dòng", n=r.lines) }}{% if r.has_code %} · {{ _("có mã CQT") }}{% endif %}</p>
+              {% for w in r.warnings %}<p class="text-xs text-amber-700 dark:text-amber-400">{{ ui.icon("triangle-alert", "inline size-3") }} {{ w }}</p>{% endfor %}</td>
+            <td class="num">{{ r.goods|money }}</td>
+            <td class="num">{{ r.vat|money0 }}</td>
+            <td class="num max-lg:hidden">{{ r.total|money }}</td>
+            <td>
+              {% if r.status == "new" %}{{ ui.badge(_("Sẽ nhập"), "green", dot=True) }}
+              {% elif r.status == "duplicate" %}{{ ui.badge(_("Trùng"), "amber") }}
+              {% else %}{{ ui.badge(_("Bỏ qua"), "gray") }}{% endif %}
+              {% if r.note %}<p class="mt-0.5 text-xs text-fg-3">{{ _(r.note) }}</p>{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+  {% call ui.form_actions() %}
+    <button type="submit" form="discard-form" class="btn-ghost">{{ _("Bỏ phiên nhập") }}</button>
+    {{ ui.button(_("Tạo {n} chứng từ nháp", n=prev.importable), "primary", icon_name="check", disabled=not prev.importable) }}
+  {% endcall %}
+</form>
+<form id="discard-form" method="post" action="/einvoices/{{ prev.token }}/discard">{{ ui.csrf_field() }}</form>
+{% endblock %}

@@ -1,0 +1,16 @@
+{#- Tax period picker: previous/next period buttons plus a menu of
+    recent periods. Variables: period, options, base_url (already
+    ending in "?" or "&"). -#}
+{% import "macros.html" as ui with context %}
+{% macro period_nav(period, options, base_url) -%}
+{%- set prev = period.previous() -%}{%- set nxt = period.next() -%}
+<div class="flex items-center gap-1">
+  {{ ui.icon_button("chevron-left", _("Kỳ trước"), href=base_url ~ "period_type=" ~ prev.period_type ~ "&year=" ~ prev.year ~ "&period=" ~ prev.period, variant="secondary") }}
+  {% call ui.dropdown(_(period.label), icon_name="calendar", align="left", width="w-48") %}
+    {% for key, label in options %}{% set parts = key.split("/") %}
+      {{ ui.menu_item(_(label), base_url ~ "period_type=" ~ parts[0] ~ "&year=" ~ parts[1] ~ "&period=" ~ parts[2]) }}
+    {% endfor %}
+  {% endcall %}
+  {{ ui.icon_button("chevron-right", _("Kỳ sau"), href=base_url ~ "period_type=" ~ nxt.period_type ~ "&year=" ~ nxt.year ~ "&period=" ~ nxt.period, variant="secondary") }}
+</div>
+{%- endmacro %}

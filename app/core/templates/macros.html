@@ -1,0 +1,1009 @@
+{#- UI component library. Usage: {% import "macros.html" as ui with context %}  then  {{ ui.button(...) }}.
+    Old (v1) templates can still use  {% from "macros.html" import page_header %}  – macros translate when `_` is available.
+    Full docs: docs/UI.md -#}
+{% import "icons.html" as _icons %}
+{% import "charts.html" as _charts %}
+
+{#- Translate the string if the template was imported with context (`_` available); otherwise return it unchanged. -#}
+{% macro tr(s) -%}{{ _(s) if _ is defined else s }}{%- endmacro %}
+
+{% macro icon(name, cls="size-4", stroke=1.75, label=None) -%}{{ _icons.icon(name, cls, stroke, label) }}{%- endmacro %}
+
+{% macro csrf_field(token=None) -%}
+<input type="hidden" name="csrf_token" value="{{ token or (csrf_token if csrf_token is defined else '') }}">
+{%- endmacro %}
+
+{% macro kbd(keys) -%}
+<span class="inline-flex items-center gap-0.5">{% for k in keys.split("+") %}<kbd class="kbd">{{ k }}</kbd>{% endfor %}</span>
+{%- endmacro %}
+
+{% macro money(value, cls="", zero="0", signed=False) -%}
+{%- if value is none or value == "" -%}<span class="text-fg-3 {{ cls }}">–</span>
+{%- elif value == 0 -%}<span class="tabular-nums {{ cls }}">{{ zero }}</span>
+{%- else -%}<span class="tabular-nums whitespace-nowrap {{ 'amount-neg' if value < 0 }} {{ cls }}">{{ '+' if signed and value > 0 }}{{ value|money }}</span>
+{%- endif -%}
+{%- endmacro %}
+
+{% macro avatar(name, size="size-7", cls="") -%}
+{%- set parts = (name or "?").split() -%}
+{%- set initials = ((parts[-2][:1] if parts|length > 1 else "") ~ parts[-1][:1])|upper if parts else "?" -%}
+<span class="inline-flex {{ size }} shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-brand-700 text-[11px] font-semibold text-white ring-2 ring-surface {{ cls }}" aria-hidden="true">{{ initials }}</span>
+{%- endmacro %}
+
+{# ------------------------------------------------------------------ Page header #}
+
+{% macro breadcrumbs_nav(items) -%}
+{% if items %}
+<nav aria-label="{{ tr('Đường dẫn') }}" class="mb-2 flex min-w-0 items-center gap-1 text-[13px] text-fg-3">
+  {% for label, href in items %}
+    {% if not loop.first %}{{ icon("chevron-right", "size-3.5 text-fg-3/70") }}{% endif %}
+    {% if href and not loop.last %}<a href="{{ href }}" class="truncate hover:text-fg">{{ tr(label) }}</a>
+    {% else %}<span class="truncate {{ 'text-fg-2' if loop.last }}">{{ tr(label) }}</span>{% endif %}
+  {% endfor %}
+</nav>
+{% endif %}
+{%- endmacro %}
+
+{#- page_header(title, subtitle=None, breadcrumbs=None, icon=None, badge=None, back=None); caller() = action buttons -#}
+{% macro page_header(title, subtitle=None, breadcrumbs=None, icon_name=None, badge=None, back=None) -%}
+{%- set crumbs = breadcrumbs if breadcrumbs is not none else (breadcrumbs_ctx if breadcrumbs_ctx is defined else none) -%}
+<header class="mb-6">
+  {{ breadcrumbs_nav(crumbs) }}
+  <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+    <div class="flex min-w-0 items-start gap-3">
+      {% if back %}<a href="{{ back }}" class="btn-ghost btn-sm btn-icon -ml-1.5 mt-0.5" aria-label="{{ tr('Quay lại') }}">{{ icon("arrow-left") }}</a>{% endif %}
+      {% if icon_name %}<span class="mt-0.5 hidden size-9 shrink-0 items-center justify-center rounded-lg border border-line bg-surface text-fg-2 shadow-card sm:flex dark:shadow-none">{{ icon(icon_name, "size-[18px]") }}</span>{% endif %}
+      <div class="min-w-0">
+        <div class="flex flex-wrap items-center gap-2">
+          <h1 class="text-xl font-semibold tracking-tight text-fg sm:text-[22px]">{{ title }}</h1>
+          {% if badge %}{{ badge }}{% endif %}
+        </div>
+        {% if subtitle %}<p class="mt-1 text-[13.5px] text-fg-3">{{ subtitle }}</p>{% endif %}
+      </div>
+    </div>
+    {% if caller %}<div class="flex flex-wrap items-center gap-2">{{ caller() }}</div>{% endif %}
+  </div>
+</header>
+{%- endmacro %}
+
+{% macro section_title(title, subtitle=None, cls="") -%}
+<div class="mb-3 flex flex-wrap items-end justify-between gap-2 {{ cls }}">
+  <div>
+    <h2 class="text-sm font-semibold text-fg">{{ title }}</h2>
+    {% if subtitle %}<p class="mt-0.5 text-[13px] text-fg-3">{{ subtitle }}</p>{% endif %}
+  </div>
+  {% if caller %}<div class="flex items-center gap-2">{{ caller() }}</div>{% endif %}
+</div>
+{%- endmacro %}
+
+{# ------------------------------------------------------------------ Buttons #}
+
+{%- macro _btn_cls(variant, size, cls) -%}
+btn-{{ variant }}{% if size %} btn-{{ size }}{% endif %}{% if cls %} {{ cls }}{% endif %}
+{%- endmacro -%}
+
+{#- button(label, variant="primary", size=None, icon=None, …) – <button>. hotkey="post|save" for Ctrl+Enter/Ctrl+S in docForm.
+    confirm="Question?" → confirm dialog; danger=True makes the confirm dialog red. -#}
+{% macro button(label=None, variant="primary", size=None, icon_name=None, icon_right=None, type="submit", name=None, value=None,
+               attrs="", cls="", kbd_hint=None, disabled=False, hotkey=None, confirm=None, danger=False, form=None) -%}
+<button type="{{ type }}" class="{{ _btn_cls(variant, size, cls) }}"
+  {%- if name %} name="{{ name }}"{% endif %}{% if value is not none %} value="{{ value }}"{% endif %}
+  {%- if disabled %} disabled{% endif %}{% if hotkey %} data-hotkey="{{ hotkey }}"{% endif %}
+  {%- if confirm %} data-confirm="{{ confirm }}"{% endif %}{% if danger %} data-danger{% endif %}
+  {%- if form %} form="{{ form }}"{% endif %} {{ attrs|safe }}>
+  {%- if icon_name %}{{ icon(icon_name, "size-4" if size not in ("xs",) else "size-3.5") }}{% endif -%}
+  {%- if label %}<span>{{ label }}</span>{% endif -%}
+  {%- if icon_right %}{{ icon(icon_right, "size-4 opacity-70") }}{% endif -%}
+  {%- if kbd_hint %}<span class="ml-1 hidden items-center gap-0.5 opacity-70 lg:inline-flex">{% for k in kbd_hint.split("+") %}<kbd class="rounded bg-black/10 px-1 font-sans text-[10.5px] dark:bg-white/10">{{ k }}</kbd>{% endfor %}</span>{% endif -%}
+</button>
+{%- endmacro %}
+
+{% macro link_button(label, href, variant="secondary", size=None, icon_name=None, icon_right=None, attrs="", cls="", kbd_hint=None, target=None) -%}
+<a href="{{ href }}" class="{{ _btn_cls(variant, size, cls) }}"{% if target %} target="{{ target }}" rel="noopener"{% endif %} {{ attrs|safe }}>
+  {%- if icon_name %}{{ icon(icon_name) }}{% endif -%}
+  {%- if label %}<span>{{ label }}</span>{% endif -%}
+  {%- if icon_right %}{{ icon(icon_right, "size-4 opacity-70") }}{% endif -%}
+  {%- if kbd_hint %}<span class="ml-1 hidden items-center gap-0.5 opacity-70 lg:inline-flex">{% for k in kbd_hint.split("+") %}<kbd class="rounded bg-black/10 px-1 font-sans text-[10.5px] dark:bg-white/10">{{ k }}</kbd>{% endfor %}</span>{% endif -%}
+</a>
+{%- endmacro %}
+
+{#- Icon-only button: label is used as aria-label + tooltip. -#}
+{% macro icon_button(icon_name, label, href=None, variant="ghost", size="sm", attrs="", cls="", type="button", tooltip=True) -%}
+{% if href %}
+<a href="{{ href }}" class="{{ _btn_cls(variant, size, 'btn-icon ' ~ cls) }}" aria-label="{{ label }}"{% if tooltip %} data-tooltip="{{ label }}"{% endif %} {{ attrs|safe }}>{{ icon(icon_name) }}</a>
+{% else %}
+<button type="{{ type }}" class="{{ _btn_cls(variant, size, 'btn-icon ' ~ cls) }}" aria-label="{{ label }}"{% if tooltip %} data-tooltip="{{ label }}"{% endif %} {{ attrs|safe }}>{{ icon(icon_name) }}</button>
+{% endif %}
+{%- endmacro %}
+
+{# ------------------------------------------------------------------ Badge #}
+
+{% macro badge(label, color="gray", icon_name=None, dot=False, cls="", title=None) -%}
+<span class="badge-{{ color }}{{ ' badge-dot' if dot }} {{ cls }}"{% if title %} title="{{ title }}"{% endif %}>{% if icon_name %}{{ icon(icon_name, "size-3") }}{% endif %}{{ label }}</span>
+{%- endmacro %}
+
+{#- Document statuses and generic statuses. tr_fn keeps v1 compatibility (status_badge(status, _)). -#}
+{% macro status_badge(status, tr_fn=None) -%}
+{%- set t = tr_fn or (_ if _ is defined else none) -%}
+{%- set MAP = {
+  "draft": ("Nháp", "amber"), "posted": ("Đã ghi sổ", "green"), "cancelled": ("Đã hủy", "gray"),
+  "locked": ("Đã khóa", "violet"), "open": ("Đang mở", "blue"), "active": ("Đang dùng", "green"),
+  "inactive": ("Ngừng dùng", "gray"), "paid": ("Đã thanh toán", "green"), "partial": ("Thanh toán một phần", "amber"),
+  "unpaid": ("Chưa thanh toán", "amber"), "overdue": ("Quá hạn", "red"), "matched": ("Đã khớp", "green"),
+  "unmatched": ("Chưa khớp", "amber"), "pending": ("Chờ xử lý", "amber"), "error": ("Lỗi", "red"),
+  "submitted": ("Đã nộp", "green"), "invited": ("Đã mời", "blue"), "disposed": ("Đã thanh lý", "gray"),
+} -%}
+{%- set label, color = MAP.get(status, (status, "gray")) -%}
+{%- if status == "cancelled" -%}<span class="badge-cancelled">{{ t(label) if t else label }}</span>
+{%- else -%}<span class="badge-{{ color }} badge-dot">{{ t(label) if t else label }}</span>{%- endif -%}
+{%- endmacro %}
+
+{#- Document type: PT, PC, BC, BN, PK, BH, MH… or v1 receipt/payment. -#}
+{% macro kind_badge(kind, tr_fn=None) -%}
+{%- set t = tr_fn or (_ if _ is defined else none) -%}
+{%- set MAP = {
+  "receipt": ("Thu", "blue"), "payment": ("Chi", "red"),
+  "PT": ("Phiếu thu", "blue"), "PC": ("Phiếu chi", "red"), "BC": ("Báo có", "blue"), "BN": ("Báo nợ", "red"),
+  "PK": ("Phiếu kế toán", "gray"), "BH": ("Bán hàng", "brand"), "MH": ("Mua hàng", "violet"), "TL": ("Giảm giá/trả lại", "amber"),
+  "NK": ("Nhập kho", "violet"), "XK": ("Xuất kho", "amber"), "KH": ("Khấu hao", "gray"), "PB": ("Phân bổ", "gray"),
+  "LG": ("Lương", "violet"), "KC": ("Kết chuyển", "gray"), "CK": ("Chuyển tiền", "blue"),
+} -%}
+{%- set label, color = MAP.get(kind, (kind, "gray")) -%}
+<span class="badge-{{ color }}">{{ t(label) if t else label }}</span>
+{%- endmacro %}
+
+{# ------------------------------------------------------------------ Cards #}
+
+{#- card(title=None, subtitle=None, actions=None, flush=False, cls="", body_cls="", footer=None, id=None)
+    actions/footer: HTML strings (use {% set acts %}…{% endset %}). flush=True: no padding (table inside a card). -#}
+{% macro card(title=None, subtitle=None, actions=None, flush=False, cls="", body_cls="", footer=None, id=None, icon_name=None) -%}
+<section class="card {{ cls }}"{% if id %} id="{{ id }}"{% endif %}>
+  {% if title or actions %}
+  <div class="card-header">
+    <div class="flex min-w-0 items-center gap-2.5">
+      {% if icon_name %}<span class="text-fg-3">{{ icon(icon_name) }}</span>{% endif %}
+      <div class="min-w-0">
+        {% if title %}<h2 class="card-title">{{ title }}</h2>{% endif %}
+        {% if subtitle %}<p class="card-subtitle">{{ subtitle }}</p>{% endif %}
+      </div>
+    </div>
+    {% if actions %}<div class="flex flex-wrap items-center gap-2">{{ actions }}</div>{% endif %}
+  </div>
+  {% endif %}
+  <div class="{{ '' if flush else 'card-body' }} {{ body_cls }}">{{ caller() if caller }}</div>
+  {% if footer %}<div class="card-footer">{{ footer }}</div>{% endif %}
+</section>
+{%- endmacro %}
+
+{#- Stat card. value: integer (money) or string. delta: % vs. the previous period (float). good="up"|"down": favorable direction.
+    spark: list of numbers for the sparkline. -#}
+{% macro stat_card(label, value, unit="đ", delta=None, delta_label=None, good="up", icon_name=None, hint=None, href=None, spark=None, money_value=True, cls="") -%}
+{% set tag = "a" if href else "div" %}
+<{{ tag }} {% if href %}href="{{ href }}"{% endif %} class="card group block p-4 sm:p-5 {{ 'transition hover:border-line-strong hover:shadow-pop/40' if href }} {{ cls }}">
+  <div class="flex items-center justify-between gap-2">
+    <p class="truncate text-[13px] font-medium text-fg-3">{{ label }}</p>
+    {% if spark %}{{ _charts.sparkline(spark, width="w-20") }}
+    {% elif icon_name %}<span class="flex size-7 shrink-0 items-center justify-center rounded-md bg-surface-3 text-fg-2">{{ icon(icon_name, "size-[15px]") }}</span>{% endif %}
+  </div>
+  {%- set shown = (value|money if money_value and value is number else value)|string -%}
+  {%- set size = "text-2xl" if shown|length <= 11 else ("text-xl" if shown|length <= 14 else "text-lg") -%}
+  <div class="mt-2 flex min-w-0 items-baseline gap-1.5">
+    <span class="truncate {{ size }} font-semibold tracking-tight text-fg {{ 'amount-neg' if money_value and value is number and value < 0 }}" title="{{ shown }}">{{ shown }}</span>
+    {% if unit %}<span class="text-[13px] text-fg-3">{{ unit }}</span>{% endif %}
+  </div>
+  <div class="mt-2 flex min-h-5 items-center justify-between gap-3">
+    <div class="flex min-w-0 items-center gap-1.5 text-xs">
+      {% if delta is not none %}
+        {% set up = delta >= 0 %}
+        {% set is_good = (up and good == "up") or ((not up) and good == "down") %}
+        <span class="inline-flex items-center gap-0.5 rounded px-1 py-0.5 font-medium tabular-nums {{ 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' if is_good else 'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400' }}">
+          {{ icon("trending-up" if up else "trending-down", "size-3.5") }}{{ "%+.1f"|format(delta) }}%
+        </span>
+        {% if delta_label %}<span class="truncate text-fg-3">{{ delta_label }}</span>{% endif %}
+      {% elif hint %}<span class="truncate text-fg-3">{{ hint }}</span>{% endif %}
+    </div>
+  </div>
+</{{ tag }}>
+{%- endmacro %}
+
+{#- Label–value list: items = [(label, value), …]; value may be HTML (Markup). -#}
+{% macro desc_list(items, cols="sm:grid-cols-2 lg:grid-cols-3", cls="") -%}
+<dl class="grid grid-cols-1 gap-x-6 gap-y-4 {{ cols }} {{ cls }}">
+  {% for label, value in items %}
+  <div class="dl-item min-w-0"><dt>{{ label }}</dt><dd class="break-words">{{ value if value not in (none, "") else "–" }}</dd></div>
+  {% endfor %}
+</dl>
+{%- endmacro %}
+
+{# ------------------------------------------------------------------ Empty states, alerts #}
+
+{#- empty_state(title, icon_name="inbox", message=None, compact=False); caller() = buttons. (v1: empty_state(msg, "tag")) -#}
+{% macro empty_state(title, icon_name="inbox", message=None, compact=False) -%}
+<div class="flex flex-col items-center justify-center px-6 text-center {{ 'py-8' if compact else 'py-14' }}">
+  <span class="mb-3 flex size-11 items-center justify-center rounded-xl border border-line bg-surface-2 text-fg-3">{{ icon(icon_name or "inbox", "size-5") }}</span>
+  <p class="text-sm font-medium text-fg">{{ title }}</p>
+  {% if message %}<p class="mt-1 max-w-sm text-[13px] text-fg-3">{{ message }}</p>{% endif %}
+  {% if caller %}<div class="mt-4 flex flex-wrap justify-center gap-2">{{ caller() }}</div>{% endif %}
+</div>
+{%- endmacro %}
+
+{% macro alert(message, kind="info", title=None, dismissible=False, cls="") -%}
+{%- set ic = {"success": "circle-check", "error": "circle-alert", "warning": "triangle-alert", "info": "info"}.get(kind, "info") -%}
+<div class="alert-{{ kind }} {{ cls }}" role="{{ 'alert' if kind in ('error', 'warning') else 'status' }}"{% if dismissible %} x-data="{ show: true }" x-show="show"{% endif %}>
+  {{ icon(ic, "mt-px size-4") }}
+  <div class="min-w-0 flex-1">
+    {% if title %}<p class="font-semibold">{{ title }}</p>{% endif %}
+    <div class="{{ 'mt-0.5 opacity-90' if title }} whitespace-pre-line">{{ message }}</div>
+    {% if caller %}<div class="mt-2.5 flex flex-wrap gap-2">{{ caller() }}</div>{% endif %}
+  </div>
+  {% if dismissible %}<button type="button" class="-m-1 rounded p-1 opacity-60 hover:opacity-100" @click="show = false" aria-label="{{ tr('Đóng') }}">{{ icon("x", "size-3.5") }}</button>{% endif %}
+</div>
+{%- endmacro %}
+
+{% macro skeleton(lines=3, cls="") -%}
+<div class="space-y-2.5 {{ cls }}" aria-hidden="true">
+  {% for i in range(lines) %}<div class="skeleton h-3.5 {{ ['w-11/12', 'w-3/4', 'w-5/6', 'w-2/3'][i % 4] }}"></div>{% endfor %}
+</div>
+{%- endmacro %}
+
+{% macro progress(value, max=100, tone="brand", cls="") -%}
+{%- set pct = ((value / max * 100) if max else 0)|round(1) -%}
+{%- set col = {"brand": "bg-primary", "green": "bg-emerald-500", "amber": "bg-amber-500", "red": "bg-rose-500"}.get(tone, "bg-primary") -%}
+<div class="h-1.5 w-full overflow-hidden rounded-full bg-surface-3 {{ cls }}" role="progressbar" aria-valuenow="{{ value }}" aria-valuemax="{{ max }}">
+  <div class="h-full rounded-full {{ col }}" style="width: {{ [pct, 100]|min }}%"></div>
+</div>
+{%- endmacro %}
+
+{# ------------------------------------------------------------------ Secondary navigation #}
+
+{#- tabs(items, active): items = [{key, label, href, count, icon}] – link-style tabs. -#}
+{% macro tabs(items, active, cls="") -%}
+<nav class="tabs {{ cls }}" aria-label="Tabs">
+  {% for it in items %}
+  <a href="{{ it.href }}" class="tab {{ 'tab-active' if it.key == active }}" {% if it.key == active %}aria-current="page"{% endif %}>
+    {% if it.icon %}{{ icon(it.icon) }}{% endif %}{{ it.label }}
+    {% if it.count is defined and it.count is not none %}<span class="tab-count">{{ it.count }}</span>{% endif %}
+  </a>
+  {% endfor %}
+</nav>
+{%- endmacro %}
+
+{#- pagination(page, pages, url_for_page, tr_fn=None, total=None) – url_for_page(n) returns the URL. -#}
+{% macro pagination(page, pages, url_for_page, tr_fn=None, total=None) -%}
+{%- set t = tr_fn or (_ if _ is defined else none) -%}
+{% if pages > 1 or total %}
+<nav class="flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3 text-[13px] sm:px-5" aria-label="{{ t('Phân trang') if t else 'Phân trang' }}">
+  <span class="text-fg-3">
+    {% if total is not none %}{{ t("{n} bản ghi", n=total|money) if t else total ~ " bản ghi" }} · {% endif %}{{ t("Trang {page}/{pages}", page=page, pages=pages) if t else "Trang " ~ page ~ "/" ~ pages }}
+  </span>
+  {% if pages > 1 %}
+  <div class="flex items-center gap-1">
+    {% if page > 1 %}<a class="btn-secondary btn-sm btn-icon" href="{{ url_for_page(page - 1) }}" aria-label="{{ t('Trang trước') if t else 'Trang trước' }}">{{ icon("chevron-left") }}</a>
+    {% else %}<span class="btn-secondary btn-sm btn-icon" aria-disabled="true">{{ icon("chevron-left") }}</span>{% endif %}
+    {% set lo = [1, page - 2]|max %}{% set hi = [pages, page + 2]|min %}
+    {% if lo > 1 %}<a class="btn-ghost btn-sm min-w-8" href="{{ url_for_page(1) }}">1</a>{% if lo > 2 %}<span class="px-1 text-fg-3">…</span>{% endif %}{% endif %}
+    {% for p in range(lo, hi + 1) %}
+      {% if p == page %}<span class="btn-secondary btn-sm min-w-8 font-semibold" aria-current="page">{{ p }}</span>
+      {% else %}<a class="btn-ghost btn-sm hidden min-w-8 sm:inline-flex" href="{{ url_for_page(p) }}">{{ p }}</a>{% endif %}
+    {% endfor %}
+    {% if hi < pages %}{% if hi < pages - 1 %}<span class="px-1 text-fg-3">…</span>{% endif %}<a class="btn-ghost btn-sm min-w-8" href="{{ url_for_page(pages) }}">{{ pages }}</a>{% endif %}
+    {% if page < pages %}<a class="btn-secondary btn-sm btn-icon" href="{{ url_for_page(page + 1) }}" aria-label="{{ t('Trang sau') if t else 'Trang sau' }}">{{ icon("chevron-right") }}</a>
+    {% else %}<span class="btn-secondary btn-sm btn-icon" aria-disabled="true">{{ icon("chevron-right") }}</span>{% endif %}
+  </div>
+  {% endif %}
+</nav>
+{% endif %}
+{%- endmacro %}
+
+{#- Filter bar: caller() = the filter fields (use input_cls="input-sm"). hx_target: filter via htmx instead of a page load. -#}
+{% macro filter_bar(action, reset_href=None, method="get", hx_target=None, cls="") -%}
+<form method="{{ method }}" action="{{ action }}" class="flex flex-wrap items-end gap-2 {{ cls }}"
+  {% if hx_target %}hx-get="{{ action }}" hx-target="{{ hx_target }}" hx-push-url="true" hx-trigger="submit, change from:select, keyup changed delay:350ms from:input[type=search]"{% endif %}>
+  {{ caller() }}
+  <div class="flex items-center gap-1.5">
+    <button type="submit" class="btn-secondary btn-sm">{{ icon("filter", "size-3.5") }}<span>{{ tr("Lọc") }}</span></button>
+    {% if reset_href %}<a href="{{ reset_href }}" class="btn-ghost btn-sm">{{ tr("Xóa lọc") }}</a>{% endif %}
+  </div>
+</form>
+{%- endmacro %}
+
+{# ------------------------------------------------------------------ Overlays: modal, drawer, menu #}
+
+{#- modal(id, title=None, size="md", description=None); open: $dispatch('modal-open', 'id'); close: $dispatch('modal-close').
+    Caller content should contain <div class="px-5 pb-5">…</div> and a footer <div class="modal-footer">…</div>. -#}
+{% macro modal(id, title=None, size="md", description=None) -%}
+{%- set w = {"sm": "max-w-sm", "md": "max-w-lg", "lg": "max-w-2xl", "xl": "max-w-4xl"}.get(size, "max-w-lg") -%}
+<div x-data="{ open: false }" x-cloak
+     @modal-open.window="if ($event.detail === '{{ id }}') open = true" @modal-close.window="open = false"
+     @keydown.escape.window="open = false">
+  <div x-show="open" x-transition.opacity.duration.150ms class="overlay" @click="open = false"></div>
+  <div x-show="open" class="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4" @click.self="open = false"
+       x-transition:enter="transition duration-150 ease-out" x-transition:enter-start="opacity-0 translate-y-2 sm:scale-[0.98]"
+       x-transition:leave="transition duration-100 ease-in" x-transition:leave-end="opacity-0">
+    <div class="modal-panel {{ w }} max-h-[90vh] overflow-y-auto rounded-b-none sm:rounded-b-2xl" role="dialog" aria-modal="true" aria-labelledby="{{ id }}-title" x-trap.noscroll="open">
+      <div class="flex items-start justify-between gap-4 px-5 pt-5 pb-3">
+        <div>
+          {% if title %}<h2 id="{{ id }}-title" class="text-base font-semibold text-fg">{{ title }}</h2>{% endif %}
+          {% if description %}<p class="mt-1 text-[13px] text-fg-3">{{ description }}</p>{% endif %}
+        </div>
+        <button type="button" class="btn-ghost btn-sm btn-icon -mt-1 -mr-2" @click="open = false" aria-label="{{ tr('Đóng') }}">{{ icon("x") }}</button>
+      </div>
+      {{ caller() }}
+    </div>
+  </div>
+</div>
+{%- endmacro %}
+
+{#- drawer(id, title, width="sm:max-w-lg"); open: $dispatch('drawer-open', 'id'). -#}
+{% macro drawer(id, title=None, width="sm:max-w-lg", description=None) -%}
+<div x-data="{ open: false }" x-cloak
+     @drawer-open.window="if ($event.detail === '{{ id }}') open = true" @drawer-close.window="open = false"
+     @keydown.escape.window="open = false">
+  <div x-show="open" x-transition.opacity.duration.150ms class="overlay" @click="open = false"></div>
+  <aside x-show="open" class="drawer-panel {{ width }}" role="dialog" aria-modal="true"
+         x-transition:enter="transition duration-200 ease-out" x-transition:enter-start="translate-x-full"
+         x-transition:leave="transition duration-150 ease-in" x-transition:leave-end="translate-x-full">
+    <div class="flex items-start justify-between gap-4 border-b border-line px-5 py-4">
+      <div>
+        {% if title %}<h2 class="text-base font-semibold text-fg">{{ title }}</h2>{% endif %}
+        {% if description %}<p class="mt-0.5 text-[13px] text-fg-3">{{ description }}</p>{% endif %}
+      </div>
+      <button type="button" class="btn-ghost btn-sm btn-icon -mr-2" @click="open = false" aria-label="{{ tr('Đóng') }}">{{ icon("x") }}</button>
+    </div>
+    <div class="min-h-0 flex-1 overflow-y-auto">{{ caller() }}</div>
+  </aside>
+</div>
+{%- endmacro %}
+
+{#- dropdown(label=None, icon_name=None, variant="secondary", size="sm", align="right", width="w-56"); caller() = menu_item… -#}
+{% macro dropdown(label=None, icon_name=None, variant="secondary", size="sm", align="right", width="w-56", icon_right="chevron-down", cls="", aria_label=None) -%}
+<div class="relative {{ cls }}" x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false">
+  <button type="button" class="{{ _btn_cls(variant, size, 'btn-icon' if not label else '') }}" @click="open = !open" :aria-expanded="open" aria-haspopup="menu"{% if aria_label or not label %} aria-label="{{ aria_label or tr('Thêm') }}"{% endif %}>
+    {% if icon_name %}{{ icon(icon_name) }}{% endif %}{% if label %}<span>{{ label }}</span>{% if icon_right %}{{ icon(icon_right, "size-3.5 opacity-60") }}{% endif %}{% endif %}
+  </button>
+  <div x-show="open" x-cloak x-transition.origin.top.duration.100ms role="menu"
+       class="menu absolute {{ 'right-0' if align == 'right' else 'left-0' }} mt-1.5 {{ width }}" @click="open = false">
+    {{ caller() }}
+  </div>
+</div>
+{%- endmacro %}
+
+{% macro menu_item(label, href=None, icon_name=None, danger=False, attrs="", kbd_hint=None) -%}
+{% if href %}<a href="{{ href }}" role="menuitem" class="menu-item {{ 'menu-item-danger' if danger }}" {{ attrs|safe }}>
+{% else %}<button type="button" role="menuitem" class="menu-item {{ 'menu-item-danger' if danger }}" {{ attrs|safe }}>{% endif %}
+  {% if icon_name %}{{ icon(icon_name) }}{% endif %}<span class="flex-1 truncate">{{ label }}</span>
+  {% if kbd_hint %}<span class="text-[11px] text-fg-3">{{ kbd_hint }}</span>{% endif %}
+{% if href %}</a>{% else %}</button>{% endif %}
+{%- endmacro %}
+
+{#- Menu item that submits a POST (with CSRF): menu_post(label, action, icon_name, danger, confirm, fields={}) -#}
+{% macro menu_post(label, action, icon_name=None, danger=False, confirm=None, fields=None) -%}
+<form method="post" action="{{ action }}"{% if confirm %} data-confirm="{{ confirm }}"{% if danger %} data-danger{% endif %}{% endif %}>
+  {{ csrf_field() }}
+  {% for k, v in (fields or {}).items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+  <button type="submit" role="menuitem" class="menu-item {{ 'menu-item-danger' if danger }}">{% if icon_name %}{{ icon(icon_name) }}{% endif %}<span class="flex-1 truncate">{{ label }}</span></button>
+</form>
+{%- endmacro %}
+
+{% macro menu_sep() %}<div class="menu-sep" role="separator"></div>{% endmacro %}
+{% macro menu_label(text) %}<div class="menu-label">{{ text }}</div>{% endmacro %}
+
+{# ------------------------------------------------------------------ Form #}
+
+{% macro field_error(errors, name) -%}
+{% if errors and errors.get(name) %}<p class="field-error" id="err-{{ name }}">{{ icon("circle-alert", "size-3.5") }}{{ tr(errors.get(name)) }}</p>{% endif %}
+{%- endmacro %}
+
+{%- macro _label(id, label, required, help) -%}
+{% if label %}<label class="label" for="{{ id }}">{{ label }}{% if required %}<span class="required-mark" aria-hidden="true">*</span>{% endif %}
+  {% if help %}<span class="text-fg-3" data-tooltip="{{ help }}" tabindex="0">{{ icon("circle-help", "size-3.5") }}</span>{% endif %}</label>{% endif %}
+{%- endmacro -%}
+
+{#- field(name, label, …): label + error + hint wrapper around a custom control in caller(). -#}
+{% macro field(name, label=None, required=False, hint=None, errors=None, cls="", help=None, id=None) -%}
+<div class="{{ cls }}">
+  {{ _label(id or "f-" ~ name, label, required, help) }}
+  {{ caller() }}
+  {% if hint and not (errors and errors.get(name)) %}<p class="hint">{{ hint }}</p>{% endif %}
+  {{ field_error(errors, name) }}
+</div>
+{%- endmacro %}
+
+{#- input(name, label=None, value="", type="text", errors=None, required=False, hint=None, attrs="", cls="", …) – keeps the v1 parameter order. -#}
+{% macro input(name, label=None, value="", type="text", errors=None, required=False, hint=None, attrs="", cls="", placeholder=None,
+               prefix=None, suffix=None, autofocus=False, input_cls="", id=None, help=None, readonly=False) -%}
+{%- set fid = id or "f-" ~ name -%}
+{%- set has_err = errors and errors.get(name) -%}
+<div class="{{ cls }}">
+  {{ _label(fid, label, required, help) }}
+  <div class="input-group">
+    {% if prefix %}<span class="input-addon left-3">{{ prefix }}</span>{% endif %}
+    <input id="{{ fid }}" name="{{ name }}" type="{{ type }}" value="{{ value if value is not none else '' }}"
+      class="input {{ 'input-error' if has_err }} {{ 'pl-9' if prefix }} {{ 'pr-10' if suffix }} {{ input_cls }}"
+      {%- if placeholder %} placeholder="{{ placeholder }}"{% endif %}{% if required %} required{% endif %}
+      {%- if autofocus %} autofocus{% endif %}{% if readonly %} readonly{% endif %}
+      {%- if has_err %} aria-invalid="true" aria-describedby="err-{{ name }}"{% endif %} {{ attrs|safe }}>
+    {% if suffix %}<span class="input-addon right-3">{{ suffix }}</span>{% endif %}
+  </div>
+  {% if hint and not has_err %}<p class="hint">{{ hint }}</p>{% endif %}
+  {{ field_error(errors, name) }}
+</div>
+{%- endmacro %}
+
+{#- password_input(name, label, errors, autocomplete="current-password", hint=None, required=True) – with a show/hide button. -#}
+{% macro password_input(name, label=None, errors=None, autocomplete="current-password", hint=None, required=True, cls="", id=None, minlength=None, attrs="") -%}
+{%- set fid = id or "f-" ~ name -%}
+{%- set has_err = errors and errors.get(name) -%}
+<div class="{{ cls }}" x-data="{ show: false }">
+  {{ _label(fid, label, required, None) }}
+  <div class="input-group">
+    <input id="{{ fid }}" name="{{ name }}" :type="show ? 'text' : 'password'" type="password" autocomplete="{{ autocomplete }}"
+      class="input pr-10 {{ 'input-error' if has_err }}"{% if required %} required{% endif %}{% if minlength %} minlength="{{ minlength }}"{% endif %}
+      {%- if has_err %} aria-invalid="true"{% endif %} {{ attrs|safe }}>
+    <button type="button" class="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-fg-3 hover:text-fg" @click="show = !show"
+      :aria-label="show ? {{ tr('Ẩn mật khẩu')|tojson|forceescape }} : {{ tr('Hiện mật khẩu')|tojson|forceescape }}" tabindex="-1">
+      <span x-show="!show">{{ icon("eye") }}</span><span x-show="show" x-cloak>{{ icon("eye-off") }}</span>
+    </button>
+  </div>
+  {% if hint and not has_err %}<p class="hint">{{ hint }}</p>{% endif %}
+  {{ field_error(errors, name) }}
+</div>
+{%- endmacro %}
+
+{% macro textarea(name, label=None, value="", rows=3, errors=None, required=False, hint=None, attrs="", cls="", placeholder=None, id=None) -%}
+{%- set fid = id or "f-" ~ name -%}
+<div class="{{ cls }}">
+  {{ _label(fid, label, required, None) }}
+  <textarea id="{{ fid }}" name="{{ name }}" rows="{{ rows }}" class="input {{ 'input-error' if errors and errors.get(name) }}"
+    {%- if placeholder %} placeholder="{{ placeholder }}"{% endif %}{% if required %} required{% endif %} {{ attrs|safe }}>{{ value if value is not none else '' }}</textarea>
+  {% if hint and not (errors and errors.get(name)) %}<p class="hint">{{ hint }}</p>{% endif %}
+  {{ field_error(errors, name) }}
+</div>
+{%- endmacro %}
+
+{#- select(name, label, options, value): options = [(value, label)] | [{value, label}] | ["a", "b"]. -#}
+{% macro select(name, label=None, options=(), value=None, placeholder=None, errors=None, required=False, hint=None, attrs="", cls="", input_cls="", id=None) -%}
+{%- set fid = id or "f-" ~ name -%}
+<div class="{{ cls }}">
+  {{ _label(fid, label, required, None) }}
+  <select id="{{ fid }}" name="{{ name }}" class="input {{ 'input-error' if errors and errors.get(name) }} {{ input_cls }}"{% if required %} required{% endif %} {{ attrs|safe }}>
+    {% if placeholder is not none %}<option value="">{{ placeholder }}</option>{% endif %}
+    {% for o in options %}
+      {%- if o is mapping %}{% set ov, ol = o.value, o.label %}{% elif o is string %}{% set ov, ol = o, o %}{% else %}{% set ov, ol = o[0], o[1] %}{% endif -%}
+      <option value="{{ ov }}" {% if value is not none and ov|string == value|string %}selected{% endif %}>{{ ol }}</option>
+    {% endfor %}
+  </select>
+  {% if hint and not (errors and errors.get(name)) %}<p class="hint">{{ hint }}</p>{% endif %}
+  {{ field_error(errors, name) }}
+</div>
+{%- endmacro %}
+
+{% macro checkbox(name, label, checked=False, value="1", hint=None, attrs="", cls="", id=None) -%}
+{%- set fid = id or "f-" ~ name -%}
+<label for="{{ fid }}" class="flex cursor-pointer items-start gap-2.5 {{ cls }}">
+  <input id="{{ fid }}" type="checkbox" name="{{ name }}" value="{{ value }}" class="checkbox mt-0.5" {% if checked %}checked{% endif %} {{ attrs|safe }}>
+  <span class="min-w-0"><span class="block text-[13.5px] text-fg">{{ label }}</span>{% if hint %}<span class="mt-0.5 block text-xs text-fg-3">{{ hint }}</span>{% endif %}</span>
+</label>
+{%- endmacro %}
+
+{#- switch: always submits name=1 or 0. -#}
+{% macro switch(name, label, checked=False, hint=None, cls="", attrs="", id=None) -%}
+{%- set fid = id or "f-" ~ name -%}
+<div class="flex items-start justify-between gap-4 {{ cls }}" x-data="{ on: {{ 'true' if checked else 'false' }} }">
+  <label for="{{ fid }}" class="min-w-0 cursor-pointer">
+    <span class="block text-[13.5px] font-medium text-fg">{{ label }}</span>
+    {% if hint %}<span class="mt-0.5 block text-xs text-fg-3">{{ hint }}</span>{% endif %}
+  </label>
+  <input type="hidden" name="{{ name }}" :value="on ? '1' : '0'" value="{{ '1' if checked else '0' }}">
+  <button id="{{ fid }}" type="button" role="switch" :aria-checked="on.toString()" @click="on = !on" {{ attrs|safe }}
+    class="relative mt-0.5 inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-150"
+    :class="on ? 'bg-primary' : 'bg-line-strong'">
+    <span class="inline-block size-4 rounded-full bg-white shadow transition-transform duration-150" :class="on ? 'translate-x-[18px]' : 'translate-x-0.5'"></span>
+  </button>
+</div>
+{%- endmacro %}
+
+{#- radio_group(name, label, options, value, style="segmented" | "cards" | "list"); options as for select. -#}
+{% macro radio_group(name, label=None, options=(), value=None, style="segmented", cls="", attrs="") -%}
+<fieldset class="{{ cls }}">
+  {% if label %}<legend class="label">{{ label }}</legend>{% endif %}
+  {% if style == "segmented" %}
+  <div class="segmented">
+    {% for o in options %}{% if o is mapping %}{% set ov, ol = o.value, o.label %}{% elif o is string %}{% set ov, ol = o, o %}{% else %}{% set ov, ol = o[0], o[1] %}{% endif %}
+    <label class="segment has-[:checked]:bg-surface has-[:checked]:text-fg has-[:checked]:shadow-[0_1px_2px_rgb(16_24_40/0.08),0_0_0_1px_var(--ui-border)] dark:has-[:checked]:bg-surface-2 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-ring">
+      <input type="radio" name="{{ name }}" value="{{ ov }}" class="sr-only" {% if value is not none and ov|string == value|string %}checked{% endif %} {{ attrs|safe }}>{{ ol }}
+    </label>
+    {% endfor %}
+  </div>
+  {% elif style == "cards" %}
+  <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+    {% for o in options %}{% set ov, ol, oh = (o.value, o.label, o.hint) if o is mapping else (o[0], o[1], o[2] if o|length > 2 else none) %}
+    <label class="flex cursor-pointer items-start gap-2.5 rounded-lg border border-line bg-surface p-3 hover:border-line-strong has-[:checked]:border-primary has-[:checked]:bg-primary-soft has-[:checked]:shadow-[0_0_0_1px_var(--ui-primary)]">
+      <input type="radio" name="{{ name }}" value="{{ ov }}" class="mt-0.5 accent-brand-700" {% if value is not none and ov|string == value|string %}checked{% endif %} {{ attrs|safe }}>
+      <span><span class="block text-[13.5px] font-medium">{{ ol }}</span>{% if oh %}<span class="mt-0.5 block text-xs text-fg-3">{{ oh }}</span>{% endif %}</span>
+    </label>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="space-y-2">
+    {% for o in options %}{% if o is mapping %}{% set ov, ol = o.value, o.label %}{% elif o is string %}{% set ov, ol = o, o %}{% else %}{% set ov, ol = o[0], o[1] %}{% endif %}
+    <label class="flex cursor-pointer items-center gap-2.5 text-[13.5px]"><input type="radio" name="{{ name }}" value="{{ ov }}" class="accent-brand-700" {% if value is not none and ov|string == value|string %}checked{% endif %} {{ attrs|safe }}>{{ ol }}</label>
+    {% endfor %}
+  </div>
+  {% endif %}
+</fieldset>
+{%- endmacro %}
+
+{#- date_input(name, label, value): value is a date or an ISO yyyy-mm-dd string. -#}
+{% macro date_input(name, label=None, value=None, errors=None, required=False, hint=None, attrs="", cls="", input_cls="", id=None, min=None, max=None) -%}
+{%- set v = value.isoformat() if value and value.isoformat is defined else (value or "") -%}
+{{ input(name, label, v, "date", errors, required, hint,
+         ((' min="' ~ (min.isoformat() if min and min.isoformat is defined else min) ~ '"') if min else '') ~ ((' max="' ~ (max.isoformat() if max and max.isoformat is defined else max) ~ '"') if max else '') ~ ' ' ~ attrs,
+         cls, input_cls=input_cls ~ " tabular-nums", id=id) }}
+{%- endmacro %}
+
+{#- money_input(name, label, value): the visible field shows 1.000.000 formatting and accepts shorthand 2tr / 500k / 1,5tr; submits an integer in hidden `name`. -#}
+{% macro money_input(name, label=None, value=None, errors=None, required=False, hint=None, attrs="", cls="", placeholder="0",
+                     suffix="đ", autofocus=False, id=None, input_cls="", help=None) -%}
+{%- set fid = id or "f-" ~ name -%}
+{%- set has_err = errors and errors.get(name) -%}
+<div class="{{ cls }}" x-data='moneyInput({{ value|tojson if value is not none else "null" }})'>
+  {{ _label(fid, label, required, help) }}
+  <div class="input-group">
+    <input id="{{ fid }}" type="text" inputmode="decimal" autocomplete="off" value="{{ value|money if value is not none else '' }}"
+      class="input input-num {{ 'pr-8' if suffix }} {{ 'input-error' if has_err }} {{ input_cls }}" placeholder="{{ placeholder }}"
+      @input="onInput($event)" @blur="onBlur($event)"{% if required %} required{% endif %}{% if autofocus %} autofocus{% endif %}
+      {%- if has_err %} aria-invalid="true"{% endif %} {{ attrs|safe }}>
+    {% if suffix %}<span class="input-addon right-3">{{ suffix }}</span>{% endif %}
+    <input type="hidden" name="{{ name }}" :value="value === null ? '' : value" value="{{ value if value is not none else '' }}">
+  </div>
+  {% if hint and not has_err %}<p class="hint">{{ hint }}</p>{% endif %}
+  {{ field_error(errors, name) }}
+</div>
+{%- endmacro %}
+
+{#- combobox(name, label, url="/lookup/accounts", value, value_label, params={}, …)
+    Submits: hidden `name` = value. On select: dispatches the `combobox-select` event (detail = {value, label, hint, extra}).
+    allow_free=True: accepts free text (value = the typed text). items=[…]: static list, filtered in the browser. -#}
+{% macro combobox(name, label=None, url="/lookup/accounts", value=None, value_label=None, params=None, placeholder=None, errors=None,
+                  required=False, hint=None, cls="", allow_free=False, local_filter=False, items=None, id=None, input_cls="", attrs="",
+                  min_chars=0, help=None) -%}
+{%- set fid = id or "f-" ~ name -%}
+{%- set has_err = errors and errors.get(name) -%}
+{%- set opts = {"url": url, "params": params or {}, "value": value, "label": value_label or (value if allow_free else ""),
+                "allowFree": allow_free, "localFilter": local_filter, "minChars": min_chars} -%}
+{%- if items is not none %}{% set _x = opts.update({"items": items, "url": none}) %}{% endif -%}
+<div class="{{ cls }}" x-data='combobox({{ opts|tojson }})' @click.outside="open = false">
+  {{ _label(fid, label, required, help) }}
+  {{ _combobox_body(fid, name, placeholder, has_err, input_cls, attrs, required) }}
+  {% if hint and not has_err %}<p class="hint">{{ hint }}</p>{% endif %}
+  {{ field_error(errors, name) }}
+</div>
+{%- endmacro %}
+
+{%- macro _combobox_body(fid, name, placeholder, has_err, input_cls, attrs, required, name_expr=None, value_expr="value") -%}
+<div class="relative">
+  <input id="{{ fid }}" x-ref="input" type="text" autocomplete="off" role="combobox" :aria-expanded="open" aria-autocomplete="list"
+    class="input pr-8 {{ 'input-error' if has_err }} {{ input_cls }}" placeholder="{{ placeholder or tr('Gõ để tìm…') }}"
+    x-model="query" @focus="onFocus()" @input="onInput()" @keydown="onKey($event)" @blur="onBlur()"{% if required %} required{% endif %} {{ attrs|safe }}>
+  <span class="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-fg-3">
+    <svg x-show="loading" class="size-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+    <span x-show="!loading">{{ icon("chevrons-up-down", "size-3.5") }}</span>
+  </span>
+  {% if name_expr %}<input type="hidden" :name="{{ name_expr }}" :value="{{ value_expr }}">
+  {% elif name %}<input type="hidden" name="{{ name }}" :value="{{ value_expr }}">{% endif %}
+  <div x-show="open && (items.length || showEmpty)" x-cloak x-transition.opacity.duration.75ms
+       class="menu absolute inset-x-0 top-full z-50 mt-1 max-h-72 min-w-64 overflow-y-auto p-1" x-ref="list" role="listbox">
+    <template x-for="(it, i) in items" :key="String(it.value) + ':' + i">
+      <button type="button" role="option" :data-i="i" :aria-selected="i === active" tabindex="-1"
+        class="flex w-full items-start gap-2 rounded-md px-2.5 py-1.5 text-left"
+        :class="i === active ? 'bg-surface-3' : ''" @mousedown.prevent="select(it)" @mouseenter="active = i">
+        <span class="min-w-0 flex-1">
+          <span class="block truncate text-[13.5px] text-fg" x-text="it.label"></span>
+          <span class="block truncate text-xs text-fg-3" x-show="it.hint" x-text="it.hint"></span>
+        </span>
+        <span x-show="String(it.value) === String(value)" class="mt-0.5 text-primary">{{ icon("check", "size-3.5") }}</span>
+      </button>
+    </template>
+    <template x-if="showEmpty"><p class="px-2.5 py-2 text-[13px] text-fg-3">{{ tr("Không tìm thấy") }}</p></template>
+  </div>
+</div>
+{%- endmacro -%}
+
+{#- Settings form layout: title + description on the left, control on the right. -#}
+{% macro form_section(title, description=None, cls="") -%}
+<div class="grid grid-cols-1 gap-x-8 gap-y-4 py-6 first:pt-0 last:pb-0 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)] {{ cls }}">
+  <div>
+    <h3 class="text-sm font-semibold text-fg">{{ title }}</h3>
+    {% if description %}<p class="mt-1 text-[13px] text-fg-3">{{ description }}</p>{% endif %}
+  </div>
+  <div class="min-w-0 space-y-4">{{ caller() }}</div>
+</div>
+{%- endmacro %}
+
+{#- Button bar at the end of a form, sticks to the bottom while scrolling (sticky=True). -#}
+{% macro form_actions(sticky=True, cls="") -%}
+<div class="{{ 'sticky bottom-0 z-20 -mx-4 border-t border-line bg-bg/85 px-4 py-3 backdrop-blur max-lg:bottom-14 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8' if sticky else 'pt-2' }} flex flex-wrap items-center justify-end gap-2 {{ cls }}">
+  {{ caller() }}
+</div>
+{%- endmacro %}
+
+{# ------------------------------------------------------------------ Document line grid (Alpine lineGrid) #}
+
+{%- macro _grid_combo(field, url, params, placeholder, local_filter=False, idx_expr="i") -%}
+<div x-data='combobox({"url": {{ url|tojson }}, "params": {{ (params or {})|tojson }}, "localFilter": {{ local_filter|tojson }}})'
+     x-init="setInitial(line.{{ field }}, line.{{ field }}_label)" @click.outside="open = false"
+     @combobox-select.stop="line.{{ field }} = $event.detail.value; line.{{ field }}_label = $event.detail.label">
+  <div class="relative">
+    <input x-ref="input" data-cell type="text" autocomplete="off" role="combobox" class="input input-sm pr-7"
+      placeholder="{{ placeholder }}" x-model="query" @focus="onFocus()" @input="onInput()" @keydown="onKey($event); keys($event, {{ idx_expr }})" @blur="onBlur()">
+    <div x-show="open && items.length" x-cloak data-fixed class="menu fixed z-[55] max-h-64 max-w-[min(28rem,90vw)] overflow-y-auto p-1" x-ref="list">
+      <template x-for="(it, j) in items" :key="String(it.value) + ':' + j">
+        <button type="button" tabindex="-1" :data-i="j" class="flex w-full flex-col rounded-md px-2.5 py-1.5 text-left" :class="j === active ? 'bg-surface-3' : ''"
+                @mousedown.prevent="select(it)" @mouseenter="active = j">
+          <span class="truncate text-[13px]" x-text="it.label"></span>
+          <span class="truncate text-xs text-fg-3" x-show="it.hint" x-text="it.hint"></span>
+        </button>
+      </template>
+    </div>
+  </div>
+</div>
+{%- endmacro -%}
+
+{#- line_grid(mode="split"|"pair", lines=[], prefix="lines", accounts_url, partners_url, show_partner=True, fixed={}, …)
+    See forms.js::lineGrid for the input names submitted to the server. -#}
+{% macro line_grid(mode="split", lines=None, prefix="lines", accounts_url="/lookup/accounts", accounts_params=None,
+                   partners_url="/lookup/partners", show_partner=True, fixed=None, description_from=None, min_lines=None, local_filter=False) -%}
+{%- set opts = {"mode": mode, "prefix": prefix, "lines": lines or [], "fixed": fixed or {}, "descriptionFrom": description_from} -%}
+{%- if min_lines is not none %}{% set _x = opts.update({"minLines": min_lines}) %}{% endif -%}
+{%- set acc_params = accounts_params or {"postable": 1} -%}
+<div x-data='lineGrid({{ opts|tojson }})' class="min-w-0">
+  <input type="hidden" :name="`${prefix}-count`" :value="lines.length">
+  <div class="table-wrap rounded-lg border border-line">
+    <table class="table table-compact table-fixed {{ 'min-w-[900px]' if show_partner else 'min-w-[700px]' }}">
+      <colgroup>
+        <col class="w-10">
+        {% if mode == "split" %}<col class="w-52"><col class="w-34"><col class="w-34">
+        {% else %}{% if not (fixed or {}).get("debit_account") %}<col class="w-48">{% endif %}{% if not (fixed or {}).get("credit_account") %}<col class="w-48">{% endif %}<col class="w-38">{% endif %}
+        {% if show_partner %}<col class="w-52">{% endif %}
+        <col>
+        <col class="w-10">
+      </colgroup>
+      <thead>
+        <tr>
+          <th class="text-center">#</th>
+          {% if mode == "split" %}
+          <th>{{ tr("Tài khoản") }}</th>
+          <th class="num">{{ tr("Nợ") }}</th>
+          <th class="num">{{ tr("Có") }}</th>
+          {% else %}
+          {% if not (fixed or {}).get("debit_account") %}<th>{{ tr("TK Nợ") }}</th>{% endif %}
+          {% if not (fixed or {}).get("credit_account") %}<th>{{ tr("TK Có") }}</th>{% endif %}
+          <th class="num">{{ tr("Số tiền") }}</th>
+          {% endif %}
+          {% if show_partner %}<th>{{ tr("Đối tượng") }}</th>{% endif %}
+          <th>{{ tr("Diễn giải") }}</th>
+          <th><span class="sr-only">{{ tr("Xóa") }}</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <template x-for="(line, i) in lines" :key="line.uid">
+          <tr data-row class="group">
+            <td class="text-center text-xs text-fg-3 tabular-nums" x-text="i + 1"></td>
+            {% if mode == "split" %}
+            <td class="!px-1.5">
+              {{ _grid_combo("account", accounts_url, acc_params, tr("TK…"), local_filter) }}
+              <input type="hidden" :name="name(i, 'account')" :value="line.account">
+            </td>
+            <td class="!px-1.5"><input data-cell type="text" inputmode="decimal" class="input input-sm input-num"
+                 x-effect="moneyEffect($el, line.debit)" @input="setMoney(line, 'debit', $event)" @blur="moneyBlur(line, 'debit', $event)" @keydown="keys($event, i)">
+                 <input type="hidden" :name="name(i, 'debit')" :value="line.debit ?? ''"></td>
+            <td class="!px-1.5"><input data-cell type="text" inputmode="decimal" class="input input-sm input-num"
+                 x-effect="moneyEffect($el, line.credit)" @input="setMoney(line, 'credit', $event)" @blur="moneyBlur(line, 'credit', $event)" @keydown="keys($event, i)">
+                 <input type="hidden" :name="name(i, 'credit')" :value="line.credit ?? ''"></td>
+            {% else %}
+            {% if not (fixed or {}).get("debit_account") %}
+            <td class="!px-1.5">{{ _grid_combo("debit_account", accounts_url, acc_params, tr("TK Nợ"), local_filter) }}
+              <input type="hidden" :name="name(i, 'debit_account')" :value="line.debit_account"></td>
+            {% endif %}
+            {% if not (fixed or {}).get("credit_account") %}
+            <td class="!px-1.5">{{ _grid_combo("credit_account", accounts_url, acc_params, tr("TK Có"), local_filter) }}
+              <input type="hidden" :name="name(i, 'credit_account')" :value="line.credit_account"></td>
+            {% endif %}
+            <td class="!px-1.5"><input data-cell type="text" inputmode="decimal" class="input input-sm input-num" placeholder="0"
+                 x-effect="moneyEffect($el, line.amount)" @input="setMoney(line, 'amount', $event)" @blur="moneyBlur(line, 'amount', $event)" @keydown="keys($event, i)">
+                 <input type="hidden" :name="name(i, 'amount')" :value="line.amount ?? ''"></td>
+            {% endif %}
+            {% if show_partner %}
+            <td class="!px-1.5">{{ _grid_combo("partner_id", partners_url, {}, tr("Đối tượng"), local_filter) }}
+              <input type="hidden" :name="name(i, 'partner_id')" :value="line.partner_id"></td>
+            {% endif %}
+            <td class="!px-1.5"><input data-cell type="text" class="input input-sm" x-model="line.description" :name="name(i, 'description')"
+                 placeholder="{{ tr('Diễn giải') }}" @keydown="keys($event, i)"></td>
+            <td class="!px-1 text-center">
+              <button type="button" class="btn-ghost btn-xs btn-icon text-fg-3 opacity-60 hover:text-rose-600 group-hover:opacity-100" @click="removeLine(i)"
+                      aria-label="{{ tr('Xóa dòng') }}" tabindex="-1">{{ icon("trash", "size-3.5") }}</button>
+            </td>
+          </tr>
+        </template>
+      </tbody>
+      <tfoot>
+        <tr class="row-total">
+          <td></td>
+          {% if mode == "split" %}
+          <td class="text-[13px]">
+            <button type="button" class="btn-ghost btn-xs -ml-1.5 font-medium text-primary dark:text-brand-400" @click="addLine(); focusRow(lines.length - 1)">{{ icon("plus", "size-3.5") }}{{ tr("Thêm dòng") }}</button>
+          </td>
+          <td class="num" x-text="fmt(totalDebit)"></td>
+          <td class="num" x-text="fmt(totalCredit)"></td>
+          {% else %}
+          {% set span = (0 if (fixed or {}).get("debit_account") else 1) + (0 if (fixed or {}).get("credit_account") else 1) %}
+          <td {% if span > 1 %}colspan="{{ span }}"{% endif %} class="text-[13px]">
+            <button type="button" class="btn-ghost btn-xs -ml-1.5 font-medium text-primary dark:text-brand-400" @click="addLine(); focusRow(lines.length - 1)">{{ icon("plus", "size-3.5") }}{{ tr("Thêm dòng") }}</button>
+          </td>
+          <td class="num" x-text="fmt(totalAmount)"></td>
+          {% endif %}
+          <td colspan="{{ 3 if show_partner else 2 }}" class="text-right text-xs font-medium">
+            {% if mode == "split" %}
+            <span x-show="balanced" class="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">{{ icon("circle-check", "size-3.5") }}{{ tr("Cân Nợ – Có") }}</span>
+            <span x-show="!balanced && diff !== 0" class="inline-flex items-center gap-1 text-rose-600 dark:text-rose-400">{{ icon("triangle-alert", "size-3.5") }}<span>{{ tr("Lệch") }} <span class="tabular-nums" x-text="fmt(Math.abs(diff))"></span></span></span>
+            {% endif %}
+          </td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  <p class="mt-2 hidden text-xs text-fg-3 sm:block">
+    {{ kbd("Enter") }} {{ tr("sang ô tiếp / thêm dòng") }} · {{ kbd("Ctrl+D") }} {{ tr("nhân bản dòng") }} · {{ kbd("Ctrl+Delete") }} {{ tr("xóa dòng") }}
+  </p>
+</div>
+{%- endmacro %}
+
+{# ------------------------------------------------------------------ Invoice grid (Alpine invoiceGrid) #}
+
+{#- invoice_grid(lines=[], prefix="lines", items_url="/lookup/items", price_field="sale_price", vat_rates=None, show_discount=False) -#}
+{% macro invoice_grid(lines=None, prefix="lines", items_url="/lookup/items", price_field="sale_price", vat_rates=None, default_vat="10",
+                      show_discount=False, local_filter=False) -%}
+{%- set opts = {"prefix": prefix, "lines": lines or [], "priceField": price_field, "defaultVat": default_vat, "showDiscount": show_discount} -%}
+{%- if vat_rates %}{% set _x = opts.update({"vatRates": vat_rates}) %}{% endif -%}
+<div x-data='invoiceGrid({{ opts|tojson }})' class="min-w-0">
+  <input type="hidden" :name="`${prefix}-count`" :value="lines.length">
+  <div class="table-wrap rounded-lg border border-line">
+    <table class="table table-compact table-fixed min-w-[1040px]">
+      <colgroup>
+        <col class="w-10"><col class="w-48"><col><col class="w-20"><col class="w-24"><col class="w-32"><col class="w-36">
+        {% if show_discount %}<col class="w-28">{% endif %}<col class="w-24"><col class="w-32"><col class="w-10">
+      </colgroup>
+      <thead>
+        <tr>
+          <th class="text-center">#</th>
+          <th>{{ tr("Hàng hóa, dịch vụ") }}</th>
+          <th>{{ tr("Diễn giải") }}</th>
+          <th>{{ tr("ĐVT") }}</th>
+          <th class="num">{{ tr("Số lượng") }}</th>
+          <th class="num">{{ tr("Đơn giá") }}</th>
+          <th class="num">{{ tr("Thành tiền") }}</th>
+          {% if show_discount %}<th class="num">{{ tr("Chiết khấu") }}</th>{% endif %}
+          <th>{{ tr("Thuế suất") }}</th>
+          <th class="num">{{ tr("Tiền thuế") }}</th>
+          <th><span class="sr-only">{{ tr("Xóa") }}</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <template x-for="(line, i) in lines" :key="line.uid">
+          <tr data-row class="group">
+            <td class="text-center text-xs text-fg-3 tabular-nums" x-text="i + 1"></td>
+            <td class="!px-1.5">
+              <div x-data='combobox({"url": {{ items_url|tojson }}, "localFilter": {{ local_filter|tojson }}})' x-init="setInitial(line.item_id, line.item_label)"
+                   @click.outside="open = false" @combobox-select.stop="onItem(line, $event.detail)">
+                <div class="relative">
+                  <input x-ref="input" data-cell type="text" autocomplete="off" class="input input-sm" placeholder="{{ tr('Mã hàng…') }}"
+                         x-model="query" @focus="onFocus()" @input="onInput()" @keydown="onKey($event); keys($event, i)" @blur="onBlur()">
+                  <div x-show="open && items.length" x-cloak data-fixed class="menu fixed z-[55] max-h-64 max-w-[min(28rem,90vw)] overflow-y-auto p-1" x-ref="list">
+                    <template x-for="(it, j) in items" :key="String(it.value) + ':' + j">
+                      <button type="button" tabindex="-1" :data-i="j" class="flex w-full flex-col rounded-md px-2.5 py-1.5 text-left" :class="j === active ? 'bg-surface-3' : ''"
+                              @mousedown.prevent="select(it)" @mouseenter="active = j">
+                        <span class="truncate text-[13px]" x-text="it.label"></span>
+                        <span class="truncate text-xs text-fg-3" x-show="it.hint" x-text="it.hint"></span>
+                      </button>
+                    </template>
+                  </div>
+                </div>
+              </div>
+              <input type="hidden" :name="name(i, 'item_id')" :value="line.item_id">
+            </td>
+            <td class="!px-1.5"><input data-cell type="text" class="input input-sm" x-model="line.description" :name="name(i, 'description')" @keydown="keys($event, i)"></td>
+            <td class="!px-1.5"><input data-cell type="text" class="input input-sm" x-model="line.unit" :name="name(i, 'unit')" @keydown="keys($event, i)"></td>
+            <td class="!px-1.5"><input data-cell type="text" inputmode="decimal" class="input input-sm input-num"
+                 x-effect="qtyEffect($el, line.quantity)" @input="setQty(line, 'quantity', $event)" @blur="$el.value = fmtQty(line.quantity)" @keydown="keys($event, i)">
+                 <input type="hidden" :name="name(i, 'quantity')" :value="num(line.quantity)"></td>
+            <td class="!px-1.5"><input data-cell type="text" inputmode="decimal" class="input input-sm input-num"
+                 x-effect="qtyEffect($el, line.unit_price)" @input="setQty(line, 'unit_price', $event)" @blur="$el.value = fmtQty(line.unit_price)" @keydown="keys($event, i)">
+                 <input type="hidden" :name="name(i, 'unit_price')" :value="num(line.unit_price)"></td>
+            <td class="!px-1.5"><input data-cell type="text" inputmode="decimal" class="input input-sm input-num" :class="line.amountLocked && 'border-amber-400'"
+                 x-effect="moneyEffect($el, line.amount)" @change="setMoney(line, 'amount', $event)" @keydown="keys($event, i)">
+                 <input type="hidden" :name="name(i, 'amount')" :value="num(line.amount)"></td>
+            {% if show_discount %}
+            <td class="!px-1.5"><input data-cell type="text" inputmode="decimal" class="input input-sm input-num" placeholder="0"
+                 x-effect="moneyEffect($el, line.discount)" @change="setMoney(line, 'discount', $event)" @keydown="keys($event, i)">
+                 <input type="hidden" :name="name(i, 'discount')" :value="num(line.discount)"></td>
+            {% endif %}
+            <td class="!px-1.5"><select data-cell class="input input-sm" x-model="line.vat_rate" :name="name(i, 'vat_rate')" @change="recalc(line)" @keydown="keys($event, i)">
+                 <template x-for="r in rates" :key="r.value"><option :value="r.value" x-text="r.label" :selected="r.value === line.vat_rate"></option></template>
+               </select></td>
+            <td class="!px-1.5"><input data-cell type="text" inputmode="decimal" class="input input-sm input-num" :class="line.vatLocked && 'border-amber-400'"
+                 x-effect="moneyEffect($el, line.vat_amount)" @change="setMoney(line, 'vat_amount', $event)" @keydown="keys($event, i)">
+                 <input type="hidden" :name="name(i, 'vat_amount')" :value="num(line.vat_amount)"></td>
+            <td class="!px-1 text-center">
+              <button type="button" class="btn-ghost btn-xs btn-icon text-fg-3 opacity-60 hover:text-rose-600 group-hover:opacity-100" @click="removeLine(i)" aria-label="{{ tr('Xóa dòng') }}" tabindex="-1">{{ icon("trash", "size-3.5") }}</button>
+            </td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+  </div>
+  <div class="mt-3 flex flex-col-reverse gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <div>
+      <button type="button" class="btn-ghost btn-sm -ml-2 text-primary dark:text-brand-400" @click="addLine(); focusRow(lines.length - 1)">{{ icon("plus") }}{{ tr("Thêm dòng") }}</button>
+      <p class="mt-1 hidden text-xs text-fg-3 sm:block">{{ tr("Sửa tay Thành tiền / Tiền thuế khi cần làm tròn theo hóa đơn – ô được viền vàng.") }}</p>
+    </div>
+    <dl class="w-full max-w-sm space-y-1.5 text-[13.5px]">
+      <div class="flex justify-between gap-4"><dt class="text-fg-3">{{ tr("Cộng tiền hàng") }}</dt><dd class="tabular-nums" x-text="fmt(subtotal)"></dd></div>
+      {% if show_discount %}<div class="flex justify-between gap-4"><dt class="text-fg-3">{{ tr("Chiết khấu") }}</dt><dd class="tabular-nums" x-text="'−' + fmt(discountTotal)"></dd></div>{% endif %}
+      <template x-for="g in vatGroups" :key="g.rate">
+        <div class="flex justify-between gap-4 text-[13px]"><dt class="text-fg-3"><span>{{ tr("Thuế GTGT") }}</span> <span x-text="rateLabel(g.rate)"></span></dt><dd class="tabular-nums" x-text="fmt(g.vat)"></dd></div>
+      </template>
+      <div class="flex justify-between gap-4 border-t border-line pt-2 text-[15px] font-semibold"><dt>{{ tr("Tổng thanh toán") }}</dt><dd class="tabular-nums" x-text="fmt(total)"></dd></div>
+    </dl>
+  </div>
+</div>
+{%- endmacro %}
+
+{# ------------------------------------------------------------------ Report period, report forms #}
+
+{#- period_selector(period, years, action, tr_fn=None, extra_hidden=None, modes=…) – keeps the v1 parameter order.
+    period: .mode (month|quarter|year|all|custom), .start, .end (date); optional .quarter, .year.
+    Submitted parameters: mode, month=YYYY-MM, quarter=1..4, year, start, end. -#}
+{% macro period_selector(period, years=None, action="", tr_fn=None, extra_hidden=None, modes=("month", "quarter", "year", "custom"), cls="") -%}
+{%- set t = tr_fn or (_ if _ is defined else none) -%}
+{%- set LABELS = {"month": "Tháng", "quarter": "Quý", "year": "Năm", "all": "Toàn bộ", "custom": "Tùy chọn"} -%}
+{%- set p_year = period.year if period.year is defined and period.year else period.start.year -%}
+{%- set p_quarter = period.quarter if period.quarter is defined and period.quarter else ((period.start.month - 1) // 3 + 1) -%}
+{%- set year_list = years or range(p_year - 3, p_year + 2)|reverse|list -%}
+<form method="get" action="{{ action }}" class="flex flex-wrap items-end gap-2 {{ cls }}" x-data="{ mode: '{{ period.mode }}' }">
+  {% for k, v in (extra_hidden or {}).items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+  <div>
+    <span class="label">{{ t("Kỳ") if t else "Kỳ" }}</span>
+    <div class="segmented">
+      {% for m in modes %}
+      <label class="segment" :class="mode === '{{ m }}' && 'segment-active'">
+        <input type="radio" name="mode" value="{{ m }}" class="sr-only" x-model="mode">{{ t(LABELS[m]) if t else LABELS[m] }}
+      </label>
+      {% endfor %}
+    </div>
+  </div>
+  <div x-show="mode === 'month'" x-cloak>
+    <label class="label" for="ps-month">{{ t("Tháng") if t else "Tháng" }}</label>
+    <input id="ps-month" type="month" name="month" class="input input-sm w-40 tabular-nums" value="{{ period.start.strftime('%Y-%m') }}" :disabled="mode !== 'month'">
+  </div>
+  <div x-show="mode === 'quarter'" x-cloak class="flex gap-2">
+    <div>
+      <label class="label" for="ps-quarter">{{ t("Quý") if t else "Quý" }}</label>
+      <select id="ps-quarter" name="quarter" class="input input-sm w-20" :disabled="mode !== 'quarter'">
+        {% for q in range(1, 5) %}<option value="{{ q }}" {% if q == p_quarter %}selected{% endif %}>{{ q }}</option>{% endfor %}
+      </select>
+    </div>
+  </div>
+  <div x-show="mode === 'quarter' || mode === 'year'" x-cloak>
+    <label class="label" for="ps-year">{{ t("Năm") if t else "Năm" }}</label>
+    <select id="ps-year" name="year" class="input input-sm w-24" :disabled="mode !== 'quarter' && mode !== 'year'">
+      {% for y in year_list %}<option value="{{ y }}" {% if y == p_year %}selected{% endif %}>{{ y }}</option>{% endfor %}
+    </select>
+  </div>
+  <div x-show="mode === 'custom'" x-cloak class="flex gap-2">
+    <div>
+      <label class="label" for="ps-start">{{ t("Từ ngày") if t else "Từ ngày" }}</label>
+      <input id="ps-start" type="date" name="start" class="input input-sm w-36 tabular-nums" value="{{ period.start.isoformat() }}" :disabled="mode !== 'custom'">
+    </div>
+    <div>
+      <label class="label" for="ps-end">{{ t("Đến ngày") if t else "Đến ngày" }}</label>
+      <input id="ps-end" type="date" name="end" class="input input-sm w-36 tabular-nums" value="{{ period.end.isoformat() }}" :disabled="mode !== 'custom'">
+    </div>
+  </div>
+  <button class="btn-primary btn-sm" type="submit">{{ t("Xem") if t else "Xem" }}</button>
+</form>
+{%- endmacro %}
+
+{#- Header block of a TT133 ledger/report form (web preview). company: .name .address .tax_code -#}
+{% macro official_header(company, form_code=None, regime_note="Ban hành theo Thông tư số 133/2016/TT-BTC ngày 26/8/2016 của Bộ Tài chính") -%}
+<div class="flex flex-col gap-3 text-[13px] leading-snug sm:flex-row sm:items-start sm:justify-between">
+  <div class="space-y-0.5">
+    <p><span class="font-semibold">Đơn vị:</span> {{ company.name if company else "" }}</p>
+    <p><span class="font-semibold">Địa chỉ:</span> {{ company.address if company and company.address else "" }}</p>
+    {% if company and company.tax_code %}<p><span class="font-semibold">Mã số thuế:</span> {{ company.tax_code }}</p>{% endif %}
+  </div>
+  {% if form_code %}
+  <div class="text-center sm:max-w-[19rem]">
+    <p class="font-bold">Mẫu số {{ form_code }}</p>
+    <p class="italic">({{ regime_note }})</p>
+  </div>
+  {% endif %}
+</div>
+{%- endmacro %}
+
+{% macro report_title(title, period_label=None, unit_label="Đơn vị tính: Đồng", extra=None) -%}
+<div class="my-5 text-center">
+  <h2 class="text-lg font-bold tracking-wide uppercase">{{ title }}</h2>
+  {% if period_label %}<p class="mt-1 italic">{{ period_label }}</p>{% endif %}
+  {% if extra %}<p class="mt-0.5">{{ extra }}</p>{% endif %}
+  {% if unit_label %}<p class="mt-1 text-right text-[12.5px] italic">{{ unit_label }}</p>{% endif %}
+</div>
+{%- endmacro %}
+
+{#- Signature block at the end of a report: signers = [(job title, note, name)], date_label = "Ngày … tháng … năm …" -#}
+{% macro signature_block(signers, date_label=None) -%}
+<div class="mt-8 grid grid-cols-{{ signers|length }} gap-4 text-center text-[13px]">
+  {% for title, note, name in signers %}
+  <div>
+    {% if loop.last and date_label %}<p class="mb-1 italic">{{ date_label }}</p>{% elif date_label %}<p class="mb-1">&nbsp;</p>{% endif %}
+    <p class="font-bold">{{ title }}</p>
+    <p class="italic">{{ note }}</p>
+    <p class="mt-16 font-semibold">{{ name or "" }}</p>
+  </div>
+  {% endfor %}
+</div>
+{%- endmacro %}
+
+{#- Report toolbar: report_toolbar(pdf_href, xlsx_href, print=False); caller() = extra buttons. -#}
+{% macro report_toolbar(pdf_href=None, xlsx_href=None, print=False, cls="") -%}
+<div class="flex flex-wrap items-center gap-2 {{ cls }}">
+  {% if caller %}{{ caller() }}{% endif %}
+  {% if xlsx_href %}<a href="{{ xlsx_href }}" class="btn-secondary btn-sm">{{ icon("file-spreadsheet", "size-4 text-emerald-600 dark:text-emerald-400") }}<span>Excel</span></a>{% endif %}
+  {% if pdf_href %}<a href="{{ pdf_href }}" class="btn-secondary btn-sm" target="_blank" rel="noopener">{{ icon("file-text", "size-4 text-rose-600 dark:text-rose-400") }}<span>PDF</span></a>{% endif %}
+  {% if print %}<button type="button" class="btn-secondary btn-sm" x-data @click="window.print()">{{ icon("printer") }}<span>{{ tr("In") }}</span></button>{% endif %}
+</div>
+{%- endmacro %}
+
+{# ------------------------------------------------------------------ History, attachments #}
+
+{#- timeline(items): items = [{at, actor, action, detail, icon, tone}] – tone: brand|green|amber|red|gray -#}
+{% macro timeline(items) -%}
+<ol class="relative space-y-5">
+  {% for it in items %}
+  {%- set tone = {"green": "bg-emerald-500", "amber": "bg-amber-500", "red": "bg-rose-500", "brand": "bg-primary", "gray": "bg-fg-3"}.get(it.tone or "gray", "bg-fg-3") -%}
+  <li class="relative flex gap-3">
+    {% if not loop.last %}<span class="absolute top-6 bottom-[-1.25rem] left-[11px] w-px bg-line" aria-hidden="true"></span>{% endif %}
+    <span class="relative z-10 flex size-6 shrink-0 items-center justify-center rounded-full border border-line bg-surface">
+      {% if it.icon %}{{ icon(it.icon, "size-3.5 text-fg-2") }}{% else %}<span class="size-2 rounded-full {{ tone }}"></span>{% endif %}
+    </span>
+    <div class="min-w-0 flex-1 pt-0.5">
+      <p class="text-[13.5px] text-fg"><span class="font-medium">{{ it.actor }}</span> {{ it.action }}</p>
+      {% if it.detail %}<p class="mt-0.5 text-[13px] text-fg-3">{{ it.detail }}</p>{% endif %}
+      <p class="mt-0.5 text-xs text-fg-3 tabular-nums">{{ it.at }}</p>
+    </div>
+  </li>
+  {% endfor %}
+</ol>
+{%- endmacro %}
+
+{#- attachment_list(files): files = [{name, size, href, kind (pdf|image|xml|xlsx), delete_action}] -#}
+{% macro attachment_list(files, can_delete=False) -%}
+<ul class="divide-y divide-line">
+  {% for f in files %}
+  {%- set ic = {"pdf": "file-text", "image": "file", "xml": "file-check", "xlsx": "file-spreadsheet"}.get(f.kind, "paperclip") -%}
+  <li class="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
+    <span class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-line bg-surface-2 text-fg-3">{{ icon(ic) }}</span>
+    <div class="min-w-0 flex-1">
+      <a href="{{ f.href }}" class="block truncate text-[13.5px] font-medium text-fg hover:underline">{{ f.name }}</a>
+      {% if f.size %}<p class="text-xs text-fg-3">{{ f.size }}</p>{% endif %}
+    </div>
+    <a href="{{ f.href }}" class="btn-ghost btn-sm btn-icon" aria-label="{{ tr('Tải xuống') }}" data-tooltip="{{ tr('Tải xuống') }}">{{ icon("download") }}</a>
+    {% if can_delete and f.delete_action %}
+    <form method="post" action="{{ f.delete_action }}" data-confirm="{{ tr('Xóa tệp đính kèm này?') }}" data-danger>{{ csrf_field() }}
+      <button class="btn-ghost btn-sm btn-icon hover:text-rose-600" aria-label="{{ tr('Xóa') }}">{{ icon("trash") }}</button>
+    </form>
+    {% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{%- endmacro %}

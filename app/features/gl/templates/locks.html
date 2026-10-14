@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Khóa sổ") }}{% endblock %}
+{% block content %}
+{% call ui.page_header(_("Khóa sổ"), _("Khóa theo thứ tự thời gian. Kỳ đã khóa không ghi sổ, hủy hay sửa chứng từ; mở khóa phải có lý do và được ghi nhật ký."), breadcrumbs=breadcrumbs, icon_name="lock") %}
+  <form method="get" action="/locks" class="flex items-center gap-2">
+    <label class="sr-only" for="lk-year">{{ _("Năm") }}</label>
+    <select id="lk-year" name="year" class="input input-sm w-28" x-data @change="$el.form.submit()">
+      {% for y in years %}<option value="{{ y }}" {{ "selected" if y == year }}>{{ _("Năm") }} {{ y }}</option>{% endfor %}
+    </select>
+  </form>
+{% endcall %}
+
+<div class="mb-5 flex flex-wrap items-center gap-3 text-[13px]">
+  {% if last %}<span class="inline-flex items-center gap-1.5 text-fg-2">{{ ui.icon("lock", "size-3.5") }}{{ _("Đã khóa đến hết tháng {m}/{y}", m="%02d"|format(last[1]), y=last[0]) }}</span>
+  {% else %}<span class="text-fg-3">{{ _("Chưa khóa kỳ nào") }}</span>{% endif %}
+  {% if year_locked %}{{ ui.badge(_("Năm {y} đã khóa", y=year), "violet", icon_name="lock") }}{% endif %}
+  {% if next_lock %}
+    <span class="text-fg-3">·</span>
+    <span class="text-fg-2">{{ _("Kỳ cần khóa tiếp theo: tháng {m}/{y}", m="%02d"|format(next_lock[1]), y=next_lock[0]) }}</span>
+    {% if next_lock[0] != year %}<a href="/locks?year={{ next_lock[0] }}" class="text-primary hover:underline">{{ _("Đến năm {y}", y=next_lock[0]) }} →</a>{% endif %}
+  {% endif %}
+</div>
+
+<div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+  {% for c in cells %}
+  <section class="card p-4 {{ 'opacity-60' if c.before_start }}">
+    <div class="flex items-center justify-between">
+      <p class="text-[15px] font-semibold tabular-nums">{{ _("Tháng") }} {{ "%02d"|format(c.month) }}</p>
+      {% if c.locked %}{{ ui.icon("lock", "size-4 text-violet-600 dark:text-violet-400") }}{% elif c.before_start %}{{ ui.icon("minus", "size-4 text-fg-3") }}{% else %}{{ ui.icon("lock-open", "size-4 text-fg-3") }}{% endif %}
+    </div>
+    <p class="mt-1 text-xs text-fg-3">
+      {% if c.before_start %}{{ _("Trước ngày bắt đầu") }}{% elif c.locked %}{{ _("Đã khóa") }}{% if c.by_year %} ({{ _("khóa năm") }}){% endif %}{% elif c.ended %}{{ _("Đã kết thúc, đang mở") }}{% else %}{{ _("Chưa kết thúc") }}{% endif %}
+    </p>
+    {% if can_manage %}
+    <div class="mt-3">
+      {% if c.can_lock %}
+        <form method="post" action="/locks/lock">{{ ui.csrf_field() }}<input type="hidden" name="year" value="{{ c.year }}"><input type="hidden" name="month" value="{{ c.month }}">
+          {{ ui.button(_("Khóa sổ"), "primary", size="xs", icon_name="lock", confirm=_("Khóa sổ tháng {m}/{y}?", m="%02d"|format(c.month), y=c.year)) }}</form>
+      {% elif c.can_unlock %}
+        {{ ui.button(_("Mở khóa"), "secondary", size="xs", icon_name="lock-open", type="button", attrs="@click=\"$dispatch('unlock-period', {year: " ~ c.year ~ ", month: " ~ c.month ~ "}); $dispatch('modal-open', 'unlock')\"") }}
+      {% endif %}
+    </div>
+    {% endif %}
+  </section>
+  {% endfor %}
+</div>
+
+{% if can_manage %}
+<div class="mt-6 flex flex-wrap gap-2">
+  {% if can_lock_year %}
+  <form method="post" action="/locks/lock">{{ ui.csrf_field() }}<input type="hidden" name="year" value="{{ year }}"><input type="hidden" name="month" value="0">
+    {{ ui.button(_("Khóa sổ cả năm {y}", y=year), "primary", icon_name="lock", confirm=_("Khóa sổ cả năm {y}? Sau khi khóa năm, phải mở khóa năm trước khi mở từng tháng.", y=year)) }}</form>
+  {% endif %}
+  {% if year_locked %}
+    {{ ui.button(_("Mở khóa năm {y}", y=year), "secondary", icon_name="lock-open", type="button", attrs="@click=\"$dispatch('unlock-period', {year: " ~ year ~ ", month: 0}); $dispatch('modal-open', 'unlock')\"") }}
+  {% endif %}
+</div>
+
+{% call ui.modal("unlock", _("Mở khóa sổ"), description=_("Mở khóa cho phép ghi sổ, hủy chứng từ trong kỳ. Bắt buộc ghi lý do – lý do được lưu vào nhật ký.")) %}
+<form method="post" action="/locks/unlock" x-data="{ year: '', month: '' }" @unlock-period.window="year = $event.detail.year; month = $event.detail.month">
+  {{ ui.csrf_field() }}
+  <input type="hidden" name="year" :value="year"><input type="hidden" name="month" :value="month">
+  <div class="px-5 pb-5">
+    <p class="mb-3 text-[13.5px] text-fg-2"><span data-year="{{ _('Năm') }}" data-month="{{ _('Tháng') }}" x-text="month == 0 ? $el.dataset.year + ' ' + year : $el.dataset.month + ' ' + String(month).padStart(2, '0') + '/' + year"></span></p>
+    {{ ui.textarea("reason", _("Lý do mở khóa"), rows=3, required=True) }}
+  </div>
+  <div class="modal-footer">
+    {{ ui.button(_("Đóng"), "secondary", type="button", attrs="@click=\"$dispatch('modal-close')\"") }}
+    {{ ui.button(_("Mở khóa"), "danger", icon_name="lock-open") }}
+  </div>
+</form>
+{% endcall %}
+{% endif %}
+{% endblock %}

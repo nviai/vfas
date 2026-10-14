@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install "ruff==0.17.0"
+      - name: PEP 8 (ruff format + ruff check)
+        run: |
+          ruff format --check app tests tools migrations
+          ruff check app tests tools migrations
+      - name: English-only comments, docstrings and log messages
+        run: python tools/check_english.py
+
+  test:
+    name: test (${{ matrix.db }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        db: [sqlite, postgres]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: ${{ matrix.db == 'postgres' && 'postgresql+psycopg://postgres:test@localhost:5432/test' || '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: System libraries for WeasyPrint (PDF)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 \
+            fonts-liberation2 fonts-dejavu-core
+      - run: pip install -e ".[dev,postgres]"
+      - run: python -m pytest -p no:warnings
+
+  e2e:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: System libraries for WeasyPrint (PDF)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 \
+            fonts-liberation2 fonts-dejavu-core
+      - run: pip install -e ".[dev]"
+      - run: python -m playwright install --with-deps chromium
+      - run: python -m pytest tests/e2e -p no:warnings
+        env:
+          E2E: "1"
+
+  docker:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t vfas:ci .
+      - name: Run the hardened container and check /healthz
+        run: |
+          docker run -d --name vfas --read-only --tmpfs /tmp:size=256m --cap-drop ALL \
+            --security-opt no-new-privileges:true -p 127.0.0.1:8000:8000 vfas:ci
+          for i in $(seq 1 30); do curl -fs http://127.0.0.1:8000/healthz && exit 0; sleep 2; done
+          docker logs vfas; exit 1

@@ -1,0 +1,58 @@
+{#- Posting table (debit/credit pairs) of a voucher. Variables: entry, names (gl.entries.Names). -#}
+{% import "macros.html" as ui with context %}
+{% call ui.card(_("Định khoản"), flush=True) %}
+<div class="table-wrap">
+  <table class="table">
+    <thead>
+      <tr>
+        <th>{{ _("Diễn giải") }}</th>
+        <th class="w-24">{{ _("TK Nợ") }}</th>
+        <th class="w-24">{{ _("TK Có") }}</th>
+        <th class="num w-40">{{ _("Số tiền") }}</th>
+        <th class="w-56 max-lg:hidden">{{ _("Đối tượng / ngân hàng") }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ln in entry.lines %}
+      <tr>
+        <td class="text-fg-2">{{ ln.description or entry.description }}</td>
+        <td><span class="font-medium tabular-nums" data-tooltip="{{ names.account(ln.debit_account) }}">{{ ln.debit_account }}</span></td>
+        <td><span class="font-medium tabular-nums" data-tooltip="{{ names.account(ln.credit_account) }}">{{ ln.credit_account }}</span></td>
+        <td class="num font-medium">{{ ln.amount|money }}</td>
+        <td class="max-lg:hidden text-[13px] text-fg-2">
+          {% set dn = names.partner(ln.debit_partner_id) or names.bank(ln.debit_bank_account_id) %}
+          {% set cn = names.partner(ln.credit_partner_id) or names.bank(ln.credit_bank_account_id) %}
+          {% if dn %}<p class="truncate"><span class="text-fg-3">{{ _("Nợ") }}:</span> {{ dn }}</p>{% endif %}
+          {% if cn %}<p class="truncate"><span class="text-fg-3">{{ _("Có") }}:</span> {{ cn }}</p>{% endif %}
+          {% if not dn and not cn %}<span class="text-fg-3">–</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr class="row-total"><td colspan="3">{{ _("Cộng") }}</td><td class="num">{{ entry.total|money }}</td><td class="max-lg:hidden"></td></tr>
+    </tfoot>
+  </table>
+</div>
+{% endcall %}
+{% if entry.vat_records %}
+{% call ui.card(_("Hóa đơn GTGT"), icon_name="receipt", flush=True, cls="mt-5") %}
+<div class="table-wrap">
+  <table class="table">
+    <thead><tr><th>{{ _("Ký hiệu / số") }}</th><th class="w-28">{{ _("Ngày") }}</th><th>{{ _("Người bán / mua") }}</th><th class="w-20">{{ _("Thuế suất") }}</th><th class="num w-36">{{ _("Tiền hàng") }}</th><th class="num w-32">{{ _("Tiền thuế") }}</th></tr></thead>
+    <tbody>
+      {% for v in entry.vat_records %}
+      <tr>
+        <td class="tabular-nums">{{ v.invoice_series }} {{ v.invoice_no }} <span class="text-xs text-fg-3">({{ _("đầu vào") if v.direction == "in" else _("đầu ra") }})</span></td>
+        <td class="tabular-nums">{{ v.invoice_date|date }}</td>
+        <td><p class="truncate">{{ v.partner_name or names.partner(v.partner_id) }}</p>{% if v.partner_tax_code %}<p class="text-xs text-fg-3">MST {{ v.partner_tax_code }}</p>{% endif %}</td>
+        <td class="tabular-nums">{{ v.vat_rate }}{{ "%" if v.vat_rate.isdigit() }}</td>
+        <td class="num">{{ v.goods_amount|money }}</td>
+        <td class="num">{{ v.vat_amount|money }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endcall %}
+{% endif %}

@@ -1,0 +1,21 @@
+{% extends "auth_base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Đăng nhập") }}{% endblock %}
+{% block content %}
+<div class="mb-8">
+  <h1 class="text-2xl font-semibold tracking-tight">{{ _("Đăng nhập") }}</h1>
+  <p class="mt-1.5 text-[14px] text-fg-3">{{ _("Chào mừng trở lại. Nhập email và mật khẩu để tiếp tục.") }}</p>
+</div>
+{% if error %}{{ ui.alert(_(error), "error", cls="mb-5") }}{% endif %}
+<form method="post" action="/login" class="space-y-4">
+  {{ ui.csrf_field() }}
+  <input type="hidden" name="next" value="{{ next or '' }}">
+  {{ ui.input("email", _("Email"), (form.email if form is defined and form else ""), "email", required=True,
+              attrs='autocomplete="username" autocapitalize="off" spellcheck="false"', autofocus=True, placeholder="ten@congty.vn") }}
+  {{ ui.password_input("password", _("Mật khẩu")) }}
+  {{ ui.button(_("Đăng nhập"), size="lg", cls="btn-block mt-2", icon_right="arrow-right") }}
+</form>
+{% if allow_signup is defined and allow_signup %}
+<p class="mt-8 text-center text-[13.5px] text-fg-3">{{ _("Chưa có tài khoản?") }} <a href="/signup" class="font-medium text-primary hover:underline dark:text-brand-400">{{ _("Đăng ký miễn phí") }}</a></p>
+{% endif %}
+{% endblock %}

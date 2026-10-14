@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Ghi tăng CCDC, chi phí trả trước") }}{% endblock %}
+{% block content %}
+{{ ui.page_header(_("Ghi tăng CCDC, chi phí trả trước"), _("Giá trị đã ghi Nợ TK 242 ở chứng từ mua; phần mềm phân bổ dần hàng tháng."), breadcrumbs=breadcrumbs, back="/prepaid", icon_name="package") }}
+{% if errors.get("_") %}{{ ui.alert(_(errors["_"]), "error", cls="mb-5") }}{% endif %}
+<form method="post" action="/prepaid" class="card" x-data="docForm()" @keydown="keys($event)">
+  {{ ui.csrf_field() }}
+  {% if form.get("entry_id") %}<input type="hidden" name="entry_id" value="{{ form.entry_id }}">{% endif %}
+  {% include "assets/_prepaid_fields.html" %}
+  <div class="card-footer flex justify-end gap-2">
+    {{ ui.link_button(_("Hủy"), "/prepaid", "secondary") }}
+    {{ ui.button(_("Lưu"), "primary", icon_name="check", hotkey="save", kbd_hint="Ctrl+S") }}
+  </div>
+</form>
+{% endblock %}

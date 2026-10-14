@@ -1,0 +1,56 @@
+{% import "macros.html" as ui with context %}
+{% if not accounts %}
+  {{ ui.empty_state(_("Không có tài khoản phù hợp"), "book-open") }}
+{% else %}
+<div class="table-wrap">
+  <table class="table table-hover">
+    <thead>
+      <tr>
+        <th class="w-32">{{ _("Số TK") }}</th>
+        <th>{{ _("Tên tài khoản") }}</th>
+        <th class="w-36 max-md:hidden">{{ _("Tính chất") }}</th>
+        <th class="w-48 max-lg:hidden">{{ _("Theo dõi chi tiết") }}</th>
+        <th class="w-28">{{ _("Trạng thái") }}</th>
+        {% if can("catalog.manage") %}<th class="w-10"></th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for a in accounts %}
+      <tr class="{{ 'is-muted' if not a.is_active }}">
+        <td class="tabular-nums {{ 'font-semibold' if not a.is_postable else '' }}" style="padding-left: {{ 0.75 + (a.level - 1) * 1.1 }}rem">{{ a.code }}</td>
+        <td class="{{ 'font-semibold text-fg' if not a.is_postable else 'text-fg-2' }}">
+          {{ a.name }}
+          {% if not a.is_system %}{{ ui.badge(_("Tự thêm"), "blue", cls="ml-1.5") }}{% endif %}
+        </td>
+        <td class="max-md:hidden text-[13px] text-fg-3">{{ _(normal_labels.get(a.normal, a.normal)) }}</td>
+        <td class="max-lg:hidden">
+          <div class="flex flex-wrap gap-1">
+            {% if a.partner_mode == "required" %}{{ ui.badge(_("Đối tượng"), "brand") }}{% elif a.partner_mode == "optional" %}{{ ui.badge(_("Đối tượng (tùy chọn)"), "gray") }}{% endif %}
+            {% if a.needs_bank %}{{ ui.badge(_("Ngân hàng"), "blue") }}{% endif %}
+            {% if a.tracks_item %}{{ ui.badge(_("Hàng hóa"), "violet") }}{% endif %}
+            {% if a.no_negative %}{{ ui.badge(_("Không âm"), "amber") }}{% endif %}
+          </div>
+        </td>
+        <td>{{ ui.status_badge("active" if a.is_active else "inactive") }}</td>
+        {% if can("catalog.manage") %}
+        <td class="!pr-3 text-right">
+          {% call ui.dropdown(icon_name="ellipsis", variant="ghost", size="xs", width="w-52", aria_label=_("Thao tác")) %}
+            {% if a.is_active %}
+              {{ ui.menu_post(_("Ngừng sử dụng"), "/accounts/" ~ a.code, "eye-off", fields={"active": "0"}) }}
+            {% else %}
+              {{ ui.menu_post(_("Dùng lại"), "/accounts/" ~ a.code, "eye", fields={"active": "1"}) }}
+            {% endif %}
+            {% if a.partner_mode != "required" %}
+              {{ ui.menu_post(_("Bắt buộc chọn đối tượng"), "/accounts/" ~ a.code, "users", fields={"partner_mode": "required"}) }}
+            {% else %}
+              {{ ui.menu_post(_("Đối tượng không bắt buộc"), "/accounts/" ~ a.code, "user", fields={"partner_mode": "optional"}) }}
+            {% endif %}
+          {% endcall %}
+        </td>
+        {% endif %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}

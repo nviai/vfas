@@ -1,0 +1,5 @@
+{#- Action history of a voucher (from the audit log). Variables: history. -#}
+{% import "macros.html" as ui with context %}
+{% call ui.card(_("Lịch sử"), icon_name="history") %}
+  {% if history %}{{ ui.timeline(history) }}{% else %}<p class="text-[13px] text-fg-3">{{ _("Chưa có") }}</p>{% endif %}
+{% endcall %}

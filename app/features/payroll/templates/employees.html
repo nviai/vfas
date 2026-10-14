@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Nhân viên") }}{% endblock %}
+{% block content %}
+{% call ui.page_header(_("Nhân viên"), _("Hồ sơ tính lương: hợp đồng, lương, bảo hiểm, người phụ thuộc"), breadcrumbs=breadcrumbs, icon_name="users") %}
+  {% if can("payroll.manage") %}{{ ui.link_button(_("Thêm nhân viên"), "/payroll/employees/new", "primary", icon_name="user-plus") }}{% endif %}
+{% endcall %}
+{{ ui.tabs([{"key": "active", "label": _("Đang làm việc"), "href": "/payroll/employees"}, {"key": "all", "label": _("Tất cả"), "href": "/payroll/employees?show=all"}], show, cls="mb-4") }}
+<div class="card">
+  <div class="border-b border-line p-3 sm:px-5">
+    {% call ui.filter_bar("/payroll/employees", reset_href="/payroll/employees") %}
+      <input type="hidden" name="show" value="{{ show }}">
+      <div class="w-full sm:w-64">{{ ui.input("q", None, q, "search", placeholder=_("Mã, họ tên…"), prefix=ui.icon("search"), input_cls="input-sm") }}</div>
+    {% endcall %}
+  </div>
+  {% if not rows %}
+    {% call ui.empty_state(_("Chưa có nhân viên"), "users", _("Nhân viên cũng là đối tượng công nợ (TK 334, 141) nên tạm ứng và trả lương theo dõi được theo từng người.")) %}
+      {% if can("payroll.manage") %}{{ ui.link_button(_("Thêm nhân viên"), "/payroll/employees/new", "primary", icon_name="user-plus") }}{% endif %}
+    {% endcall %}
+  {% else %}
+  <div class="table-wrap max-md:hidden">
+    <table class="table table-hover">
+      <thead><tr><th class="w-28">{{ _("Mã") }}</th><th>{{ _("Họ và tên") }}</th><th class="max-lg:hidden">{{ _("Bộ phận") }}</th><th class="max-xl:hidden">{{ _("Hợp đồng") }}</th><th class="num w-20">{{ _("NPT") }}</th><th class="num w-36">{{ _("Lương") }}</th><th class="num w-36 max-lg:hidden">{{ _("Lương đóng BH") }}</th><th class="w-28">{{ _("Trạng thái") }}</th></tr></thead>
+      <tbody>
+        {% for e in rows %}
+        <tr class="is-link {{ 'is-muted' if not e.is_active }}">
+          <td><a href="/payroll/employees/{{ e.id }}" class="doc-no whitespace-nowrap hover:underline">{{ e.code }}</a></td>
+          <td class="max-w-0"><p class="truncate font-medium text-fg">{{ e.full_name }}</p>{% if e.position %}<p class="truncate text-xs text-fg-3">{{ e.position }}</p>{% endif %}</td>
+          <td class="max-lg:hidden text-fg-2">{{ e.department or "–" }}</td>
+          <td class="max-xl:hidden text-[13px] text-fg-2">{{ _(e.contract_label) }}</td>
+          <td class="num">{{ e.dependents }}</td>
+          <td class="num">{{ e.base_salary|money }}</td>
+          <td class="num max-lg:hidden text-fg-2">{{ e.insurance_salary|money0 }}</td>
+          <td>{{ ui.status_badge("active" if e.is_active else "inactive") }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <ul class="divide-y divide-line md:hidden">
+    {% for e in rows %}
+    <li><a href="/payroll/employees/{{ e.id }}" class="flex items-center gap-3 px-4 py-3 active:bg-surface-2">
+      {{ ui.avatar(e.full_name, "size-9") }}
+      <div class="min-w-0 flex-1"><p class="truncate text-[14px] font-medium">{{ e.full_name }}</p><p class="truncate text-xs text-fg-3">{{ e.code }}{% if e.department %} · {{ e.department }}{% endif %}</p></div>
+      <span class="shrink-0 text-[13.5px] font-semibold tabular-nums">{{ e.base_salary|money }}</span>
+    </a></li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</div>
+{% endblock %}

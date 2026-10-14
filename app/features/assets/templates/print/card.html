@@ -1,0 +1,56 @@
+{% extends "assets/print/_layout.html" %}
+{% import "assets/print/_parts.html" as parts %}
+{% block title %}Thẻ tài sản cố định {{ a.code }}{% endblock %}
+{% block page_size %}size: A4 portrait; margin: 14mm 12mm 14mm 14mm;{% endblock %}
+{% block css %}
+  .kv { width: 100%; border-collapse: collapse; margin-top: 3mm; }
+  .kv td { padding: .8mm 0; vertical-align: top; }
+  .kv td.k { width: 42%; }
+  .dots { border-bottom: .5pt dotted #555; }
+{% endblock %}
+{% block body %}
+{{ parts.doc_header(company, "S11-DNN") }}
+<p class="title">THẺ TÀI SẢN CỐ ĐỊNH</p>
+<p class="subtitle">Số: {{ a.code }}</p>
+<p class="subtitle i">Ngày {{ a.acquired_date.day }} tháng {{ a.acquired_date.month }} năm {{ a.acquired_date.year }} lập thẻ</p>
+<table class="kv">
+  <tr><td class="k">Căn cứ vào chứng từ ghi tăng số:</td><td class="dots">{{ entry.number if entry else "" }}{% if entry %} ngày {{ entry.date|date }}{% endif %}</td></tr>
+  <tr><td class="k">Tên, ký mã hiệu, quy cách (cấp hạng) TSCĐ:</td><td class="dots b">{{ a.name }}</td></tr>
+  <tr><td class="k">Số hiệu TSCĐ:</td><td class="dots">{{ a.serial_no or a.code }}</td></tr>
+  <tr><td class="k">Nước sản xuất (xây dựng):</td><td class="dots">{{ a.manufacturer }}</td></tr>
+  <tr><td class="k">Năm sản xuất:</td><td class="dots">{{ a.year_made or "" }}</td></tr>
+  <tr><td class="k">Bộ phận quản lý, sử dụng:</td><td class="dots">{{ a.department }}</td></tr>
+  <tr><td class="k">Năm đưa vào sử dụng:</td><td class="dots">{{ a.acquired_date.year }}</td></tr>
+  <tr><td class="k">Công suất (diện tích thiết kế):</td><td class="dots"></td></tr>
+  <tr><td class="k">Đình chỉ sử dụng TSCĐ ngày … tháng … năm …:</td><td class="dots">{{ a.disposal_date|date if a.disposal_date else "" }}</td></tr>
+  <tr><td class="k">Lý do đình chỉ:</td><td class="dots">{{ a.disposal_reason or "" }}</td></tr>
+</table>
+
+<table class="book">
+  <colgroup><col style="width:13%"><col style="width:12%"><col style="width:25%"><col style="width:16%"><col style="width:10%"><col style="width:12%"><col style="width:12%"></colgroup>
+  <thead>
+    <tr><th colspan="4">Nguyên giá tài sản cố định</th><th colspan="3">Giá trị hao mòn tài sản cố định</th></tr>
+    <tr><th>Số hiệu chứng từ</th><th>Ngày, tháng, năm</th><th>Diễn giải</th><th>Nguyên giá</th><th>Năm</th><th>Giá trị hao mòn</th><th>Cộng dồn</th></tr>
+    <tr class="letters"><th>A</th><th>B</th><th>C</th><th>1</th><th>2</th><th>3</th><th>4</th></tr>
+  </thead>
+  <tbody>
+    {% set rows = [years|length, 1]|max %}
+    {% for i in range(rows) %}
+    {% set y = years[i] if i < years|length else none %}
+    <tr>
+      {% if loop.first %}
+        <td class="code">{{ entry.number if entry else "" }}</td><td class="date">{{ a.acquired_date|date }}</td>
+        <td>{{ "Tài sản đầu kỳ" if a.source == "opening" else "Ghi tăng TSCĐ" }}{% if a.opening_accumulated %} (hao mòn đầu kỳ {{ a.opening_accumulated|money }}){% endif %}</td>
+        <td class="num">{{ a.cost|money }}</td>
+      {% else %}<td></td><td></td><td></td><td></td>{% endif %}
+      <td class="code">{{ y.year if y else "" }}</td><td class="num">{{ y.amount|money if y else "" }}</td><td class="num">{{ y.accumulated|money if y else "" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<p style="margin-top:2mm">Ghi giảm TSCĐ chứng từ số: {{ disposal.number if disposal else "............" }} ngày {{ disposal.date|date if disposal else ".... tháng .... năm ...." }}</p>
+<p>Lý do giảm: {{ a.disposal_reason or "........................................................................" }}</p>
+<div class="after-table">
+  {{ parts.signatures(company, left="Người lập thẻ") }}
+</div>
+{% endblock %}

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Tiền gửi ngân hàng") }}{% endblock %}
+{% block content %}
+{% call ui.page_header(_("Tiền gửi ngân hàng"), _("Thu, chi tiền gửi và chuyển tiền nội bộ (TK 112)"), breadcrumbs=breadcrumbs, icon_name="landmark") %}
+  {% call ui.dropdown(icon_name="ellipsis", aria_label=_("Thao tác khác"), width="w-60") %}
+    {{ ui.menu_item(_("Sổ tiền gửi ngân hàng"), "/bank/book", "book-text") }}
+    {{ ui.menu_item(_("Đối chiếu sao kê"), "/bank/statements", "git-compare") }}
+    {{ ui.menu_item(_("Tài khoản ngân hàng"), "/bank-accounts", "landmark") }}
+  {% endcall %}
+  {% if can("bank.create") %}
+    {{ ui.link_button(_("Chuyển tiền"), "/bank/transfer/new", "secondary", icon_name="arrow-left-right", cls="max-sm:hidden") }}
+    {{ ui.link_button(_("Thu tiền gửi"), "/bank/new?kind=BC", "secondary", icon_name="arrow-down-left") }}
+    {{ ui.link_button(_("Chi tiền gửi"), "/bank/new?kind=BN", "primary", icon_name="arrow-up-right") }}
+  {% endif %}
+{% endcall %}
+
+{% if balances %}
+<div class="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+  {% for row in balances %}
+    {{ ui.stat_card(row.bank.short_name or row.bank.bank_name, row.balance, icon_name="landmark", hint=row.bank.number ~ " · TK " ~ row.bank.account_code,
+                    href="/bank/book?bank_account_id=" ~ row.bank.id) }}
+  {% endfor %}
+</div>
+{% else %}
+  {% call ui.alert(_("Chưa có tài khoản ngân hàng. Thêm tài khoản để lập chứng từ thu, chi tiền gửi."), "info", cls="mb-5") %}
+    {{ ui.link_button(_("Thêm tài khoản ngân hàng"), "/bank-accounts", "primary", size="sm", icon_name="plus") }}
+  {% endcall %}
+{% endif %}
+
+{% set qbase = "/bank?" ~ base_q ~ ("&" if base_q else "") %}
+{{ ui.tabs([
+  {"key": "", "label": _("Tất cả"), "href": "/bank?" ~ base_q, "count": counts.get("all", 0)},
+  {"key": "draft", "label": _("Nháp"), "href": qbase ~ "status=draft", "count": counts.get("draft", 0)},
+  {"key": "posted", "label": _("Đã ghi sổ"), "href": qbase ~ "status=posted", "count": counts.get("posted", 0)},
+  {"key": "cancelled", "label": _("Đã hủy"), "href": qbase ~ "status=cancelled", "count": counts.get("cancelled", 0)},
+], filters.status, cls="mb-4") }}
+
+<div class="card">
+  <div class="border-b border-line p-3 sm:px-5">
+    {% call ui.filter_bar("/bank", reset_href="/bank", hx_target="#bank-results") %}
+      <input type="hidden" name="status" value="{{ filters.status }}">
+      <div class="w-full sm:w-64">
+        {{ ui.input("q", None, filters.q, "search", placeholder=_("Số chứng từ, diễn giải…"), prefix=ui.icon("search"), input_cls="input-sm") }}
+      </div>
+      {{ ui.select("kind", None, [("BC", _("Thu tiền gửi")), ("BN", _("Chi tiền gửi")), ("CK", _("Chuyển tiền nội bộ"))], filters.kind, placeholder=_("Mọi loại"), input_cls="input-sm w-40") }}
+      {{ ui.select("bank_account_id", None, bank_options, filters.bank_account_id, placeholder=_("Mọi tài khoản"), input_cls="input-sm w-48") }}
+      <div class="flex items-center gap-1.5">
+        <input type="date" name="start" value="{{ filters.start }}" class="input input-sm w-36 tabular-nums" aria-label="{{ _('Từ ngày') }}">
+        <span class="text-fg-3">–</span>
+        <input type="date" name="end" value="{{ filters.end }}" class="input input-sm w-36 tabular-nums" aria-label="{{ _('Đến ngày') }}">
+      </div>
+    {% endcall %}
+  </div>
+  <div id="bank-results">{% include "cash/_results.html" %}</div>
+</div>
+{% endblock %}

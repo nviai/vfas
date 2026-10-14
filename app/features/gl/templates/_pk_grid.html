@@ -1,0 +1,79 @@
+{#- General journal voucher grid: each line is a debit/credit pair, with a partner per side and a bank
+    account (for the 112x side). Uses Alpine lineGrid (mode "pair") + combobox. Input names:
+    lines-{i}-debit_account|credit_account|amount|debit_partner_id|credit_partner_id|bank_account_id|description. -#}
+{% import "icons.html" as ic %}
+{%- macro tr(s) -%}{{ _(s) if _ is defined else s }}{%- endmacro -%}
+{%- macro combo(field, url, params, placeholder, items=None) -%}
+<div x-data='combobox({{ {"url": (none if items is not none else url), "params": params or {}, "items": items, "localFilter": items is not none}|tojson }})'
+     x-init="setInitial(line.{{ field }}, line.{{ field }}_label)" @click.outside="open = false"
+     @combobox-select.stop="line.{{ field }} = $event.detail.value; line.{{ field }}_label = $event.detail.label">
+  <div class="relative">
+    <input x-ref="input" data-cell type="text" autocomplete="off" role="combobox" class="input input-sm pr-7"
+      placeholder="{{ placeholder }}" x-model="query" @focus="onFocus()" @input="onInput(); if (!query) { line.{{ field }} = ''; line.{{ field }}_label = '' }" @keydown="onKey($event); keys($event, i)" @blur="onBlur()">
+    <div x-show="open && items.length" x-cloak data-fixed class="menu fixed z-[55] max-h-64 max-w-[min(28rem,90vw)] overflow-y-auto p-1" x-ref="list">
+      <template x-for="(it, j) in items" :key="String(it.value) + ':' + j">
+        <button type="button" tabindex="-1" :data-i="j" class="flex w-full flex-col rounded-md px-2.5 py-1.5 text-left" :class="j === active ? 'bg-surface-3' : ''"
+                @mousedown.prevent="select(it)" @mouseenter="active = j">
+          <span class="truncate text-[13px]" x-text="it.label"></span>
+          <span class="truncate text-xs text-fg-3" x-show="it.hint" x-text="it.hint"></span>
+        </button>
+      </template>
+    </div>
+  </div>
+</div>
+<input type="hidden" :name="name(i, '{{ field }}')" :value="line.{{ field }} ?? ''">
+{%- endmacro -%}
+
+{%- macro pk_grid(lines, bank_items) -%}
+<div x-data='lineGrid({{ {"mode": "pair", "prefix": "lines", "lines": lines, "minLines": 1, "descriptionFrom": "#f-description"}|tojson }})' class="min-w-0">
+  <input type="hidden" name="lines-count" :value="lines.length">
+  <div class="table-wrap rounded-lg border border-line">
+    <table class="table table-compact table-fixed min-w-[1120px]">
+      <colgroup><col class="w-10"><col><col class="w-30"><col class="w-30"><col class="w-34"><col class="w-42"><col class="w-42"><col class="w-36"><col class="w-10"></colgroup>
+      <thead>
+        <tr>
+          <th class="text-center">#</th>
+          <th>{{ tr("Diễn giải") }}</th>
+          <th>{{ tr("TK Nợ") }}</th>
+          <th>{{ tr("TK Có") }}</th>
+          <th class="num">{{ tr("Số tiền") }}</th>
+          <th>{{ tr("Đối tượng Nợ") }}</th>
+          <th>{{ tr("Đối tượng Có") }}</th>
+          <th>{{ tr("TK ngân hàng") }}</th>
+          <th><span class="sr-only">{{ tr("Xóa") }}</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <template x-for="(line, i) in lines" :key="line.uid">
+          <tr data-row class="group">
+            <td class="text-center text-xs text-fg-3 tabular-nums" x-text="i + 1"></td>
+            <td class="!px-1.5"><input data-cell type="text" class="input input-sm" x-model="line.description" :name="name(i, 'description')" placeholder="{{ tr('Diễn giải') }}" @keydown="keys($event, i)"></td>
+            <td class="!px-1.5">{{ combo("debit_account", "/lookup/accounts", {"postable": 1}, tr("TK Nợ")) }}</td>
+            <td class="!px-1.5">{{ combo("credit_account", "/lookup/accounts", {"postable": 1}, tr("TK Có")) }}</td>
+            <td class="!px-1.5"><input data-cell type="text" inputmode="decimal" class="input input-sm input-num" placeholder="0"
+                 x-effect="moneyEffect($el, line.amount)" @input="setMoney(line, 'amount', $event)" @blur="moneyBlur(line, 'amount', $event)" @keydown="keys($event, i)">
+                 <input type="hidden" :name="name(i, 'amount')" :value="line.amount ?? ''"></td>
+            <td class="!px-1.5">{{ combo("debit_partner_id", "/lookup/partners", {}, tr("Đối tượng")) }}</td>
+            <td class="!px-1.5">{{ combo("credit_partner_id", "/lookup/partners", {}, tr("Đối tượng")) }}</td>
+            <td class="!px-1.5">{{ combo("bank_account_id", None, {}, tr("Ngân hàng"), items=bank_items) }}</td>
+            <td class="!px-1 text-center">
+              <button type="button" class="btn-ghost btn-xs btn-icon text-fg-3 opacity-60 hover:text-rose-600 group-hover:opacity-100" @click="removeLine(i)" aria-label="{{ tr('Xóa dòng') }}" tabindex="-1">{{ ic.icon("trash", "size-3.5", 1.75, None) }}</button>
+            </td>
+          </tr>
+        </template>
+      </tbody>
+      <tfoot>
+        <tr class="row-total">
+          <td></td>
+          <td colspan="3" class="text-[13px]">
+            <button type="button" class="btn-ghost btn-xs -ml-1.5 font-medium text-primary dark:text-brand-400" @click="addLine(); focusRow(lines.length - 1)">+ {{ tr("Thêm dòng") }}</button>
+          </td>
+          <td class="num" x-text="fmt(totalAmount)"></td>
+          <td colspan="4"></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  <p class="mt-2 hidden text-xs text-fg-3 sm:block">{{ tr("Enter: sang ô tiếp / thêm dòng · Ctrl+D: nhân bản dòng · Ctrl+Delete: xóa dòng. TK ngân hàng áp dụng cho vế 112x của dòng.") }}</p>
+</div>
+{%- endmacro -%}

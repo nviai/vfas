@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% import "gl/_macros.html" as gm with context %}
+{% block title %}{{ _("Bảng cân đối tài khoản") }}{% endblock %}
+{% block content %}
+{{ ui.page_header(_("Bảng cân đối tài khoản"), _("Mẫu F01-DNN · số dư đầu kỳ, phát sinh và số dư cuối kỳ của từng tài khoản"), breadcrumbs=breadcrumbs, icon_name="scale") }}
+
+{% call gm.report_bar(period, years, "/reports/f01", extra={"level": level, "show_zero": 1 if show_zero else 0}) %}
+  <form method="get" action="/reports/f01" class="flex items-center gap-3" x-data>
+    {% for k, v in [("mode", period.mode), ("month", period.start.strftime("%Y-%m")), ("quarter", period.quarter or ""), ("year", period.year), ("start", period.start.isoformat()), ("end", period.end.isoformat())] %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+    <select name="level" class="input input-sm w-36" @change="$el.form.submit()" aria-label="{{ _('Cấp tài khoản') }}">
+      <option value="1" {{ "selected" if level == 1 }}>{{ _("Cấp 1") }}</option>
+      <option value="2" {{ "selected" if level == 2 }}>{{ _("Cấp 1 và 2") }}</option>
+      <option value="3" {{ "selected" if level == 3 }}>{{ _("Mọi cấp") }}</option>
+    </select>
+    <label class="flex items-center gap-1.5 text-[13px] text-fg-2"><input type="checkbox" name="show_zero" value="1" class="checkbox" {{ "checked" if show_zero }} @change="$el.form.submit()">{{ _("Hiện TK không có số liệu") }}</label>
+  </form>
+{% endcall %}
+
+<div class="mb-4 flex items-center gap-2 text-[13px]">
+  {% if tb.balanced %}<span class="inline-flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400">{{ ui.icon("circle-check") }}{{ _("Tổng Nợ = tổng Có ở cả ba nhóm cột") }}</span>
+  {% else %}<span class="inline-flex items-center gap-1.5 text-rose-600 dark:text-rose-400">{{ ui.icon("triangle-alert") }}{{ _("Bảng chưa cân – kiểm tra số dư đầu kỳ") }}</span>{% endif %}
+</div>
+
+<div class="paper overflow-hidden">
+  <div class="table-wrap">
+    <div class="min-w-[1000px] p-6 sm:p-10">
+      {{ ui.official_header(company, "F01-DNN") }}
+      {{ ui.report_title("Bảng cân đối tài khoản", period.label) }}
+      <table class="table table-report">
+        <thead>
+          <tr><th rowspan="2" class="w-20">Số hiệu tài khoản</th><th rowspan="2">Tên tài khoản</th><th colspan="2">Số dư đầu kỳ</th><th colspan="2">Số phát sinh trong kỳ</th><th colspan="2">Số dư cuối kỳ</th></tr>
+          <tr><th>Nợ</th><th>Có</th><th>Nợ</th><th>Có</th><th>Nợ</th><th>Có</th></tr>
+          <tr class="italic"><th>A</th><th>B</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr>
+        </thead>
+        <tbody>
+          {% for r in tb.rows %}
+          <tr class="{{ 'font-semibold' if r.level == 1 }}">
+            <td class="text-center tabular-nums"><a href="/reports/ledger?account={{ r.code }}&{{ period.query() }}" class="hover:underline">{{ r.code }}</a></td>
+            <td style="padding-left: {{ 0.5 + (r.level - 1) * 1.1 }}rem">{{ r.name }}</td>
+            <td class="num">{{ r.open_d|money0 }}</td><td class="num">{{ r.open_c|money0 }}</td>
+            <td class="num">{{ r.per_d|money0 }}</td><td class="num">{{ r.per_c|money0 }}</td>
+            <td class="num">{{ r.close_d|money0 }}</td><td class="num">{{ r.close_c|money0 }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="8" class="py-8 text-center text-fg-3">{{ _("Không có số liệu trong kỳ") }}</td></tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr class="row-total">
+            <td></td><td class="text-center uppercase">Tổng cộng</td>
+            <td class="num">{{ tb.total.open_d|money }}</td><td class="num">{{ tb.total.open_c|money }}</td>
+            <td class="num">{{ tb.total.per_d|money }}</td><td class="num">{{ tb.total.per_c|money }}</td>
+            <td class="num">{{ tb.total.close_d|money }}</td><td class="num">{{ tb.total.close_c|money }}</td>
+          </tr>
+        </tfoot>
+      </table>
+      {{ gm.signatures(company) }}
+    </div>
+  </div>
+</div>
+{% endblock %}

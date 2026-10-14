@@ -1,0 +1,88 @@
+{% extends "inventory/print/_layout.html" %}
+{% import "inventory/print/_parts.html" as p %}
+{% block title %}{{ title }} {{ doc.number or "" }}{% endblock %}
+{% block page_size %}size: A4 portrait; margin: 12mm 12mm 14mm 14mm;{% endblock %}
+{% block css %}
+  .acc { width: 100%; border-collapse: collapse; margin-top: 1mm; }
+  .acc td { vertical-align: top; padding: 0; }
+  .acc .mid { text-align: center; width: 50%; }
+  .acc .side { width: 25%; }
+{% endblock %}
+{% block body %}
+{% if draft %}<div class="watermark">NHÁP – CHƯA GHI SỔ</div>{% endif %}
+{{ p.doc_header(company, form_code, issued) }}
+<table class="acc">
+  <tr>
+    <td class="side"></td>
+    <td class="mid">
+      <p class="title">{{ title }}</p>
+      <p class="i">Ngày {{ '%02d' % doc.date.day }} tháng {{ '%02d' % doc.date.month }} năm {{ doc.date.year }}</p>
+      <p>Số: {{ doc.number or "........" }}</p>
+    </td>
+    <td class="side">
+      {% if debit %}<p>Nợ: {{ debit|join(", ") }}</p>{% endif %}
+      {% if credit %}<p>Có: {{ credit|join(", ") }}</p>{% endif %}
+    </td>
+  </tr>
+</table>
+<div class="meta" style="margin-top:3mm">
+  {% if doc.kind == "receipt" %}
+    <p>- Họ và tên người giao: {{ doc.contact_name or (doc.partner.name if doc.partner else "") }}</p>
+    <p>- Theo {{ doc.ref_no or "........................" }} ngày {{ doc.doc_date|date }}</p>
+    <p>- Nhập tại kho: {{ doc.warehouse.name }}{% if doc.warehouse.address %} &nbsp; địa điểm: {{ doc.warehouse.address }}{% endif %}</p>
+  {% elif doc.kind == "issue" %}
+    <p>- Họ và tên người nhận hàng: {{ doc.contact_name or (doc.partner.name if doc.partner else "") }}</p>
+    <p>- Lý do xuất kho: {{ doc.description }}</p>
+    <p>- Xuất tại kho: {{ doc.warehouse.name }}{% if doc.warehouse.address %} &nbsp; địa điểm: {{ doc.warehouse.address }}{% endif %}</p>
+  {% else %}
+    <p>- Kho xuất: {{ doc.warehouse.name }} &nbsp;&nbsp; Kho nhận: {{ doc.to_warehouse.name if doc.to_warehouse else "" }}</p>
+    <p>- Người vận chuyển: {{ doc.contact_name }}</p>
+    <p>- Lý do: {{ doc.description }}</p>
+  {% endif %}
+</div>
+<table class="book">
+  <colgroup><col style="width:7%"><col style="width:33%"><col style="width:10%"><col style="width:8%"><col style="width:10%"><col style="width:10%"><col style="width:10%"><col style="width:12%"></colgroup>
+  <thead>
+    <tr>
+      <th rowspan="2">STT</th>
+      <th rowspan="2">Tên, nhãn hiệu, quy cách, phẩm chất vật tư, dụng cụ, sản phẩm, hàng hóa</th>
+      <th rowspan="2">Mã số</th>
+      <th rowspan="2">Đơn vị tính</th>
+      <th colspan="2">Số lượng</th>
+      <th rowspan="2">Đơn giá</th>
+      <th rowspan="2">Thành tiền</th>
+    </tr>
+    <tr><th>{{ "Theo chứng từ" if doc.kind == "receipt" else "Yêu cầu" }}</th><th>{{ "Thực nhập" if doc.kind == "receipt" else "Thực xuất" }}</th></tr>
+    <tr class="letters"><th>A</th><th>B</th><th>C</th><th>D</th><th>1</th><th>2</th><th>3</th><th>4</th></tr>
+  </thead>
+  <tbody>
+    {% for ln in doc.lines %}
+    {% set cost = line_values.get(ln.id) if line_values else none %}
+    {% set price = cost[0] if cost else ln.unit_price %}
+    {% set amount = cost[1] if cost else ln.amount %}
+    <tr>
+      <td class="code">{{ loop.index }}</td>
+      <td>{{ ln.description or ln.item.name }}</td>
+      <td class="code">{{ ln.item.code }}</td>
+      <td class="code">{{ ln.unit or ln.item.unit }}</td>
+      <td class="num">{{ p.qty(ln.quantity) }}</td>
+      <td class="num">{{ p.qty(ln.quantity) }}</td>
+      <td class="num">{{ price|qty(2) if price else "" }}</td>
+      <td class="num">{{ amount|money0 }}</td>
+    </tr>
+    {% endfor %}
+    <tr class="sum"><td></td><td class="c">Cộng</td><td></td><td></td><td class="num">{{ p.qty(doc.total_qty) }}</td><td class="num">{{ p.qty(doc.total_qty) }}</td><td></td><td class="num">{{ total|money0 }}</td></tr>
+  </tbody>
+</table>
+<div class="after-table">
+  {% if total %}<p>- Tổng số tiền (viết bằng chữ): <span class="i">{{ total|words }}</span></p>{% endif %}
+  <p>- Số chứng từ gốc kèm theo: {{ doc.attached_docs or "........" }}</p>
+  {% if doc.kind == "receipt" %}
+    {{ p.book_signatures(company, [("Người lập phiếu", "(Ký, họ tên)", company.preparer), ("Người giao hàng", "(Ký, họ tên)", doc.contact_name), ("Thủ kho", "(Ký, họ tên)", company.storekeeper), ("Kế toán trưởng", "(Hoặc bộ phận có nhu cầu nhập)", company.chief_accountant)]) }}
+  {% elif doc.kind == "issue" %}
+    {{ p.book_signatures(company, [("Người lập phiếu", "(Ký, họ tên)", company.preparer), ("Người nhận hàng", "(Ký, họ tên)", doc.contact_name), ("Thủ kho", "(Ký, họ tên)", company.storekeeper), ("Kế toán trưởng", "(Hoặc bộ phận có nhu cầu nhập)", company.chief_accountant), ("Giám đốc", "(Ký, họ tên)", company.legal_rep)]) }}
+  {% else %}
+    {{ p.book_signatures(company, [("Người lập phiếu", "(Ký, họ tên)", company.preparer), ("Thủ kho xuất", "(Ký, họ tên)", ""), ("Người vận chuyển", "(Ký, họ tên)", doc.contact_name), ("Thủ kho nhận", "(Ký, họ tên)", "")]) }}
+  {% endif %}
+</div>
+{% endblock %}

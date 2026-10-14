@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% import "gl/_macros.html" as gm with context %}
+{% block title %}{{ _("Kết chuyển cuối kỳ") }}{% endblock %}
+{% block content %}
+{{ ui.page_header(_("Kết chuyển cuối kỳ"), _("Kết chuyển doanh thu, chi phí về TK 911 và xác định lãi, lỗ vào TK 4212. Chạy lại được khi kỳ còn mở."), breadcrumbs=breadcrumbs, icon_name="repeat") }}
+
+<div class="card mb-5 p-3 sm:px-5">{{ ui.period_selector(period, years=years, action="/closing", modes=("month", "quarter", "year")) }}</div>
+
+{% if plan.later %}{{ ui.alert(_("Đã có kết chuyển kỳ sau ({n} ngày {d}). Muốn chạy lại kỳ này phải hủy kết chuyển kỳ sau trước.", n=plan.later.number, d=plan.later.date|date), "warning", cls="mb-5") }}{% endif %}
+{% if plan.existing %}{% call ui.alert(_("Kỳ này đã kết chuyển: {n}. Chạy lại sẽ hủy chứng từ cũ và lập chứng từ mới.", n=plan.existing.number), "info", cls="mb-5") %}{{ ui.link_button(_("Xem chứng từ"), plan.existing.url, "secondary", size="sm") }}{% endcall %}{% endif %}
+{% if period_locked %}{{ ui.alert(_("Kỳ {p} đã khóa sổ.", p=gm.plabel(period)), "warning", cls="mb-5") }}{% endif %}
+{% if plan.skipped %}{{ ui.alert(_("Bỏ qua TK theo phương pháp kiểm kê định kỳ (611, 631) còn số dư: {a}", a=plan.skipped|join(", ")), "warning", cls="mb-5") }}{% endif %}
+
+<div class="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
+  {% set acts %}{% if plan.lines and not plan.later and not period_locked %}
+    <form method="post" action="/closing/run">{{ ui.csrf_field() }}
+      {% for k, v in [("mode", period.mode), ("month", period.start.strftime("%Y-%m")), ("quarter", period.quarter or ""), ("year", period.year)] %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+      {{ ui.button(_("Chạy lại kết chuyển") if plan.existing else _("Kết chuyển"), "primary", icon_name="repeat", confirm=_("Lập và ghi sổ chứng từ kết chuyển {p}?", p=gm.plabel(period)|string|lower)) }}
+    </form>{% endif %}{% endset %}
+  {% call ui.card(_("Bút toán kết chuyển") ~ " – " ~ gm.plabel(period), _("Ngày hạch toán {d}", d=period.end|date), actions=acts, flush=True) %}
+    {% if plan.lines %}
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>{{ _("Diễn giải") }}</th><th class="w-24">{{ _("TK Nợ") }}</th><th class="w-24">{{ _("TK Có") }}</th><th class="num w-40">{{ _("Số tiền") }}</th></tr></thead>
+        <tbody>
+          {% for ln in plan.lines %}
+          <tr><td class="text-fg-2">{{ ln.description }}</td><td class="tabular-nums font-medium">{{ ln.debit }}</td><td class="tabular-nums font-medium">{{ ln.credit }}</td><td class="num">{{ ln.amount|money }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      {{ ui.empty_state(_("Không còn số dư doanh thu, chi phí cần kết chuyển"), "circle-check", compact=True) }}
+    {% endif %}
+  {% endcall %}
+
+  <aside class="space-y-5">
+    <section class="card p-5">
+      <p class="text-[13px] font-medium text-fg-3">{{ _("Kết quả kỳ") }}</p>
+      <p class="mt-1 text-2xl font-semibold tracking-tight tabular-nums {{ 'amount-neg' if plan.profit < 0 }}">{{ plan.profit|money }} <span class="text-sm font-normal text-fg-3">đ</span></p>
+      <p class="mt-1 text-[13px] text-fg-3">{{ _("Lãi") if plan.profit >= 0 else _("Lỗ") }} · {{ _("Thu {a} · Chi {b}", a=plan.revenue|money, b=plan.expense|money) }}</p>
+    </section>
+
+    {% call ui.card(_("Chi phí thuế TNDN"), _("Ghi nhận Nợ 821 / Có 3334 trước khi kết chuyển (nếu có)."), icon_name="percent") %}
+      <form method="post" action="/closing/cit" class="space-y-3">
+        {{ ui.csrf_field() }}
+        {{ ui.date_input("date", _("Ngày"), period.end) }}
+        {{ ui.money_input("amount", _("Số thuế TNDN"), None, required=True) }}
+        {{ ui.button(_("Ghi nhận"), "secondary", icon_name="check", size="sm", confirm=_("Lập và ghi sổ phiếu kế toán chi phí thuế TNDN?")) }}
+      </form>
+    {% endcall %}
+
+    {% if retained %}
+    {% call ui.card(_("Kết chuyển lợi nhuận năm trước"), _("Đầu năm: chuyển số dư 4212 sang 4211."), icon_name="calendar") %}
+      {% if retained.existing %}
+        <p class="text-[13px] text-fg-2">{{ _("Năm {y} đã kết chuyển", y=retained.year) }}: <a class="text-primary hover:underline" href="{{ retained.existing.url }}">{{ retained.existing.number }}</a></p>
+      {% elif retained.amount %}
+        <p class="mb-3 text-[13px] text-fg-2">{{ _("Số dư 4212 ngày 31/12/{y}: {a} ({k})", y=retained.year, a=(retained.amount if retained.amount > 0 else -retained.amount)|money, k=_("lãi") if retained.amount > 0 else _("lỗ")) }}</p>
+        <form method="post" action="/closing/retained">{{ ui.csrf_field() }}<input type="hidden" name="year" value="{{ retained.year }}">
+          {{ ui.button(_("Kết chuyển ngày {d}", d=retained.on|date), "secondary", size="sm", icon_name="repeat") }}</form>
+      {% else %}
+        <p class="text-[13px] text-fg-3">{{ _("TK 4212 không có số dư ngày 31/12/{y}", y=retained.year) }}</p>
+      {% endif %}
+    {% endcall %}
+    {% endif %}
+  </aside>
+</div>
+
+{% call ui.card(_("Lịch sử kết chuyển"), flush=True, cls="mt-5") %}
+  {% if history %}
+  <div class="table-wrap">
+    <table class="table table-hover">
+      <tbody>
+        {% for e in history %}
+        <tr class="is-link {{ 'is-muted' if e.is_cancelled }}">
+          <td class="w-36"><a href="{{ e.url }}" class="doc-no hover:underline">{{ e.display_number }}</a></td>
+          <td class="w-28 tabular-nums text-fg-2">{{ e.date|date }}</td>
+          <td class="max-w-0"><p class="truncate">{{ e.description }}</p></td>
+          <td class="num w-40">{{ e.total|money }}</td>
+          <td class="w-32">{{ ui.status_badge(e.status) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}{{ ui.empty_state(_("Chưa kết chuyển kỳ nào"), "repeat", compact=True) }}{% endif %}
+{% endcall %}
+{% endblock %}

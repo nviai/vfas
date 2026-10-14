@@ -1,0 +1,31 @@
+{# Shared parts of the asset and payroll print forms (Vietnamese, not translated). #}
+{% macro doc_header(company, form_code=None, issued="(Ban hành theo Thông tư số 133/2016/TT-BTC ngày 26/8/2016 của Bộ Tài chính)") -%}
+<table class="doc-head">
+  <tr>
+    <td class="left">
+      <p><span class="b">Đơn vị:</span> {{ company.name }}</p>
+      <p><span class="b">Địa chỉ:</span> {{ company.address }}</p>
+      {% if company.tax_code %}<p><span class="b">Mã số thuế:</span> {{ company.tax_code }}</p>{% endif %}
+    </td>
+    <td class="right">
+      {% if form_code %}<p class="form-code">Mẫu số {{ form_code }}</p><p class="issued">{{ issued }}</p>{% endif %}
+    </td>
+  </tr>
+</table>
+{%- endmacro %}
+
+{% macro signatures(company, left="Người lập biểu", middle="Kế toán trưởng", right="Người đại diện theo pháp luật", left_name=None) -%}
+<table class="signatures">
+  <tr><td></td><td></td><td class="i" style="padding-bottom:1mm">Ngày ..... tháng ..... năm ..........</td></tr>
+  <tr>
+    <td style="width:33%"><p class="role">{{ left }}</p><p class="hint">(Ký, họ tên)</p></td>
+    <td style="width:33%"><p class="role">{{ middle }}</p><p class="hint">(Ký, họ tên)</p></td>
+    <td style="width:34%"><p class="role">{{ right }}</p><p class="hint">(Ký, họ tên{{ ", đóng dấu" if "đại diện" in right or "Giám đốc" in right }})</p></td>
+  </tr>
+  <tr>
+    <td class="name">{{ left_name if left_name is not none else company.preparer }}</td>
+    <td class="name">{{ company.chief_accountant }}</td>
+    <td class="name">{{ company.legal_rep }}</td>
+  </tr>
+</table>
+{%- endmacro %}

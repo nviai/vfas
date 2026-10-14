@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Thẻ kho") if card else _("Sổ chi tiết hàng hóa") }}{% endblock %}
+{% block content %}
+{% set period_hidden = {"mode": period.mode, "month": period.start.strftime("%Y-%m"), "year": period.year or period.start.year, "quarter": period.quarter or "", "start": period.start.isoformat(), "end": period.end.isoformat()} %}
+{% call ui.page_header(_("Thẻ kho") if card else _("Sổ chi tiết vật liệu, dụng cụ, sản phẩm, hàng hóa"),
+                       _("Mẫu {c} · theo dõi số lượng nhập, xuất, tồn của từng hàng", c=form_code) if card else _("Mẫu {c} · số lượng và giá trị nhập, xuất, tồn", c=form_code),
+                       breadcrumbs=breadcrumbs, icon_name="clipboard-list" if card else "book-open") %}
+  {% if led and can("inventory.export") %}{{ ui.report_toolbar(pdf_href=base ~ ".pdf?" ~ qs, xlsx_href=base ~ ".xlsx?" ~ qs) }}{% endif %}
+{% endcall %}
+
+<div class="card mb-5 space-y-3 p-3 sm:px-5">
+  <form method="get" action="{{ base }}" class="flex flex-wrap items-end gap-2">
+    {% for k, v in period_hidden.items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+    {{ ui.combobox("item_id", _("Hàng hóa"), "/lookup/items", value=item.id if item else None, value_label=item.label if item else None, cls="w-full sm:w-80", input_cls="input-sm") }}
+    <div>
+      <label class="label" for="f-wh">{{ _("Kho") }}</label>
+      <select id="f-wh" name="warehouse_id" class="input input-sm w-48">
+        <option value="">{{ _("Tất cả các kho") }}</option>
+        {% for w in warehouses %}<option value="{{ w.id }}" {{ "selected" if wh and w.id == wh.id }}>{{ w.name }}</option>{% endfor %}
+      </select>
+    </div>
+    <button class="btn-secondary btn-sm" type="submit">{{ ui.icon("filter", "size-3.5") }}<span>{{ _("Chọn") }}</span></button>
+  </form>
+  {{ ui.period_selector(period, action=base, extra_hidden={"item_id": item.id if item else "", "warehouse_id": wh.id if wh else ""}) }}
+</div>
+
+{% if not led %}
+  {% call ui.card() %}{{ ui.empty_state(_("Chưa có hàng hóa phát sinh nhập, xuất kho"), "boxes") }}{% endcall %}
+{% else %}
+{% if led.pending %}{{ ui.alert(_("Có dòng xuất chưa tính giá – giá trị xuất, tồn chưa đầy đủ. Chạy Tính giá xuất kho cho tháng tương ứng."), "warning", cls="mb-4") }}{% endif %}
+<div class="paper overflow-hidden">
+  <div class="table-wrap">
+    <div class="{{ 'min-w-[820px]' if card else 'min-w-[1080px]' }} p-6 sm:p-10">
+      {{ ui.official_header(company, form_code) }}
+      {{ ui.report_title(title, period.label, unit_label=None if card else "Đơn vị tính: Đồng",
+                         extra=("Hàng: " ~ led.item.code ~ " – " ~ led.item.name ~ " · ĐVT: " ~ led.item.unit ~ " · " ~ ("Kho: " ~ wh.name if wh else "Tất cả các kho"))) }}
+      <table class="table table-report">
+        {% if card %}
+        <thead>
+          <tr><th rowspan="2" class="w-10">STT</th><th rowspan="2" class="w-24">Ngày</th><th colspan="2">Số hiệu chứng từ</th><th rowspan="2" style="min-width:14rem">Diễn giải</th><th colspan="3">Số lượng</th></tr>
+          <tr><th class="w-28">Nhập</th><th class="w-28">Xuất</th><th class="w-24">Nhập</th><th class="w-24">Xuất</th><th class="w-24">Tồn</th></tr>
+        </thead>
+        <tbody>
+          <tr class="font-semibold italic"><td></td><td></td><td></td><td></td><td>Số tồn đầu kỳ</td><td></td><td></td><td class="num">{{ led.opening_qty|qty }}</td></tr>
+          {% for r in led.rows %}
+          <tr>
+            <td class="text-center tabular-nums">{{ loop.index }}</td><td class="text-center tabular-nums">{{ r.date|date }}</td>
+            <td>{% if r.qty_in %}{% if r.url %}<a href="{{ r.url }}" class="text-inherit hover:underline">{{ r.number or "Đầu kỳ" }}</a>{% else %}{{ r.number }}{% endif %}{% endif %}</td>
+            <td>{% if r.qty_out %}{% if r.url %}<a href="{{ r.url }}" class="text-inherit hover:underline">{{ r.number }}</a>{% else %}{{ r.number }}{% endif %}{% endif %}</td>
+            <td>{{ r.description }}{% if not wh and r.warehouse %} <span class="text-fg-3">· {{ r.warehouse }}</span>{% endif %}</td>
+            <td class="num">{{ r.qty_in|qty if r.qty_in else "" }}</td><td class="num">{{ r.qty_out|qty if r.qty_out else "" }}</td><td class="num">{{ r.balance_qty|qty }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot><tr class="row-total"><td></td><td></td><td></td><td></td><td class="text-center">Cộng cuối kỳ</td><td class="num">{{ led.in_qty|qty }}</td><td class="num">{{ led.out_qty|qty }}</td><td class="num">{{ led.closing_qty|qty }}</td></tr></tfoot>
+        {% else %}
+        <thead>
+          <tr><th colspan="2">Chứng từ</th><th rowspan="2" style="min-width:14rem">Diễn giải</th><th rowspan="2" class="w-16">TK đối ứng</th><th rowspan="2" class="w-24">Đơn giá</th><th colspan="2">Nhập</th><th colspan="2">Xuất</th><th colspan="2">Tồn</th></tr>
+          <tr><th class="w-28">Số hiệu</th><th class="w-24">Ngày</th><th class="w-20">SL</th><th class="w-28">Thành tiền</th><th class="w-20">SL</th><th class="w-28">Thành tiền</th><th class="w-20">SL</th><th class="w-28">Thành tiền</th></tr>
+        </thead>
+        <tbody>
+          <tr class="font-semibold italic"><td></td><td></td><td>Số dư đầu kỳ</td><td></td><td></td><td></td><td></td><td></td><td></td><td class="num">{{ led.opening_qty|qty }}</td><td class="num">{{ led.opening_val|money }}</td></tr>
+          {% for r in led.rows %}
+          <tr class="{{ 'bg-amber-50/40 dark:bg-amber-500/5' if r.pending }}">
+            <td>{% if r.url %}<a href="{{ r.url }}" class="text-inherit hover:underline">{{ r.number or "Đầu kỳ" }}</a>{% else %}{{ r.number }}{% endif %}</td>
+            <td class="text-center tabular-nums">{{ r.date|date }}</td>
+            <td>{{ r.description }}{% if r.pending %} <span class="text-xs text-amber-700 dark:text-amber-400">(chưa tính giá)</span>{% endif %}</td>
+            <td class="text-center tabular-nums">{{ r.contra or "" }}</td>
+            <td class="num">{{ r.unit_cost|qty(2) if r.unit_cost else "" }}</td>
+            <td class="num">{{ r.qty_in|qty if r.qty_in else "" }}</td><td class="num">{{ r.amount_in|money0 }}</td>
+            <td class="num">{{ r.qty_out|qty if r.qty_out else "" }}</td><td class="num">{{ r.amount_out|money0 }}</td>
+            <td class="num">{{ r.balance_qty|qty }}</td><td class="num">{{ r.balance_val|money }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot><tr class="row-total"><td></td><td></td><td class="text-center">Cộng</td><td></td><td></td><td class="num">{{ led.in_qty|qty }}</td><td class="num">{{ led.in_val|money }}</td><td class="num">{{ led.out_qty|qty }}</td><td class="num">{{ led.out_val|money }}</td><td class="num">{{ led.closing_qty|qty }}</td><td class="num">{{ led.closing_val|money }}</td></tr></tfoot>
+        {% endif %}
+      </table>
+      {% if card %}
+        {{ ui.signature_block([("Thủ kho", "(Ký, họ tên)", company.storekeeper), ("Kế toán trưởng", "(Ký, họ tên)", company.chief_accountant), ("Người đại diện theo pháp luật", "(Ký, họ tên, đóng dấu)", company.legal_rep)], "Ngày ..... tháng ..... năm ..........") }}
+      {% else %}
+        {{ ui.signature_block([("Người ghi sổ", "(Ký, họ tên)", company.preparer), ("Kế toán trưởng", "(Ký, họ tên)", company.chief_accountant), ("Người đại diện theo pháp luật", "(Ký, họ tên, đóng dấu)", company.legal_rep)], "Ngày ..... tháng ..... năm ..........") }}
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Tài khoản ngân hàng") }}{% endblock %}
+{% block content %}
+{% call ui.page_header(_("Tài khoản ngân hàng"), _("Chi tiết TK 1121 theo từng tài khoản – mỗi tài khoản có sổ tiền gửi và số dư riêng"), breadcrumbs=breadcrumbs, icon_name="landmark") %}
+  {% if can("bank.manage") %}{{ ui.button(_("Thêm tài khoản"), "primary", icon_name="plus", type="button", attrs="@click=\"$dispatch('modal-open', 'bank-new')\"") }}{% endif %}
+{% endcall %}
+
+<div class="card">
+{% if not rows %}
+  {% call ui.empty_state(_("Chưa có tài khoản ngân hàng"), "landmark", _("Thêm số tài khoản công ty mở tại ngân hàng để theo dõi tiền gửi và đối chiếu sao kê.")) %}
+    {% if can("bank.manage") %}{{ ui.button(_("Thêm tài khoản"), "primary", icon_name="plus", type="button", attrs="@click=\"$dispatch('modal-open', 'bank-new')\"") }}{% endif %}
+  {% endcall %}
+{% else %}
+  <div class="table-wrap md:overflow-visible">
+    <table class="table">
+      <thead><tr><th>{{ _("Tài khoản") }}</th><th class="max-md:hidden">{{ _("Ngân hàng, chi nhánh") }}</th><th class="w-20">{{ _("TK") }}</th><th class="num w-40">{{ _("Số dư hôm nay") }}</th><th class="w-28">{{ _("Trạng thái") }}</th>{% if can("bank.manage") %}<th class="w-10"></th>{% endif %}</tr></thead>
+      <tbody>
+        {% for row in rows %}{% set b = row.bank %}
+        <tr class="{{ 'is-muted' if not b.is_active }}">
+          <td><p class="font-medium text-fg">{{ b.short_name or b.bank_name }}</p><p class="mono text-xs text-fg-3">{{ b.number }}</p></td>
+          <td class="max-md:hidden text-fg-2">{{ b.bank_name }}{% if b.branch %} – {{ b.branch }}{% endif %}</td>
+          <td class="tabular-nums">{{ b.account_code }}</td>
+          <td class="num font-medium {{ 'amount-neg' if row.balance < 0 }}"><a href="/bank/book?bank_account_id={{ b.id }}" class="hover:underline">{{ row.balance|money }}</a></td>
+          <td>{{ ui.status_badge("active" if b.is_active else "inactive") }}</td>
+          {% if can("bank.manage") %}
+          <td class="!pr-3 text-right">
+            {% call ui.dropdown(icon_name="ellipsis", variant="ghost", size="xs", width="w-48", aria_label=_("Thao tác")) %}
+              {{ ui.menu_item(_("Sổ tiền gửi"), "/bank/book?bank_account_id=" ~ b.id, "book-text") }}
+              {{ ui.menu_item(_("Đối chiếu sao kê"), "/bank/statements?bank_account_id=" ~ b.id, "git-compare") }}
+              {{ ui.menu_sep() }}
+              {{ ui.menu_post(_("Ngừng sử dụng") if b.is_active else _("Dùng lại"), "/bank-accounts/" ~ b.id, "eye-off" if b.is_active else "eye", fields={"active": "0" if b.is_active else "1"}) }}
+            {% endcall %}
+          </td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}
+</div>
+
+{% if can("bank.manage") %}
+{% call ui.modal("bank-new", _("Thêm tài khoản ngân hàng")) %}
+<form method="post" action="/bank-accounts" class="space-y-4 px-5 pb-5">
+  {{ ui.csrf_field() }}
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    {{ ui.input("number", _("Số tài khoản"), "", required=True, input_cls="tabular-nums") }}
+    {{ ui.input("short_name", _("Tên viết tắt"), "", placeholder="VCB, TCB…") }}
+    {{ ui.input("bank_name", _("Ngân hàng"), "", required=True, cls="sm:col-span-2", placeholder=_("Ngân hàng TMCP Ngoại thương Việt Nam")) }}
+    {{ ui.input("branch", _("Chi nhánh"), "") }}
+    {{ ui.select("account_code", _("Hạch toán vào"), [("1121", "1121 – " ~ _("Tiền Việt Nam")), ("1122", "1122 – " ~ _("Ngoại tệ"))], "1121") }}
+  </div>
+  <div class="modal-footer -mx-5 -mb-5">
+    {{ ui.button(_("Hủy"), "secondary", type="button", attrs="@click=\"$dispatch('modal-close')\"") }}
+    {{ ui.button(_("Thêm"), "primary", icon_name="plus") }}
+  </div>
+</form>
+{% endcall %}
+{% endif %}
+{% endblock %}

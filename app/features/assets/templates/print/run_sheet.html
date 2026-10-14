@@ -1,0 +1,39 @@
+{% extends "assets/print/_layout.html" %}
+{% import "assets/print/_parts.html" as parts %}
+{% set dep = kind == "depreciation" %}
+{% block title %}{{ meta.sheet_title }}{% endblock %}
+{% block body %}
+{% if not posted %}<div class="watermark">CHƯA GHI SỔ</div>{% endif %}
+{{ parts.doc_header(company, meta.form_code) }}
+<p class="title">{{ meta.sheet_title }}</p>
+<p class="subtitle i">Tháng {{ "%02d"|format(month) }} năm {{ year }}{% if entry and posted %} – Chứng từ {{ entry.number }}{% endif %}</p>
+<p class="r i small">Đơn vị tính: Đồng</p>
+{% set accounts = by_account|map(attribute=0)|list %}
+<table class="book">
+  <thead>
+    <tr>
+      <th rowspan="2" style="width:5%">STT</th><th rowspan="2" style="width:9%">Mã</th>
+      <th rowspan="2">{{ "Chỉ tiêu (tài sản)" if dep else "Tên công cụ dụng cụ, khoản chi phí" }}</th>
+      <th rowspan="2" style="width:12%">{{ "Nguyên giá" if dep else "Giá trị" }}</th>
+      <th rowspan="2" style="width:7%">Số tháng</th>
+      <th rowspan="2" style="width:12%">{{ "Số khấu hao" if dep else "Số phân bổ" }}</th>
+      <th colspan="{{ accounts|length or 1 }}">Nơi sử dụng (TK chi phí)</th>
+    </tr>
+    <tr>{% for acc in accounts %}<th style="width:9%">TK {{ acc }}</th>{% else %}<th></th>{% endfor %}</tr>
+  </thead>
+  <tbody>
+    {% for r in rows %}
+    <tr>
+      <td class="code">{{ loop.index }}</td><td class="code">{{ r.ref.code }}</td><td>{{ r.ref.name }}</td>
+      <td class="num">{{ (r.ref.cost if dep else r.ref.amount)|money }}</td>
+      <td class="code">{{ r.ref.useful_life_months if dep else r.ref.months }}</td>
+      <td class="num">{{ r.amount|money }}</td>
+      {% for acc in accounts %}<td class="num">{{ r.amount|money if r.debit == acc else "" }}</td>{% endfor %}
+    </tr>
+    {% endfor %}
+    <tr class="summary"><td></td><td></td><td class="label c">Cộng</td><td></td><td></td><td class="num">{{ total|money }}</td>
+      {% for acc, v in by_account %}<td class="num">{{ v|money }}</td>{% endfor %}</tr>
+  </tbody>
+</table>
+<div class="after-table">{{ parts.signatures(company) }}</div>
+{% endblock %}

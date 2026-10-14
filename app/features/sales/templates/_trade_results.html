@@ -1,0 +1,74 @@
+{% import "macros.html" as ui with context %}
+{% macro page_url(p) %}{{ cfg.kind_path(kind) }}?page={{ p }}&q={{ f.q|urlencode }}&status={{ f.status }}&payment={{ f.payment }}&start={{ f.start.isoformat() if f.start else '' }}&end={{ f.end.isoformat() if f.end else '' }}{% endmacro %}
+{% if not rows %}
+  {% call ui.empty_state(_("Chưa có chứng từ nào") if not (f.q or f.status or f.start or f.end or f.payment) else _("Không có chứng từ phù hợp"), cfg.icon,
+                         _("Lập chứng từ mới hoặc nhập từ hóa đơn điện tử XML.") if cfg.module == "purchases" else _("Lập chứng từ bán hàng hoặc nhập hóa đơn đầu ra từ XML.")) %}
+    {% if can(cfg.perm ~ ".create") %}{{ ui.link_button(_("Tạo mới"), cfg.base ~ "/new?kind=" ~ kind, "primary", icon_name="plus") }}{% endif %}
+  {% endcall %}
+{% else %}
+<div class="table-wrap max-md:hidden">
+  <table class="table table-hover">
+    <thead>
+      <tr>
+        <th class="w-36">{{ _("Số chứng từ") }}</th>
+        <th class="w-28">{{ _("Ngày") }}</th>
+        <th>{{ _(cfg.partner_label) }}</th>
+        <th class="w-36 max-lg:hidden">{{ _("Hóa đơn") }}</th>
+        <th class="num w-36 max-xl:hidden">{{ _("Tiền hàng") }}</th>
+        <th class="num w-32 max-xl:hidden">{{ _("Thuế GTGT") }}</th>
+        <th class="num w-40">{{ _("Tổng thanh toán") }}</th>
+        <th class="w-32">{{ _("Trạng thái") }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for doc, e in rows %}
+      {% set name = doc.partner_name if cfg.module == "sales" else doc.seller_name %}
+      {% set tax = doc.buyer_tax_code if cfg.module == "sales" else doc.seller_tax_code %}
+      <tr class="is-link {{ 'is-muted' if e.status == 'cancelled' }}">
+        <td><a href="{{ cfg.base }}/{{ e.id }}" class="doc-no hover:underline">{{ e.number or _("Nháp #{n}", n=e.id) }}</a></td>
+        <td class="tabular-nums text-fg-2">{{ e.date|date }}</td>
+        <td class="max-w-0">
+          <p class="truncate text-fg">{{ name or _("Khách lẻ") }}</p>
+          <p class="truncate text-xs text-fg-3">{% if tax %}MST {{ tax }} · {% endif %}{{ _({"credit": "Ghi nợ", "cash": "Tiền mặt", "bank": "Chuyển khoản"}[doc.payment_method]) }}</p>
+        </td>
+        <td class="max-lg:hidden tabular-nums text-fg-2">{{ (doc.invoice_series ~ "-" ~ doc.invoice_no) if doc.invoice_no else "–" }}</td>
+        <td class="num max-xl:hidden">{{ (doc.goods_amount - (doc.discount_amount if cfg.module == "sales" else 0))|money }}</td>
+        <td class="num max-xl:hidden text-fg-2">{{ doc.vat_amount|money0 }}</td>
+        <td class="num font-medium">{{ doc.total_amount|money }}</td>
+        <td>{{ ui.status_badge(e.status) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr class="row-total">
+        <td colspan="4" class="max-lg:hidden">{{ _("Cộng (không gồm chứng từ đã hủy)") }}</td>
+        <td colspan="3" class="lg:hidden">{{ _("Cộng") }}</td>
+        <td class="num max-xl:hidden">{{ totals.net|money }}</td>
+        <td class="num max-xl:hidden">{{ totals.vat|money }}</td>
+        <td class="num">{{ totals.total|money }}</td>
+        <td></td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+
+<ul class="divide-y divide-line md:hidden">
+  {% for doc, e in rows %}
+  {% set name = doc.partner_name if cfg.module == "sales" else doc.seller_name %}
+  <li>
+    <a href="{{ cfg.base }}/{{ e.id }}" class="flex items-start gap-3 px-4 py-3 active:bg-surface-2">
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center gap-2">
+          <span class="doc-no text-[13px]">{{ e.number or _("Nháp") }}</span>
+          <span class="text-xs text-fg-3 tabular-nums">{{ e.date|date }}</span>
+        </div>
+        <p class="mt-0.5 truncate text-[13.5px] text-fg">{{ name or _("Khách lẻ") }}</p>
+        <div class="mt-1.5">{{ ui.status_badge(e.status) }}</div>
+      </div>
+      <span class="shrink-0 text-[14px] font-semibold tabular-nums">{{ doc.total_amount|money }}</span>
+    </a>
+  </li>
+  {% endfor %}
+</ul>
+{{ ui.pagination(page, pages, page_url, total=totals.count) }}
+{% endif %}

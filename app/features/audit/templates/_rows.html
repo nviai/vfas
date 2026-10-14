@@ -1,0 +1,44 @@
+{% import "macros.html" as ui with context %}
+{% macro page_url(p) %}/audit?page={{ p }}&q={{ q|urlencode }}&group={{ group }}&via={{ via }}&start={{ start }}&end={{ end }}{% endmacro %}
+{% if not logs %}
+  {{ ui.empty_state(_("Không có thao tác nào phù hợp"), "history") }}
+{% else %}
+<ul class="divide-y divide-line">
+  {% for log in logs %}
+  <li class="px-4 py-3 sm:px-5" x-data="{ open: false }">
+    <div class="flex items-start gap-3">
+      {{ ui.avatar((log.username or "?").split(" <", 1)[0], "size-8") }}
+      <div class="min-w-0 flex-1">
+        <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+          {% set _who = (log.username or "").split(" <", 1) %}
+          <span class="text-[13.5px] font-medium text-fg">{{ _who[0] or _("Hệ thống") }}</span>
+          {% if _who|length > 1 %}<span class="text-xs text-fg-3">&lt;{{ _who[1] }}</span>{% endif %}
+          <span class="text-[13.5px] text-fg-2">{{ log.summary }}</span>
+          {% if log.via != "web" %}{{ ui.badge({"ai": _("Trợ lý AI"), "api": "API", "cli": "CLI", "system": _("Hệ thống")}.get(log.via, log.via), "violet" if log.via == "ai" else "blue") }}{% endif %}
+        </div>
+        <p class="mt-0.5 text-xs text-fg-3 tabular-nums">{{ log.at|datetime }} · <span class="font-mono">{{ log.action }}</span>{% if log.ip %} · {{ log.ip }}{% endif %}</p>
+        {% if log.reason %}<p class="mt-1 text-[13px] text-fg-2"><span class="text-fg-3">{{ _("Lý do") }}:</span> {{ log.reason }}</p>{% endif %}
+        {% if log.id in hidden_ids and (log.before or log.after) %}
+          <p class="mt-1 inline-flex items-center gap-1 text-xs text-fg-3">{{ ui.icon("lock", "size-3") }}{{ _("Chi tiết ẩn – cần quyền xem lương") }}</p>
+        {% elif log.before or log.after %}
+          <button type="button" class="mt-1 text-xs text-primary hover:underline" @click="open = !open" data-hide="{{ _('Ẩn chi tiết') }}" data-show="{{ _('Xem chi tiết') }}" x-text="open ? $el.dataset.hide : $el.dataset.show"></button>
+          <div x-show="open" x-cloak class="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
+            {% if log.before %}<pre class="overflow-x-auto rounded-md border border-line bg-surface-2 p-2 text-[11.5px] text-fg-2"><span class="text-fg-3">{{ _("Trước") }}</span>
+{{ log.before_dict|tojson(indent=1) }}</pre>{% endif %}
+            {% if log.after %}<pre class="overflow-x-auto rounded-md border border-line bg-surface-2 p-2 text-[11.5px] text-fg-2"><span class="text-fg-3">{{ _("Sau") }}</span>
+{{ log.after_dict|tojson(indent=1) }}</pre>{% endif %}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </li>
+  {% endfor %}
+</ul>
+<div class="flex items-center justify-between border-t border-line px-4 py-3 text-[13px] sm:px-5">
+  <span class="text-fg-3">{{ _("Trang {page}", page=page) }}</span>
+  <div class="flex gap-1">
+    {% if page > 1 %}{{ ui.link_button(_("Trang trước"), page_url(page - 1), "secondary", size="sm", icon_name="chevron-left") }}{% endif %}
+    {% if has_next %}{{ ui.link_button(_("Trang sau"), page_url(page + 1), "secondary", size="sm", icon_right="chevron-right") }}{% endif %}
+  </div>
+</div>
+{% endif %}

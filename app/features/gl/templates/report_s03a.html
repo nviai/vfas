@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% import "gl/_macros.html" as gm with context %}
+{% block title %}{{ _("Sổ Nhật ký chung") }}{% endblock %}
+{% block content %}
+{{ ui.page_header(_("Sổ Nhật ký chung"), _("Mẫu S03a-DNN · mọi nghiệp vụ theo thứ tự thời gian"), breadcrumbs=breadcrumbs, icon_name="notebook-pen") }}
+{{ gm.report_bar(period, years, "/reports/s03a") }}
+{% if truncated %}{{ ui.alert(_("Kỳ có nhiều dòng – trang web chỉ hiện {n} dòng đầu. Xuất PDF hoặc Excel để xem đủ.", n=rows|length), "info", cls="mb-4") }}{% endif %}
+
+<div class="paper overflow-hidden">
+  <div class="table-wrap">
+    <div class="min-w-[1000px] p-6 sm:p-10">
+      {{ ui.official_header(company, "S03a-DNN") }}
+      {{ ui.report_title("Sổ Nhật ký chung", period.label) }}
+      <table class="table table-report">
+        <thead>
+          <tr><th rowspan="2" class="w-24">Ngày, tháng ghi sổ</th><th colspan="2">Chứng từ</th><th rowspan="2">Diễn giải</th><th rowspan="2" class="w-14">STT dòng</th><th rowspan="2" class="w-20">Số hiệu TK</th><th colspan="2">Số phát sinh</th></tr>
+          <tr><th class="w-32">Số hiệu</th><th class="w-24">Ngày, tháng</th><th class="w-36">Nợ</th><th class="w-36">Có</th></tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+          <tr class="{{ 'border-t-2 border-line' if r.new_entry and not loop.first }}">
+            <td class="text-center tabular-nums">{{ r.date|date if r.new_entry }}</td>
+            <td class="text-center">{% if r.new_entry %}<a href="/entries/{{ r.entry_id }}" class="tabular-nums underline-offset-2 hover:underline">{{ r.number }}</a>{% endif %}</td>
+            <td class="text-center tabular-nums">{{ r.doc_date|date if r.new_entry }}</td>
+            <td>{{ r.description }}</td>
+            <td class="text-center tabular-nums opacity-70">{{ r.stt }}</td>
+            <td class="text-center tabular-nums {{ 'pl-6' if r.credit }}">{{ r.account }}</td>
+            <td class="num">{{ r.debit|money0 }}</td>
+            <td class="num">{{ r.credit|money0 }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="8" class="py-8 text-center text-fg-3">{{ _("Không có nghiệp vụ trong kỳ") }}</td></tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr class="row-total"><td colspan="6" class="text-center">Cộng</td><td class="num">{{ book.total_debit|money }}</td><td class="num">{{ book.total_credit|money }}</td></tr>
+        </tfoot>
+      </table>
+      {{ gm.signatures(company, left="Người ghi sổ") }}
+    </div>
+  </div>
+</div>
+{% endblock %}

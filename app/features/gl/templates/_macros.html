@@ -1,0 +1,33 @@
+{#- Shared macros of the gl module (import with context). -#}
+{% import "macros.html" as ui with context %}
+
+{#- Period label shown on the web (translatable). Print output uses period.label (always Vietnamese). -#}
+{% macro plabel(p) -%}
+{%- if p.mode == "month" -%}{{ _("Tháng {m}/{y}", m="%02d"|format(p.month), y=p.year) }}
+{%- elif p.mode == "quarter" -%}{{ _("Quý {q}/{y}", q=p.quarter, y=p.year) }}
+{%- elif p.mode == "year" -%}{{ _("Năm {y}", y=p.year) }}
+{%- else -%}{{ _("Từ {a} đến {b}", a=p.start|date, b=p.end|date) }}{%- endif -%}
+{%- endmacro %}
+
+{#- Period selector bar + export buttons. extra: dict of parameters to keep (account, partner_id…). -#}
+{% macro report_bar(period, years, base, extra=None, modes=("month", "quarter", "year", "custom")) -%}
+{%- set qs = period.query() ~ ("&" ~ (extra|urlencode) if extra else "") -%}
+<div class="card mb-5 flex flex-wrap items-end justify-between gap-3 p-3 sm:px-5">
+  {{ ui.period_selector(period, years=years, action=base, extra_hidden=extra, modes=modes) }}
+  <div class="flex flex-wrap items-center gap-2">
+    {% if caller %}{{ caller() }}{% endif %}
+    {% if can("reports.export") %}{{ ui.report_toolbar(pdf_href=base ~ ".pdf?" ~ qs, xlsx_href=base ~ ".xlsx?" ~ qs) }}{% endif %}
+  </div>
+</div>
+{%- endmacro %}
+
+{#- Negative numbers in parentheses (financial statements). -#}
+{% macro paren(v) -%}
+{%- if v is none or v == 0 -%}<span class="text-fg-3">–</span>
+{%- elif v < 0 -%}<span class="amount-neg tabular-nums">({{ (-v)|money }})</span>
+{%- else -%}<span class="tabular-nums">{{ v|money }}</span>{%- endif -%}
+{%- endmacro %}
+
+{% macro signatures(company, left="Người lập biểu") -%}
+{{ ui.signature_block([(left, "(Ký, họ tên)", company.preparer if company else ""), ("Kế toán trưởng", "(Ký, họ tên)", company.chief_accountant if company else ""), ("Người đại diện theo pháp luật", "(Ký, họ tên, đóng dấu)", company.legal_rep if company else "")], date_label) }}
+{%- endmacro %}

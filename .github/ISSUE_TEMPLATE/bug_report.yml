@@ -1,0 +1,54 @@
+name: Bug report
+description: Something works incorrectly, a figure is wrong, or an error is shown
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! You may write in English or Vietnamese.
+        **Security vulnerabilities: do not open a public issue** – follow SECURITY.md.
+        Remove real data (customer names, tax codes, amounts) from the description, screenshots and attachments.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: If a figure is wrong, name the ledger/report and the line or indicator.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open Tiền → Phiếu thu, chi (Cash → Receipts & payments)
+        2. Create a cash receipt dated …, amount …
+        3. Click "Lưu và ghi sổ" (Save and post)
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+      description: What should happen instead? For accounting rules, cite the legal basis (document, article) if you can.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version / commit
+      description: See "Hệ thống → Giới thiệu" (System → About), or `git rev-parse --short HEAD`
+  - type: dropdown
+    id: deploy
+    attributes:
+      label: How do you run VFAS?
+      options:
+        - Docker + SQLite
+        - Docker + PostgreSQL
+        - From source (make dev)
+        - Other
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs and screenshots
+      description: Error logs (`docker compose logs vfas`) and screenshots with sensitive data removed.
+      render: text

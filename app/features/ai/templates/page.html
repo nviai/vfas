@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Trợ lý AI") }}{% endblock %}
+{% block content %}
+{% call ui.page_header(_("Trợ lý AI"), _("Hỏi số liệu, tra cứu chứng từ, nhờ lập chứng từ nháp – theo đúng quyền của bạn."), breadcrumbs=breadcrumbs, icon_name="sparkles") %}
+  {% if can("ai.manage") %}{{ ui.link_button(_("Cài đặt"), "/settings/ai", "secondary", icon_name="settings") }}{% endif %}
+{% endcall %}
+<div class="grid grid-cols-1 gap-5 lg:grid-cols-[16rem_minmax(0,1fr)]">
+  <aside class="card hidden self-start lg:block" aria-label="{{ _('Hội thoại') }}">
+    <div class="card-header"><h2 class="card-title">{{ _("Hội thoại") }}</h2>
+      <a href="/ai" class="btn-ghost btn-sm btn-icon" aria-label="{{ _('Hội thoại mới') }}" data-tooltip="{{ _('Hội thoại mới') }}">{{ ui.icon("square-pen") }}</a></div>
+    <ul class="max-h-[60vh] overflow-y-auto p-1.5">
+      {% for cv in chat.conversations %}
+      <li class="group flex items-center gap-1">
+        <a href="/ai?c={{ cv.id }}" class="min-w-0 flex-1 rounded-md px-2.5 py-2 text-[13px] hover:bg-surface-2 {{ 'bg-surface-3 font-medium text-fg' if cv.active else 'text-fg-2' }}">
+          <span class="block truncate">{{ cv.title or _("Hội thoại") }}</span>
+          <span class="block text-[11px] text-fg-3">{{ cv.updated_at }}</span>
+        </a>
+        <form method="post" action="/ai/conversations/{{ cv.id }}/delete" data-confirm="{{ _('Xóa hội thoại này?') }}" data-danger class="opacity-0 group-hover:opacity-100 focus-within:opacity-100">
+          {{ ui.csrf_field() }}{{ ui.icon_button("trash-2", _("Xóa"), type="submit", size="xs") }}
+        </form>
+      </li>
+      {% else %}
+      <li class="px-2.5 py-6 text-center text-[13px] text-fg-3">{{ _("Chưa có hội thoại") }}</li>
+      {% endfor %}
+    </ul>
+  </aside>
+  <section class="card flex h-[calc(100dvh-14rem)] min-h-[28rem] flex-col overflow-hidden">
+    {% include "partials/ai_chat.html" %}
+  </section>
+</div>
+{% endblock %}

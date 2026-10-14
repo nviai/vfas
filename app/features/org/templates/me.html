@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Tài khoản của tôi") }}{% endblock %}
+{% block content %}
+{{ ui.page_header(_("Tài khoản của tôi"), u.email, breadcrumbs=breadcrumbs, icon_name="user") }}
+<div class="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
+  <div class="space-y-5">
+    <form method="post" action="/me" class="card">
+      {{ ui.csrf_field() }}
+      <div class="card-body divide-y divide-line">
+        {% call ui.form_section(_("Hồ sơ")) %}
+          {{ ui.input("full_name", _("Họ tên"), u.full_name, required=True) }}
+          {{ ui.input("email", _("Email đăng nhập"), u.email, readonly=True, hint=_("Liên hệ quản trị để đổi email")) }}
+        {% endcall %}
+        {% call ui.form_section(_("Giao diện")) %}
+          {{ ui.radio_group("language", _("Ngôn ngữ"), [("vi", "Tiếng Việt"), ("en", "English")], u.language or lang) }}
+          {{ ui.radio_group("theme", _("Giao diện"), [("light", _("Sáng")), ("dark", _("Tối")), ("system", _("Theo hệ thống"))], u.theme or theme) }}
+        {% endcall %}
+      </div>
+      <div class="card-footer flex justify-end">{{ ui.button(_("Lưu"), "primary", icon_name="check") }}</div>
+    </form>
+
+    <form method="post" action="/me/password" class="card">
+      {{ ui.csrf_field() }}
+      <div class="card-body">
+        {% call ui.form_section(_("Đổi mật khẩu"), _("Tối thiểu 8 ký tự. Các phiên đăng nhập khác sẽ bị đăng xuất.")) %}
+          {{ ui.password_input("current_password", _("Mật khẩu hiện tại")) }}
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {{ ui.password_input("new_password", _("Mật khẩu mới"), autocomplete="new-password", minlength=8) }}
+            {{ ui.password_input("new_password2", _("Nhập lại mật khẩu mới"), autocomplete="new-password", minlength=8) }}
+          </div>
+        {% endcall %}
+      </div>
+      <div class="card-footer flex justify-end">{{ ui.button(_("Đổi mật khẩu"), "secondary", icon_name="key") }}</div>
+    </form>
+  </div>
+
+  <div class="space-y-5">
+  {% call ui.card(_("Công ty của tôi"), flush=True) %}
+    <ul class="divide-y divide-line">
+      {% for c in my_companies %}
+      <li class="flex items-center justify-between gap-3 px-5 py-3">
+        <div class="min-w-0">
+          <p class="truncate font-medium text-fg">{{ c.name }}</p>
+          <p class="text-xs text-fg-3">{{ _(c.role_label) }}</p>
+        </div>
+        {% if company and company.id == c.id %}{{ ui.badge(_("Đang dùng"), "green", dot=True) }}
+        {% else %}
+        <form method="post" action="/switch-company">{{ ui.csrf_field() }}<input type="hidden" name="company_id" value="{{ c.id }}">{{ ui.button(_("Chuyển"), "ghost", size="sm") }}</form>
+        {% endif %}
+      </li>
+      {% else %}
+      <li class="px-5 py-6 text-center text-[13px] text-fg-3">{{ _("Chưa thuộc công ty nào") }}</li>
+      {% endfor %}
+    </ul>
+  {% endcall %}
+
+  {% set sess_actions %}{% if sessions|length > 1 %}<form method="post" action="/me/sessions/logout-others">{{ ui.csrf_field() }}{{ ui.button(_("Đăng xuất phiên khác"), "ghost", size="xs", icon_name="log-out") }}</form>{% endif %}{% endset %}
+  {% call ui.card(_("Phiên đăng nhập"), actions=sess_actions, flush=True) %}
+    <ul class="divide-y divide-line">
+      {% for x in sessions %}
+      <li class="px-5 py-3">
+        <p class="flex items-center gap-2 text-[13px] text-fg">{{ ui.icon("monitor", "size-3.5 text-fg-3") }}<span class="truncate">{{ x.ua[:60] or _("Trình duyệt") }}</span>{% if x.current %}{{ ui.badge(_("Phiên này"), "green") }}{% endif %}</p>
+        <p class="mt-0.5 text-xs text-fg-3 tabular-nums">{{ x.ip or "–" }} · {{ _("hoạt động") }} {{ x.seen|datetime }}</p>
+      </li>
+      {% endfor %}
+    </ul>
+  {% endcall %}
+  </div>
+</div>
+{% endblock %}

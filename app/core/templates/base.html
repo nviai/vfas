@@ -1,0 +1,378 @@
+{#- App shell (logged in). Variable contract: docs/CONTRACTS.md section 1. Docs: docs/UI.md. -#}
+{% import "macros.html" as ui with context %}
+{%- set _nav = nav if nav is defined and nav else [] -%}
+{%- set _actions = quick_actions if quick_actions is defined and quick_actions else [] -%}
+{%- set _companies = companies if companies is defined and companies else [] -%}
+{%- set _company = company if company is defined else none -%}
+{%- set _user = user if user is defined else none -%}
+{%- set _product = product_name if product_name is defined and product_name else "VFAS" -%}
+{%- set _ai = ai_enabled if ai_enabled is defined else false -%}
+{%- set _path = path if path is defined else "/" -%}
+{%- set _theme = theme if theme is defined and theme else "system" -%}
+{%- set _lang = lang if lang is defined and lang else "vi" -%}
+{%- set _csrf = csrf_token if csrf_token is defined else "" -%}
+<!doctype html>
+<html lang="{{ _lang }}" class="h-full{{ ' dark' if _theme == 'dark' }}" data-theme="{{ _theme }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="csrf-token" content="{{ _csrf }}">
+  <title>{% block title %}{{ _("Tổng quan") }}{% endblock %} · {{ (_company.short_name or _company.name) if _company else _product }}</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="/static/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/static/fonts/inter-vietnamese-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/static/css/app.css?v={{ asset_version if asset_version is defined else '2' }}">
+  <script src="/static/js/theme-init.js"></script>
+  <script src="/static/vendor/htmx.min.js" defer></script>
+  <script src="/static/js/core.js" defer></script>
+  <script src="/static/js/shell.js" defer></script>
+  <script src="/static/js/forms.js" defer></script>
+  <script src="/static/js/ai.js" defer></script>
+  <script src="/static/vendor/alpine-focus.min.js" defer></script>
+  <script src="/static/vendor/alpine.min.js" defer></script>
+  {% block head %}{% endblock %}
+</head>
+<body class="min-h-full {% block body_class %}{% endblock %}" hx-headers='{"X-CSRF-Token": "{{ _csrf }}"}'
+      x-data="appShell()" @keydown.window="globalKeys($event)">
+<a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[100] focus:rounded-md focus:bg-surface focus:px-3 focus:py-2 focus:shadow-pop">{{ _("Bỏ qua tới nội dung") }}</a>
+
+{#- Data for JS (non-executable JSON – CSP-safe) -#}
+{%- set _flashes = [] -%}
+{%- for f in (get_flashes() if get_flashes is defined else []) -%}
+  {%- set _x = _flashes.append({"kind": f.kind or f.level or "info", "message": _(f.message)}) -%}
+{%- endfor -%}
+{%- set _cmdk = [] -%}
+{%- for a in _actions -%}{%- set _x = _cmdk.append({"label": a.label, "href": a.href, "icon": a.icon, "group": _("Tạo mới"), "hint": a.shortcut or ""}) -%}{%- endfor -%}
+{%- for sec in _nav -%}{%- for it in sec["items"] -%}{%- set _x = _cmdk.append({"label": it.label, "href": it.href, "icon": it.icon, "group": sec.label or _("Điều hướng")}) -%}{%- endfor -%}{%- endfor -%}
+{%- set _shortcuts = [] -%}
+{%- for a in _actions if a.shortcut -%}{%- set _x = _shortcuts.append({"href": a.href, "shortcut": a.shortcut, "label": a.label}) -%}{%- endfor -%}
+<script type="application/json" id="flash-data">{{ _flashes|tojson }}</script>
+<script type="application/json" id="cmdk-data">{{ _cmdk|tojson }}</script>
+<script type="application/json" id="shortcut-data">{{ _shortcuts|tojson }}</script>
+
+{#- ------------------------------------------------------------ Sidebar #}
+{% macro brand_block() -%}
+<a href="/" class="flex min-w-0 items-center gap-2.5">
+  <span class="flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-sm">
+    <svg viewBox="0 0 24 24" class="size-4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 5.5l6.5 11 6.5-11M8.5 19.5h7"/></svg>
+  </span>
+  <span class="truncate text-[14px] font-semibold tracking-tight text-fg lg:sb-collapsed:hidden">{{ _product }}</span>
+</a>
+{%- endmacro %}
+
+{% macro nav_list(mobile=False) -%}
+<nav class="space-y-0.5" aria-label="{{ _('Điều hướng chính') }}">
+  {% for sec in _nav %}
+    {% if sec.label %}<div class="nav-section {{ '' if mobile else 'lg:sb-collapsed:invisible lg:sb-collapsed:h-3 lg:sb-collapsed:mt-3' }}">{{ sec.label }}</div>{% endif %}
+    {% for it in sec["items"] %}
+    <a href="{{ it.href }}" class="nav-link {{ 'nav-link-active' if it.active }} {{ '' if mobile else 'lg:sb-collapsed:justify-center lg:sb-collapsed:px-0' }}"
+       {% if it.active %}aria-current="page"{% endif %} data-label="{{ it.label }}">
+      {{ ui.icon(it.icon or "file-text", "size-[17px] text-fg-3") }}
+      <span class="truncate {{ '' if mobile else 'lg:sb-collapsed:hidden' }}">{{ it.label }}</span>
+      {% if it.badge %}<span class="nav-badge {{ '' if mobile else 'lg:sb-collapsed:hidden' }}">{{ it.badge }}</span>{% endif %}
+    </a>
+    {% endfor %}
+  {% endfor %}
+</nav>
+{%- endmacro %}
+
+<aside class="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-line bg-sidebar transition-[width] duration-150 lg:flex lg:sb-collapsed:w-[60px]" aria-label="Sidebar">
+  <div class="flex h-14 shrink-0 items-center justify-between gap-2 px-3.5 lg:sb-collapsed:justify-center lg:sb-collapsed:px-0">
+    {{ brand_block() }}
+    <button type="button" class="btn-ghost btn-xs btn-icon text-fg-3 lg:sb-collapsed:hidden" @click="toggleSidebar()" aria-label="{{ _('Thu gọn thanh bên') }}" data-tooltip="{{ _('Thu gọn') }}">{{ ui.icon("panel-left-close") }}</button>
+  </div>
+  <div class="min-h-0 flex-1 overflow-y-auto px-2.5 pt-1 pb-4">
+    {{ nav_list() }}
+  </div>
+  <div class="hidden shrink-0 border-t border-line p-2.5 lg:sb-collapsed:block">
+    <button type="button" class="btn-ghost btn-sm btn-icon mx-auto flex text-fg-3" @click="toggleSidebar()" aria-label="{{ _('Mở rộng thanh bên') }}" data-tooltip="{{ _('Mở rộng') }}" data-tooltip-side="right">{{ ui.icon("panel-left") }}</button>
+  </div>
+</aside>
+
+{#- Slide-out menu on mobile -#}
+<div x-show="navOpen" x-cloak class="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true">
+  <div class="overlay" @click="navOpen = false" x-show="navOpen" x-transition.opacity></div>
+  <div class="absolute inset-y-0 left-0 z-50 flex w-[min(20rem,86vw)] flex-col border-r border-line bg-sidebar shadow-pop"
+       x-show="navOpen" x-transition:enter="transition duration-200 ease-out" x-transition:enter-start="-translate-x-full"
+       x-transition:leave="transition duration-150 ease-in" x-transition:leave-end="-translate-x-full">
+    <div class="flex h-14 shrink-0 items-center justify-between px-4">
+      {{ brand_block() }}
+      <button type="button" class="btn-ghost btn-sm btn-icon" @click="navOpen = false" aria-label="{{ _('Đóng') }}">{{ ui.icon("x") }}</button>
+    </div>
+    {% if _company %}
+    <div class="mx-3 mb-2 rounded-lg border border-line bg-surface px-3 py-2">
+      <p class="truncate text-[13px] font-medium">{{ _company.name }}</p>
+      {% if _company.tax_code %}<p class="text-xs text-fg-3 tabular-nums">{{ _("MST") }} {{ _company.tax_code }}</p>{% endif %}
+    </div>
+    {% endif %}
+    <div class="min-h-0 flex-1 overflow-y-auto px-2.5 pb-6">{{ nav_list(True) }}</div>
+  </div>
+</div>
+
+{#- ------------------------------------------------------------ Content column #}
+<div class="flex min-h-dvh flex-col transition-[padding] duration-150 lg:pl-60 lg:sb-collapsed:pl-[60px]">
+  <header class="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b border-line bg-bg/80 px-3 backdrop-blur-md supports-[backdrop-filter]:bg-bg/70 sm:px-5 lg:px-6 print:hidden">
+    <button type="button" class="btn-ghost btn-sm btn-icon -ml-1 lg:hidden" @click="navOpen = true" aria-label="{{ _('Mở menu') }}">{{ ui.icon("menu", "size-5") }}</button>
+
+    {#- Company switcher -#}
+    {% if _company %}
+    <div class="relative min-w-0" x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false">
+      <button type="button" class="flex h-9 max-w-[16rem] min-w-0 items-center gap-2 rounded-lg px-2 text-left hover:bg-surface-3 sm:max-w-xs" @click="open = !open" :aria-expanded="open" aria-haspopup="menu">
+        <span class="flex size-6 shrink-0 items-center justify-center rounded-md border border-line bg-surface text-[11px] font-semibold text-fg-2">{{ (_company.short_name or _company.name)[:1]|upper }}</span>
+        <span class="min-w-0">
+          <span class="block truncate text-[13.5px] leading-tight font-medium text-fg">{{ _company.short_name or _company.name }}</span>
+          {% if _company.tax_code %}<span class="hidden truncate text-[11px] leading-tight text-fg-3 tabular-nums sm:block">{{ _("MST") }} {{ _company.tax_code }}</span>{% endif %}
+        </span>
+        {{ ui.icon("chevrons-up-down", "size-3.5 shrink-0 text-fg-3") }}
+      </button>
+      <div x-show="open" x-cloak x-transition.origin.top.left.duration.100ms class="menu absolute left-0 mt-1.5 w-80 max-w-[90vw]" role="menu">
+        <div class="menu-label">{{ _("Công ty của bạn") }}</div>
+        <div class="max-h-72 overflow-y-auto">
+        {% for c in _companies %}
+          <form method="post" action="/switch-company">
+            <input type="hidden" name="csrf_token" value="{{ _csrf }}"><input type="hidden" name="company_id" value="{{ c.id }}">
+            <button type="submit" role="menuitem" class="menu-item h-auto py-2" {% if c.current %}aria-current="true"{% endif %}>
+              <span class="flex size-7 shrink-0 items-center justify-center rounded-md border border-line bg-surface-2 text-xs font-semibold text-fg-2">{{ c.name[:1]|upper }}</span>
+              <span class="min-w-0 flex-1"><span class="block truncate">{{ c.name }}</span><span class="block text-xs text-fg-3">{{ c.role_label }}</span></span>
+              {% if c.current %}{{ ui.icon("check", "size-4 text-primary") }}{% endif %}
+            </button>
+          </form>
+        {% endfor %}
+        </div>
+        <div class="menu-sep"></div>
+        <a href="/companies/new" class="menu-item" role="menuitem">{{ ui.icon("circle-plus") }}<span>{{ _("Thêm công ty") }}</span></a>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="flex flex-1 justify-center px-2">
+      <button type="button" @click="openPalette()" class="hidden h-9 w-full max-w-md items-center gap-2 rounded-lg border border-line bg-surface px-3 text-left text-[13.5px] text-fg-3 shadow-[0_1px_2px_rgb(16_24_40/0.04)] transition hover:border-line-strong hover:text-fg-2 md:flex dark:shadow-none" aria-label="{{ _('Tìm kiếm') }}">
+        {{ ui.icon("search") }}<span class="flex-1 truncate">{{ _("Tìm chứng từ, đối tượng, chức năng…") }}</span>{{ ui.kbd("Ctrl+K") }}
+      </button>
+    </div>
+
+    <div class="flex items-center gap-1.5">
+      <button type="button" class="btn-ghost btn-sm btn-icon md:hidden" @click="openPalette()" aria-label="{{ _('Tìm kiếm') }}">{{ ui.icon("search", "size-[18px]") }}</button>
+      {% if _actions %}
+      <div class="relative hidden sm:block" x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false">
+        <button type="button" class="btn-primary btn-sm" @click="open = !open" :aria-expanded="open" aria-haspopup="menu">{{ ui.icon("plus") }}<span class="hidden md:inline">{{ _("Tạo mới") }}</span></button>
+        <div x-show="open" x-cloak x-transition.origin.top.right.duration.100ms class="menu absolute right-0 mt-1.5 w-64" role="menu">
+          {% for a in _actions %}
+          <a href="{{ a.href }}" class="menu-item" role="menuitem">{{ ui.icon(a.icon or "plus") }}<span class="flex-1 truncate">{{ a.label }}</span>{% if a.shortcut %}<span class="text-[11px] text-fg-3">{{ a.shortcut }}</span>{% endif %}</a>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      {% if _ai %}
+      <button type="button" class="btn-ghost btn-sm gap-1.5 text-fg-2" @click="aiOpen ? (aiOpen = false) : openAi()" :class="aiOpen && 'bg-surface-3 text-fg'" aria-label="{{ _('Trợ lý AI') }}" data-tooltip="{{ _('Trợ lý AI') }} (Ctrl+J)">
+        {{ ui.icon("sparkles", "size-[17px] text-primary dark:text-brand-400") }}<span class="hidden xl:inline">{{ _("Trợ lý AI") }}</span>
+      </button>
+      {% endif %}
+
+      {#- User menu -#}
+      {% if _user %}
+      <div class="relative" x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false">
+        <button type="button" class="flex items-center rounded-full p-0.5 hover:ring-4 hover:ring-surface-3" @click="open = !open" :aria-expanded="open" aria-haspopup="menu" aria-label="{{ _('Tài khoản') }}">
+          {{ ui.avatar(_user.full_name, "size-8") }}
+        </button>
+        <div x-show="open" x-cloak x-transition.origin.top.right.duration.100ms class="menu absolute right-0 mt-1.5 w-72" role="menu">
+          <div class="flex items-center gap-3 px-2.5 py-2.5">
+            {{ ui.avatar(_user.full_name, "size-9") }}
+            <div class="min-w-0">
+              <p class="truncate text-[13.5px] font-medium">{{ _user.full_name }}</p>
+              <p class="truncate text-xs text-fg-3">{{ _user.email }}</p>
+              {% if _user.role_label %}<p class="mt-0.5 truncate text-xs text-fg-3">{{ _(_user.role_label) }}{% if _company %} · {{ _company.short_name or _company.name }}{% endif %}</p>{% endif %}
+            </div>
+          </div>
+          <div class="menu-sep"></div>
+          <a href="/me" class="menu-item" role="menuitem">{{ ui.icon("user") }}<span>{{ _("Tài khoản của tôi") }}</span></a>
+          {% if _user.is_superadmin %}<a href="/admin" class="menu-item" role="menuitem">{{ ui.icon("shield") }}<span>{{ _("Quản trị hệ thống") }}</span></a>{% endif %}
+          <button type="button" class="menu-item" role="menuitem" @click="helpOpen = true">{{ ui.icon("keyboard") }}<span class="flex-1">{{ _("Phím tắt") }}</span><kbd class="kbd">?</kbd></button>
+          <div class="menu-sep"></div>
+          <div class="flex items-center justify-between gap-2 px-2.5 py-1.5" @click.stop>
+            <span class="text-[13px] text-fg-2">{{ _("Giao diện") }}</span>
+            <div class="segmented">
+              <button type="button" class="segment px-2" :class="theme === 'light' && 'segment-active'" @click="setTheme('light')" aria-label="{{ _('Sáng') }}" data-tooltip="{{ _('Sáng') }}">{{ ui.icon("sun", "size-3.5") }}</button>
+              <button type="button" class="segment px-2" :class="theme === 'dark' && 'segment-active'" @click="setTheme('dark')" aria-label="{{ _('Tối') }}" data-tooltip="{{ _('Tối') }}">{{ ui.icon("moon", "size-3.5") }}</button>
+              <button type="button" class="segment px-2" :class="theme === 'system' && 'segment-active'" @click="setTheme('system')" aria-label="{{ _('Theo hệ thống') }}" data-tooltip="{{ _('Theo hệ thống') }}">{{ ui.icon("monitor", "size-3.5") }}</button>
+            </div>
+          </div>
+          <div class="flex items-center justify-between gap-2 px-2.5 py-1.5">
+            <span class="text-[13px] text-fg-2">{{ _("Ngôn ngữ") }}</span>
+            <div class="segmented">
+              <a href="/lang/vi?next={{ _path|urlencode }}" class="segment {{ 'segment-active' if _lang == 'vi' }}">VI</a>
+              <a href="/lang/en?next={{ _path|urlencode }}" class="segment {{ 'segment-active' if _lang == 'en' }}">EN</a>
+            </div>
+          </div>
+          <div class="menu-sep"></div>
+          <form method="post" action="/logout">
+            <input type="hidden" name="csrf_token" value="{{ _csrf }}">
+            <button type="submit" class="menu-item menu-item-danger" role="menuitem">{{ ui.icon("log-out") }}<span>{{ _("Đăng xuất") }}</span></button>
+          </form>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </header>
+
+  <main id="main" class="mx-auto w-full max-w-[1440px] flex-1 px-4 pt-6 pb-28 sm:px-6 lg:px-8 lg:pb-12">
+    {% block content %}{% endblock %}
+  </main>
+</div>
+
+{#- ------------------------------------------------------------ Bottom bar (mobile) #}
+<nav class="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden print:hidden" aria-label="{{ _('Thanh công cụ') }}">
+  <div class="mx-auto grid h-14 max-w-md grid-cols-5 items-center px-2">
+    <a href="/" class="flex flex-col items-center gap-0.5 text-[10.5px] font-medium {{ 'text-primary dark:text-brand-400' if _path == '/' else 'text-fg-3' }}">{{ ui.icon("house", "size-5") }}{{ _("Tổng quan") }}</a>
+    <button type="button" @click="openPalette()" class="flex flex-col items-center gap-0.5 text-[10.5px] font-medium text-fg-3">{{ ui.icon("search", "size-5") }}{{ _("Tìm") }}</button>
+    <div class="flex justify-center">
+      {% if _actions %}
+      <button type="button" @click="createOpen = true" class="-mt-5 flex size-12 items-center justify-center rounded-full bg-primary text-primary-fg shadow-pop ring-4 ring-bg" aria-label="{{ _('Tạo mới') }}">{{ ui.icon("plus", "size-6", 2) }}</button>
+      {% endif %}
+    </div>
+    {% if _ai %}
+    <button type="button" @click="openAi()" class="flex flex-col items-center gap-0.5 text-[10.5px] font-medium text-fg-3">{{ ui.icon("sparkles", "size-5") }}{{ _("Trợ lý") }}</button>
+    {% else %}<span></span>{% endif %}
+    <button type="button" @click="navOpen = true" class="flex flex-col items-center gap-0.5 text-[10.5px] font-medium text-fg-3">{{ ui.icon("menu", "size-5") }}{{ _("Menu") }}</button>
+  </div>
+</nav>
+
+{#- "Tạo mới" (create new) sheet on mobile -#}
+<div x-show="createOpen" x-cloak class="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="{{ _('Tạo mới') }}">
+  <div class="overlay" @click="createOpen = false" x-show="createOpen" x-transition.opacity></div>
+  <div class="absolute inset-x-0 bottom-0 z-50 rounded-t-2xl border-t border-line bg-surface p-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-pop"
+       x-show="createOpen" x-transition:enter="transition duration-200 ease-out" x-transition:enter-start="translate-y-full"
+       x-transition:leave="transition duration-150 ease-in" x-transition:leave-end="translate-y-full">
+    <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-line-strong"></div>
+    <p class="px-2 pb-2 text-sm font-semibold">{{ _("Tạo mới") }}</p>
+    <div class="grid grid-cols-2 gap-2">
+      {% for a in _actions %}
+      <a href="{{ a.href }}" class="flex items-center gap-2.5 rounded-xl border border-line bg-surface-2 px-3 py-3 text-[13.5px] font-medium active:bg-surface-3">
+        <span class="flex size-8 items-center justify-center rounded-lg bg-primary-soft text-primary-soft-fg">{{ ui.icon(a.icon or "plus") }}</span><span class="min-w-0 truncate">{{ a.label }}</span>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+{#- ------------------------------------------------------------ Ctrl+K #}
+<div x-show="paletteOpen" x-cloak class="fixed inset-0 z-[60]" role="dialog" aria-modal="true" aria-label="{{ _('Tìm kiếm') }}">
+  <div class="overlay" @click="paletteOpen = false" x-show="paletteOpen" x-transition.opacity.duration.100ms></div>
+  <div class="relative z-50 mx-auto mt-[10vh] w-[min(40rem,calc(100vw-1.5rem))]" x-show="paletteOpen"
+       x-transition:enter="transition duration-150 ease-out" x-transition:enter-start="opacity-0 scale-[0.98]">
+    <div class="modal-panel" x-data="commandPalette()" data-search-url="{{ search_url if search_url is defined else '/search' }}"
+         @keydown.arrow-down.prevent="move(1)" @keydown.arrow-up.prevent="move(-1)" @keydown.enter.prevent="go()">
+      <div class="flex items-center gap-3 border-b border-line px-4">
+        {{ ui.icon("search", "size-[18px] text-fg-3") }}
+        <input x-ref="q" x-model="q" type="text" class="h-13 w-full bg-transparent text-[15px] text-fg placeholder:text-fg-3 focus:outline-none" placeholder="{{ _('Tìm chứng từ, đối tượng, chức năng…') }}" autocomplete="off" aria-label="{{ _('Tìm kiếm') }}">
+        <svg x-show="loading" class="size-4 animate-spin text-fg-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+        <kbd class="kbd">Esc</kbd>
+      </div>
+      <div class="max-h-[min(26rem,60vh)] overflow-y-auto p-2">
+        <template x-for="g in groups" :key="g.label">
+          <div class="mb-1">
+            <p class="px-2.5 pt-2 pb-1 text-[11px] font-semibold tracking-wide text-fg-3 uppercase" x-text="g.label" x-show="g.label"></p>
+            <template x-for="it in g.items" :key="it.idx">
+              <a :href="it.href" :data-idx="it.idx" class="flex h-10 items-center gap-3 rounded-lg px-2.5 text-[13.5px]"
+                 :class="it.idx === active ? 'bg-surface-3 text-fg' : 'text-fg-2'" @mouseenter="active = it.idx">
+                <span class="flex size-6 items-center justify-center rounded-md border border-line bg-surface text-fg-3">
+                  <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                </span>
+                <span class="min-w-0 flex-1 truncate" x-text="it.label"></span>
+                <span class="truncate text-xs text-fg-3" x-text="it.hint || ''"></span>
+              </a>
+            </template>
+          </div>
+        </template>
+        <p x-show="!flat.length && !loading" class="px-3 py-8 text-center text-[13px] text-fg-3">{{ _("Không có kết quả phù hợp") }}</p>
+      </div>
+      <div class="flex items-center gap-4 border-t border-line bg-surface-2 px-4 py-2 text-xs text-fg-3">
+        <span class="inline-flex items-center gap-1"><kbd class="kbd">↑</kbd><kbd class="kbd">↓</kbd> {{ _("chọn") }}</span>
+        <span class="inline-flex items-center gap-1"><kbd class="kbd">Enter</kbd> {{ _("mở") }}</span>
+        <span class="ml-auto hidden sm:inline">{{ _("Gõ không dấu cũng được") }}</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+{#- ------------------------------------------------------------ Keyboard shortcuts #}
+<div x-show="helpOpen" x-cloak class="fixed inset-0 z-[60] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="help-title">
+  <div class="overlay" @click="helpOpen = false"></div>
+  <div class="modal-panel max-w-md p-5" x-show="helpOpen" x-transition>
+    <div class="mb-4 flex items-center justify-between">
+      <h2 id="help-title" class="text-base font-semibold">{{ _("Phím tắt") }}</h2>
+      <button type="button" class="btn-ghost btn-sm btn-icon -mr-2" @click="helpOpen = false" aria-label="{{ _('Đóng') }}">{{ ui.icon("x") }}</button>
+    </div>
+    <dl class="grid grid-cols-[1fr_auto] items-center gap-x-6 gap-y-2.5 text-[13.5px]">
+      <dt class="text-fg-2">{{ _("Tìm kiếm, nhảy tới chức năng") }}</dt><dd>{{ ui.kbd("Ctrl+K") }}</dd>
+      {% if _ai %}<dt class="text-fg-2">{{ _("Mở trợ lý AI") }}</dt><dd>{{ ui.kbd("Ctrl+J") }}</dd>{% endif %}
+      {% for a in _actions if a.shortcut %}<dt class="text-fg-2">{{ a.label }}</dt><dd>{{ ui.kbd(a.shortcut) }}</dd>{% endfor %}
+      <dt class="text-fg-2">{{ _("Lưu chứng từ") }}</dt><dd>{{ ui.kbd("Ctrl+S") }}</dd>
+      <dt class="text-fg-2">{{ _("Lưu và ghi sổ") }}</dt><dd>{{ ui.kbd("Ctrl+Enter") }}</dd>
+      <dt class="text-fg-2">{{ _("Lưới dòng: sang ô tiếp / thêm dòng") }}</dt><dd>{{ ui.kbd("Enter") }}</dd>
+      <dt class="text-fg-2">{{ _("Đóng hộp thoại") }}</dt><dd>{{ ui.kbd("Esc") }}</dd>
+      <dt class="text-fg-2">{{ _("Hiện bảng này") }}</dt><dd>{{ ui.kbd("?") }}</dd>
+    </dl>
+  </div>
+</div>
+
+{#- ------------------------------------------------------------ AI assistant #}
+{% if _ai %}
+<div x-show="aiOpen" x-cloak class="fixed inset-0 z-40 bg-black/20 sm:hidden" @click="aiOpen = false"></div>
+<aside x-show="aiOpen" x-cloak class="drawer-panel z-40 sm:max-w-[440px] print:hidden" aria-label="{{ _('Trợ lý AI') }}"
+       x-transition:enter="transition duration-200 ease-out" x-transition:enter-start="translate-x-full"
+       x-transition:leave="transition duration-150 ease-in" x-transition:leave-end="translate-x-full">
+  <div id="ai-panel" class="flex min-h-0 flex-1 flex-col" data-url="{{ ai_panel_url if ai_panel_url is defined else '/ai/panel' }}">
+    <div class="flex h-14 items-center justify-between border-b border-line px-4">
+      <span class="flex items-center gap-2 text-sm font-semibold">{{ ui.icon("sparkles", "size-4 text-primary dark:text-brand-400") }}{{ _("Trợ lý AI") }}</span>
+      <button type="button" class="btn-ghost btn-sm btn-icon" @click="aiOpen = false" aria-label="{{ _('Đóng') }}">{{ ui.icon("x") }}</button>
+    </div>
+    <div class="p-5">{{ ui.skeleton(4) }}</div>
+  </div>
+</aside>
+{% endif %}
+
+{#- ------------------------------------------------------------ Toast + confirm dialog #}
+<div x-data="toaster()" @ui-toast.window="add($event.detail)" aria-live="polite"
+     class="pointer-events-none fixed right-0 bottom-20 z-[70] flex w-full max-w-sm flex-col gap-2 px-4 sm:right-2 lg:bottom-4">
+  <template x-for="t in toasts" :key="t.id">
+    <div class="toast" role="status">
+      <span class="mt-px shrink-0" :class="{ 'text-emerald-600 dark:text-emerald-400': t.kind === 'success', 'text-rose-600 dark:text-rose-400': t.kind === 'error', 'text-amber-600 dark:text-amber-400': t.kind === 'warning', 'text-sky-600 dark:text-sky-400': t.kind === 'info' }">
+        <template x-if="t.kind === 'success'">{{ ui.icon("circle-check") }}</template>
+        <template x-if="t.kind === 'error'">{{ ui.icon("circle-alert") }}</template>
+        <template x-if="t.kind === 'warning'">{{ ui.icon("triangle-alert") }}</template>
+        <template x-if="t.kind === 'info'">{{ ui.icon("info") }}</template>
+      </span>
+      <div class="min-w-0 flex-1">
+        <p class="font-medium text-fg" x-show="t.title" x-text="t.title"></p>
+        <p class="whitespace-pre-line text-fg-2" x-text="t.message"></p>
+      </div>
+      <button type="button" class="-m-1 rounded p-1 text-fg-3 hover:text-fg" @click="remove(t.id)" aria-label="{{ _('Đóng') }}">{{ ui.icon("x", "size-3.5") }}</button>
+    </div>
+  </template>
+</div>
+
+<div x-data="confirmDialog()" @ui-confirm.window="ask($event.detail)" @keydown.escape.window="open && close(false)">
+  <div x-show="open" x-cloak class="fixed inset-0 z-[80] flex items-center justify-center p-4" role="alertdialog" aria-modal="true">
+    <div class="overlay" @click="close(false)"></div>
+    <div class="modal-panel max-w-sm p-5" x-show="open" x-transition>
+      <div class="flex gap-3.5">
+        <span class="flex size-9 shrink-0 items-center justify-center rounded-full" :class="danger ? 'bg-rose-100 text-rose-600 dark:bg-rose-500/15 dark:text-rose-400' : 'bg-primary-soft text-primary-soft-fg'">
+          <template x-if="danger">{{ ui.icon("triangle-alert") }}</template><template x-if="!danger">{{ ui.icon("circle-help") }}</template>
+        </span>
+        <div class="min-w-0 pt-1">
+          <h2 class="text-[15px] font-semibold" x-text='title || {{ _("Xác nhận")|tojson }}'></h2>
+          <p class="mt-1.5 text-[13.5px] whitespace-pre-line text-fg-2" x-text="message"></p>
+        </div>
+      </div>
+      <div class="mt-5 flex justify-end gap-2">
+        <button type="button" class="btn-secondary" @click="close(false)">{{ _("Hủy bỏ") }}</button>
+        <button type="button" x-ref="ok" :class="danger ? 'btn-danger' : 'btn-primary'" @click="close(true)" x-text='confirmLabel || {{ _("Đồng ý")|tojson }}'></button>
+      </div>
+    </div>
+  </div>
+</div>
+{% block scripts %}{% endblock %}
+</body>
+</html>

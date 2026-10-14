@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Số dư đầu kỳ") }}{% endblock %}
+{% block content %}
+{% call ui.page_header(_("Số dư đầu kỳ"), _("Số dư các tài khoản tại ngày {d} – trước ngày bắt đầu hạch toán trên phần mềm.", d=opening_date|date), breadcrumbs=breadcrumbs, icon_name="scroll-text") %}
+  {{ ui.link_button(_("Tải mẫu Excel"), "/opening/template.xlsx", "secondary", icon_name="file-down") }}
+  {% if can_edit and not locked %}
+    {{ ui.button(_("Nhập từ Excel"), "secondary", icon_name="upload", type="button", attrs="@click=\"$dispatch('modal-open', 'opening-import')\"") }}
+  {% endif %}
+{% endcall %}
+
+{% if locked %}
+  {{ ui.alert(_("Đã có kỳ khóa sổ nên không sửa được số dư đầu kỳ. Mở khóa toàn bộ các kỳ nếu cần sửa."), "warning", cls="mb-5") }}
+{% elif not can_edit %}
+  {{ ui.alert(_("Chỉ Chủ doanh nghiệp / Kế toán trưởng được sửa số dư đầu kỳ."), "info", cls="mb-5") }}
+{% endif %}
+{% if errors %}
+  {{ ui.alert(errors|join("\n"), "error", title=_("Chưa lưu được"), cls="mb-5") }}
+{% endif %}
+
+<div class="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+  {{ ui.stat_card(_("Tổng dư Nợ"), total_debit, icon_name="arrow-down-left") }}
+  {{ ui.stat_card(_("Tổng dư Có"), total_credit, icon_name="arrow-up-right") }}
+  {% if total_debit == total_credit %}
+    {{ ui.stat_card(_("Chênh lệch"), 0, icon_name="circle-check", hint=_("Đã cân Nợ – Có")) }}
+  {% else %}
+    {{ ui.stat_card(_("Chênh lệch"), total_debit - total_credit, icon_name="triangle-alert", hint=_("Nợ − Có, cần bằng 0")) }}
+  {% endif %}
+</div>
+
+<form method="post" action="/opening" x-data="docForm()" @keydown="keys($event)" novalidate>
+  {{ ui.csrf_field() }}
+  <div class="space-y-5">
+    {% call ui.card(_("Số dư theo tài khoản"), _("TK theo dõi đối tượng (131, 331, 141, 334…) nhập từng đối tượng một dòng. Mỗi dòng chỉ một bên Nợ hoặc Có.")) %}
+      {{ ui.line_grid("split", lines, min_lines=3) }}
+      {% if banks %}<p class="mt-2 text-xs text-fg-3">{{ _("Chênh lệch trong bảng chưa gồm số dư tiền gửi ngân hàng nhập ở phần dưới; tổng Nợ – Có của cả trang xem ở các ô số liệu phía trên.") }}</p>{% endif %}
+    {% endcall %}
+    {% call ui.card(_("Tiền gửi ngân hàng"), _("Số dư từng tài khoản ngân hàng (TK 1121, 1122).")) %}
+      {% if banks %}
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {% for b in banks %}{{ ui.money_input("bank-" ~ b.id, b.label ~ " (" ~ b.account_code ~ ")", bank_values.get(b.id)) }}{% endfor %}
+      </div>
+      {% else %}
+        {% call ui.empty_state(_("Chưa khai báo tài khoản ngân hàng"), "landmark", compact=True) %}
+          {{ ui.link_button(_("Thêm tài khoản ngân hàng"), "/bank-accounts", "secondary", size="sm", icon_name="plus") }}
+        {% endcall %}
+      {% endif %}
+    {% endcall %}
+  </div>
+  {% if can_edit and not locked %}
+  {% call ui.form_actions() %}
+    <span class="mr-auto hidden text-xs text-fg-3 md:inline">{{ _("Lưu sẽ thay toàn bộ số dư đầu kỳ bằng nội dung trên trang.") }}</span>
+    {{ ui.button(_("Lưu số dư đầu kỳ"), icon_name="check", hotkey="save", kbd_hint="Ctrl+S") }}
+  {% endcall %}
+  {% endif %}
+</form>
+
+{% if can_edit and not locked %}
+{% call ui.modal("opening-import", _("Nhập số dư đầu kỳ từ Excel"), description=_("Dùng file mẫu (Số hiệu TK, Mã đối tượng, Số tài khoản ngân hàng, Dư Nợ, Dư Có, Ghi chú). Bạn sẽ xem trước trước khi nhập.")) %}
+<form method="post" action="/opening/import" enctype="multipart/form-data">
+  {{ ui.csrf_field() }}
+  <div class="px-5 pb-5"><input type="file" name="file" accept=".xlsx" required class="input"></div>
+  <div class="modal-footer">
+    {{ ui.button(_("Đóng"), "secondary", type="button", attrs="@click=\"$dispatch('modal-close')\"") }}
+    {{ ui.button(_("Xem trước"), "primary", icon_name="eye") }}
+  </div>
+</form>
+{% endcall %}
+{% endif %}
+{% endblock %}

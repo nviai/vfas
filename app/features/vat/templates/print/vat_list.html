@@ -1,0 +1,34 @@
+{% extends "vat/print/_layout.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block page_size %}size: A4 landscape; margin: 12mm 10mm 14mm 12mm;{% endblock %}
+{% block body %}
+<table class="doc-head"><tr>
+  <td class="left"><p><span class="b">Đơn vị:</span> {{ company.name }}</p><p><span class="b">Mã số thuế:</span> {{ company.tax_code }}</p><p><span class="b">Địa chỉ:</span> {{ company.address }}</p></td>
+  <td class="right"></td>
+</tr></table>
+<p class="title">{{ title|upper }}</p>
+<p class="subtitle">Kỳ tính thuế: {{ period.label }} (từ ngày {{ period.start|date }} đến ngày {{ period.end|date }})</p>
+<table class="grid">
+  <colgroup><col style="width:4%"><col style="width:8%"><col style="width:9%"><col style="width:8%"><col style="width:25%"><col style="width:10%"><col style="width:12%"><col style="width:6%"><col style="width:10%"><col style="width:8%"></colgroup>
+  <thead><tr><th>STT</th><th>Ký hiệu</th><th>Số hóa đơn</th><th>Ngày</th><th>Tên {{ "người bán" if direction == "in" else "người mua" }}</th><th>Mã số thuế</th><th>Giá trị chưa thuế</th><th>Thuế suất</th><th>Thuế GTGT</th><th>Ghi chú</th></tr></thead>
+  <tbody>
+    {% for rec, e, sign in data.rows %}
+    <tr>
+      <td class="code">{{ loop.index }}</td><td class="code">{{ rec.invoice_series }}</td><td class="code">{{ rec.invoice_no }}</td>
+      <td class="code">{{ rec.invoice_date|date }}</td><td>{{ rec.partner_name }}</td><td class="code">{{ rec.partner_tax_code }}</td>
+      <td class="num">{{ (sign * rec.goods_amount)|money }}</td><td class="code">{{ vat_labels.get(rec.vat_rate, rec.vat_rate) }}</td>
+      <td class="num">{{ (sign * rec.vat_amount)|money0 }}</td>
+      <td class="small">{{ "Điều chỉnh giảm" if sign < 0 else ("Không khấu trừ" if direction == "in" and not rec.deductible else "") }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="10" class="c i">Không phát sinh</td></tr>
+    {% endfor %}
+    <tr class="total"><td colspan="6" class="c">Tổng cộng</td><td class="num">{{ data.goods|money }}</td><td></td><td class="num">{{ data.vat|money }}</td><td></td></tr>
+  </tbody>
+</table>
+<table class="signatures"><tr>
+  <td style="width:33%"><p class="role">Người lập biểu</p><p class="hint">(Ký, họ tên)</p><p class="name">{{ company.preparer }}</p></td>
+  <td style="width:33%"><p class="role">Kế toán trưởng</p><p class="hint">(Ký, họ tên)</p><p class="name">{{ company.chief_accountant }}</p></td>
+  <td style="width:34%"><p class="i">Ngày ..... tháng ..... năm ..........</p><p class="role">Người đại diện theo pháp luật</p><p class="hint">(Ký, họ tên, đóng dấu)</p><p class="name">{{ company.legal_rep }}</p></td>
+</tr></table>
+{% endblock %}

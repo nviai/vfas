@@ -1,0 +1,36 @@
+{#- Entry card shared by assets and payroll: variable `e` (JournalEntry). Actions go through the core's shared endpoints. -#}
+{% import "macros.html" as ui with context %}
+{% set acts %}
+  {% if e.status == "posted" and can_entry_cancel %}
+    <button type="button" class="btn-ghost btn-xs" @click="$dispatch('modal-open', 'cancel-{{ e.id }}')">{{ ui.icon("ban", "size-3.5") }}{{ _("Hủy chứng từ") }}</button>
+  {% elif e.status == "draft" and can_entry_post %}
+    <form method="post" action="/entries/{{ e.id }}/post">{{ ui.csrf_field() }}<button class="btn-primary btn-xs">{{ ui.icon("check", "size-3.5") }}{{ _("Ghi sổ") }}</button></form>
+  {% endif %}
+{% endset %}
+{% call ui.card(e.doc_type_label ~ " " ~ e.display_number, e.date|date ~ " · " ~ e.description, actions=acts, flush=True) %}
+  <div class="table-wrap">
+    <table class="table table-compact">
+      <thead><tr><th>{{ _("Diễn giải") }}</th><th class="w-20">{{ _("TK Nợ") }}</th><th class="w-20">{{ _("TK Có") }}</th><th class="num w-36">{{ _("Số tiền") }}</th></tr></thead>
+      <tbody>
+        {% for ln in e.lines %}
+        <tr><td class="max-w-0"><p class="truncate text-fg-2">{{ ln.description }}</p></td>
+            <td class="tabular-nums">{{ ln.debit_account }}</td><td class="tabular-nums">{{ ln.credit_account }}</td>
+            <td class="num">{{ ln.amount|money }}</td></tr>
+        {% endfor %}
+      </tbody>
+      <tfoot><tr class="row-total"><td colspan="3">{{ _("Cộng") }} · {{ ui.status_badge(e.status) }}</td><td class="num">{{ e.total|money }}</td></tr></tfoot>
+    </table>
+  </div>
+{% endcall %}
+{% if e.status == "posted" and can_entry_cancel %}
+{% call ui.modal("cancel-" ~ e.id, _("Hủy chứng từ") ~ " " ~ e.display_number, description=_("Chỉ hủy được khi kỳ còn mở. Chứng từ vẫn được lưu, có ghi lý do.")) %}
+<form method="post" action="/entries/{{ e.id }}/cancel">
+  {{ ui.csrf_field() }}
+  <div class="px-5 pb-5">{{ ui.textarea("reason", _("Lý do hủy"), rows=3, required=True) }}</div>
+  <div class="flex justify-end gap-2 border-t border-line bg-surface-2 px-5 py-3">
+    {{ ui.button(_("Đóng"), "secondary", type="button", attrs="@click=\"$dispatch('modal-close')\"") }}
+    {{ ui.button(_("Hủy chứng từ"), "danger", icon_name="ban") }}
+  </div>
+</form>
+{% endcall %}
+{% endif %}

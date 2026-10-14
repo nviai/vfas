@@ -1,0 +1,198 @@
+{#- Shared money voucher form: PT/PC (cash module) and BC/BN (bank module).
+    Quick mode: pick a receipt/payment purpose + one amount (cashier, phone).
+    Multi-line mode: grid of offsetting accounts (accountant). Has an
+    optional VAT invoice block. -#}
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% set title = (_("Sửa {kind} nháp", kind=_(kind_label).lower()) if entry else _(kind_label) ~ " " ~ _("mới")) %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+{% set person = _("Người nộp tiền") if incoming else _("Người nhận tiền") %}
+{% set reason_label = _("Lý do thu") if incoming else _("Lý do chi") %}
+{% set qs = "kind=" ~ kind %}
+{% macro info_card() %}
+      {% call ui.card(_("Thông tin chung")) %}
+      <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {{ ui.date_input("date", _("Ngày hạch toán"), v.date, errors=errors, required=True, max=(none if is_bank else today)) }}
+        {{ ui.date_input("doc_date", _("Ngày chứng từ"), v.doc_date, errors=errors) }}
+        {% if is_bank %}
+          <div class="col-span-2">
+            <label class="label" for="f-bank_account_id">{{ _("Tài khoản ngân hàng") }}<span class="required-mark">*</span></label>
+            <select id="f-bank_account_id" name="bank_account_id" class="input {{ 'input-error' if errors.get('bank_account_id') }}" required>
+              {% for b in banks %}<option value="{{ b.id }}" {{ "selected" if v.bank_account_id|string == b.id|string }}>{{ b.label }} · {{ b.bank_name }}</option>{% endfor %}
+            </select>
+            {% if not banks %}<p class="hint">{{ _("Chưa có tài khoản ngân hàng.") }} <a class="text-primary hover:underline" href="/bank-accounts">{{ _("Thêm tài khoản") }}</a></p>{% endif %}
+            {{ ui.field_error(errors, "bank_account_id") }}
+          </div>
+        {% else %}
+          {{ ui.input("attached_docs", _("Kèm theo (chứng từ gốc)"), v.attached_docs or "", type="number", errors=errors, input_cls="tabular-nums", attrs='min="0"') }}
+          {{ ui.input("ref_no", _("Số chứng từ gốc"), v.ref_no or "", placeholder=_("Số hóa đơn, hợp đồng…")) }}
+        {% endif %}
+      </div>
+      <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2"
+           x-data='{ contact: {{ (v.contact_name or "")|tojson }}, address: {{ (v.contact_address or "")|tojson }} }'
+           @combobox-select.stop="if ($event.detail && $event.detail.extra) { contact = $event.detail.extra.name || contact; address = $event.detail.extra.address || address }">
+        {{ ui.combobox("partner_id", _("Đối tượng"), "/lookup/partners", value=v.partner_id, value_label=partner_label,
+                       placeholder=_("Khách hàng, nhà cung cấp, nhân viên…"), errors=errors,
+                       hint=_("Bắt buộc khi thu/chi công nợ (131, 331, 141); còn lại chọn để theo dõi")) }}
+        <div>
+          <label class="label" for="f-contact_name">{{ person }}{% if not is_bank %}<span class="required-mark">*</span>{% endif %}</label>
+          <input id="f-contact_name" name="contact_name" class="input {{ 'input-error' if errors.get('contact_name') }}" x-model="contact" autocomplete="off">
+          {{ ui.field_error(errors, "contact_name") }}
+        </div>
+        <div class="lg:col-span-2">
+          <label class="label" for="f-contact_address">{{ _("Địa chỉ") }}</label>
+          <input id="f-contact_address" name="contact_address" class="input" x-model="address" autocomplete="off">
+        </div>
+      </div>
+      <div class="mt-4">
+        {{ ui.input("description", reason_label, v.description or "", errors=errors, required=True,
+                    placeholder=(_("Ví dụ: Thu tiền hàng HĐ 0000123") if incoming else _("Ví dụ: Mua văn phòng phẩm tháng 10"))) }}
+      </div>
+      {% endcall %}
+{% endmacro %}
+{% macro quick_card() %}
+      <div x-data='{
+             sel: {{ purpose_sel|tojson }}, opts: {{ purposes|tojson }}, otherBank: false, words: "",
+             get cur() { return this.opts.find(o => o.account === this.sel) || null },
+             get needsBank() { return this.sel === "__other__" ? this.otherBank : !!(this.cur && this.cur.needs_bank) },
+             loadWords(v) { if (!v) { this.words = ""; return } fetch("/cash/words?amount=" + v).then(r => r.text()).then(t => this.words = t) }
+           }' x-init="loadWords({{ (v.amount or 0)|tojson }})">
+        {% call ui.card(_("Số tiền")) %}
+          {% if errors.get("lines") %}{{ ui.alert(errors.get("lines"), "error", cls="mb-4") }}{% endif %}
+          <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div>
+              <label class="label" for="f-purpose">{{ _("Mục đích thu") if incoming else _("Mục đích chi") }}<span class="required-mark">*</span></label>
+              <select id="f-purpose" class="input {{ 'input-error' if errors.get('account') }}" x-model="sel">
+                <option value="">{{ _("— Chọn —") }}</option>
+                {% for o in purposes %}<option value="{{ o.account }}">{{ _(o.label) }} ({{ o.account }})</option>{% endfor %}
+                <option value="__other__">{{ _("Khác – chọn tài khoản…") }}</option>
+              </select>
+              <input type="hidden" name="account" :value="sel === '__other__' ? '' : sel">
+              {{ ui.field_error(errors, "account") }}
+              <p class="hint" x-show="cur" x-cloak><span x-text="cur && (cur.account + ' – ' + cur.account_name)"></span></p>
+              <div x-show="sel === '__other__'" x-cloak class="mt-2" @combobox-select.stop="otherBank = !!($event.detail.extra && $event.detail.extra.needs_bank)">
+                {{ ui.combobox("account_other", None, "/lookup/accounts", value=other_account, value_label=other_account_label,
+                               params={"postable": 1}, placeholder=_("Gõ số hoặc tên tài khoản đối ứng…")) }}
+              </div>
+            </div>
+            <div @money-change="loadWords($event.detail.value)">
+              {{ ui.money_input("amount", _("Số tiền") ~ (" (" ~ _("chưa thuế") ~ ")" if v.vat_on else ""), v.amount, errors=errors, required=True,
+                                input_cls="!h-11 !text-lg font-semibold") }}
+              <p class="mt-1.5 min-h-5 text-[13px] text-fg-3 italic" x-text="words"></p>
+            </div>
+            <div x-show="needsBank" x-cloak class="lg:col-span-2">
+              <label class="label" for="f-contra_bank">{{ _("Tài khoản ngân hàng (đối ứng)") }}</label>
+              <select id="f-contra_bank" name="contra_bank_account_id" class="input sm:max-w-md">
+                {% for b in banks %}<option value="{{ b.id }}" {{ "selected" if v.contra_bank_account_id|string == b.id|string }}>{{ b.label }} · {{ b.bank_name }}</option>{% endfor %}
+              </select>
+              {% if not banks %}<p class="hint">{{ _("Chưa có tài khoản ngân hàng.") }} <a class="text-primary hover:underline" href="/bank-accounts">{{ _("Thêm tài khoản") }}</a></p>{% endif %}
+            </div>
+          </div>
+        {% endcall %}
+      </div>
+{% endmacro %}
+<form method="post" action="{{ action }}" x-data="docForm()" @keydown="keys($event)" novalidate>
+  {{ ui.csrf_field() }}
+  <input type="hidden" name="kind" value="{{ kind }}">
+  <input type="hidden" name="mode" value="{{ mode }}">
+  {% if v.cash_count_id %}<input type="hidden" name="cash_count_id" value="{{ v.cash_count_id }}">{% endif %}
+
+  {% call ui.page_header(title, _("Số chứng từ được cấp khi ghi sổ. Chứng từ đã ghi sổ không sửa được số liệu."),
+                         breadcrumbs=breadcrumbs, back=cancel_url, badge=ui.status_badge("draft")) %}
+    <div class="segmented" role="tablist" aria-label="{{ _('Cách nhập') }}">
+      {% set base = (request.url.path if entry else ("/bank/new" if is_bank else "/cash/new")) %}
+      <a class="segment {{ 'segment-active' if mode == 'quick' }}" href="{{ base }}?{{ qs }}&mode=quick" role="tab">{{ ui.icon("zap", "size-3.5") }}{{ _("Nhanh") }}</a>
+      <a class="segment {{ 'segment-active' if mode == 'detail' }}" href="{{ base }}?{{ qs }}&mode=detail" role="tab">{{ ui.icon("list", "size-3.5") }}{{ _("Nhiều dòng") }}</a>
+    </div>
+  {% endcall %}
+
+  {% if errors and errors.get("_") %}{{ ui.alert(errors.get("_"), "error", cls="mb-5") }}{% endif %}
+  {% if v.cash_count_id %}{{ ui.alert(_("Chứng từ xử lý chênh lệch kiểm kê quỹ. Kiểm tra lại số tiền, tài khoản rồi ghi sổ."), "info", cls="mb-5") }}{% endif %}
+
+  <div class="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_20rem]">
+    <div class="min-w-0 space-y-5">
+      {% if mode == "quick" %}
+      {{ quick_card() }}
+      {{ info_card() }}
+      {% else %}
+      {{ info_card() }}
+      {% call ui.card(_("Định khoản"), _("Nợ {acc} cố định; nhập các tài khoản đối ứng.", acc=money_account) if incoming else _("Có {acc} cố định; nhập các tài khoản đối ứng.", acc=money_account)) %}
+        {% if errors.get("lines") %}{{ ui.alert(errors.get("lines"), "error", cls="mb-4") }}{% endif %}
+        {% if incoming %}
+          {{ ui.line_grid("pair", lines, fixed={"debit_account": money_account, "debit_account_label": money_account}, description_from="#f-description") }}
+        {% else %}
+          {{ ui.line_grid("pair", lines, fixed={"credit_account": money_account, "credit_account_label": money_account}, description_from="#f-description") }}
+        {% endif %}
+        {% if banks %}
+        <div class="mt-4 sm:max-w-md">
+          <label class="label" for="f-contra_bank2">{{ _("Tài khoản ngân hàng cho dòng đối ứng TK 112") }}</label>
+          <select id="f-contra_bank2" name="contra_bank_account_id" class="input">
+            <option value="">{{ _("— Không có —") }}</option>
+            {% for b in banks %}<option value="{{ b.id }}" {{ "selected" if v.contra_bank_account_id|string == b.id|string }}>{{ b.label }} · {{ b.bank_name }}</option>{% endfor %}
+          </select>
+        </div>
+        {% endif %}
+      {% endcall %}
+      {% endif %}
+
+      <section class="card" x-data="{ on: {{ 'true' if v.vat_on else 'false' }} }">
+        <div class="card-header">
+          <div class="flex items-center gap-2.5">
+            <span class="text-fg-3">{{ ui.icon("receipt-text") }}</span>
+            <div>
+              <h2 class="card-title">{{ _("Hóa đơn GTGT") }}</h2>
+              <p class="card-subtitle">{{ _("Thuế GTGT đầu ra (Có 33311) – lên bảng kê bán ra.") if incoming else _("Thuế GTGT đầu vào được khấu trừ (Nợ 1331) – lên bảng kê mua vào.") }}</p>
+            </div>
+          </div>
+          <label class="flex cursor-pointer items-center gap-2 text-[13.5px]">
+            <input type="checkbox" name="vat_on" value="1" class="checkbox" x-model="on"> {{ _("Có hóa đơn") }}
+          </label>
+        </div>
+        <div class="card-body" x-show="on" x-cloak>
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {{ ui.input("vat_invoice_template", _("Mẫu số"), v.vat_invoice_template or "", placeholder="1") }}
+            {{ ui.input("vat_invoice_series", _("Ký hiệu"), v.vat_invoice_series or "", placeholder="C26TAA") }}
+            {{ ui.input("vat_invoice_no", _("Số hóa đơn"), v.vat_invoice_no or "", errors=errors, input_cls="tabular-nums") }}
+            {{ ui.date_input("vat_invoice_date", _("Ngày hóa đơn"), v.vat_invoice_date, errors=errors) }}
+            {{ ui.input("vat_partner_name", _("Người mua") if incoming else _("Người bán"), v.vat_partner_name or "", cls="sm:col-span-2") }}
+            {{ ui.input("vat_partner_tax_code", _("Mã số thuế"), v.vat_partner_tax_code or "", input_cls="tabular-nums", cls="sm:col-span-2") }}
+            {{ ui.money_input("vat_goods_amount", _("Giá trị chưa thuế"), v.vat_goods_amount, errors=errors, hint=_("Trống = tổng các dòng")) }}
+            {{ ui.select("vat_rate", _("Thuế suất"), vat_rates, v.vat_rate or "10") }}
+            {{ ui.money_input("vat_amount", _("Tiền thuế GTGT"), v.vat_amount, errors=errors, hint=_("Trống = tự tính theo thuế suất"), cls="sm:col-span-2") }}
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <aside class="grid grid-cols-1 content-start gap-5 md:grid-cols-2 xl:grid-cols-1">
+      {% call ui.card(_("Định khoản"), icon_name="scale") %}
+        <ul class="space-y-1.5 text-[13px] text-fg-2">
+          {% if incoming %}
+          <li><span class="font-medium text-fg">Nợ {{ money_account }}</span> / {{ _("Có TK đối ứng") }}</li>
+          <li class="text-fg-3">{{ _("Có hóa đơn: thêm Có 33311 phần thuế.") }}</li>
+          {% else %}
+          <li>{{ _("Nợ TK đối ứng") }} / <span class="font-medium text-fg">Có {{ money_account }}</span></li>
+          <li class="text-fg-3">{{ _("Có hóa đơn: thêm Nợ 1331 phần thuế.") }}</li>
+          {% endif %}
+          <li class="text-fg-3">{{ _("TK 131, 331, 141 cần chọn đối tượng.") }}</li>
+        </ul>
+      {% endcall %}
+      {% call ui.card(_("Kiểm soát"), icon_name="shield-check") %}
+        <ul class="list-disc space-y-1.5 pl-4 text-[13px] text-fg-2">
+          {% if not is_bank %}<li>{{ _("Không ghi sổ được nếu tồn quỹ bị âm ở bất kỳ thời điểm nào, kể cả phiếu ghi lùi ngày.") }}</li>{% endif %}
+          <li>{{ _("Ngày hạch toán phải thuộc kỳ chưa khóa sổ và không ở tương lai.") }}</li>
+          <li>{{ _("Sau khi ghi sổ, sửa sai bằng hủy (có lý do) hoặc chứng từ điều chỉnh.") }}</li>
+        </ul>
+      {% endcall %}
+    </aside>
+  </div>
+
+  {% call ui.form_actions() %}
+    <span class="mr-auto hidden text-xs text-fg-3 md:inline">{{ ui.kbd("Ctrl+S") }} {{ _("lưu nháp") }}{% if can_post %} · {{ ui.kbd("Ctrl+Enter") }} {{ _("lưu và ghi sổ") }}{% endif %}</span>
+    {{ ui.link_button(_("Hủy bỏ"), cancel_url, "ghost") }}
+    {{ ui.button(_("Lưu nháp"), "secondary", name="action", value="save", hotkey="save", kbd_hint="Ctrl+S") }}
+    {% if can_post %}{{ ui.button(_("Lưu và ghi sổ"), icon_name="check", name="action", value="post", hotkey="post", kbd_hint="Ctrl+Enter") }}{% endif %}
+  {% endcall %}
+</form>
+{% endblock %}

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Nhập sao kê") }}{% endblock %}
+{% block content %}
+{{ ui.page_header(_("Nhập sao kê ngân hàng"), _("File CSV hoặc Excel tải từ internet banking. Giao dịch đã nhập trước đó tự bỏ qua."), breadcrumbs=breadcrumbs, back="/bank/statements", icon_name="upload") }}
+<div class="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
+  {% call ui.card(_("Chọn file")) %}
+  <form method="post" action="/bank/statements/import" enctype="multipart/form-data" class="space-y-4" x-data="{ name: '' }">
+    {{ ui.csrf_field() }}
+    <div>
+      <label class="label" for="f-bank">{{ _("Tài khoản ngân hàng") }}</label>
+      <select id="f-bank" name="bank_account_id" class="input sm:max-w-md" required>
+        {% for b in banks %}<option value="{{ b.id }}" {{ "selected" if bank_id and bank_id|string == b.id|string }}>{{ b.label }} · {{ b.bank_name }}</option>{% endfor %}
+      </select>
+    </div>
+    <label class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-line-strong bg-surface-2 px-6 py-10 text-center hover:border-primary">
+      {{ ui.icon("file-spreadsheet", "size-8 text-emerald-600") }}
+      <span class="text-[14px] font-medium" data-empty="{{ _('Chọn file .csv hoặc .xlsx') }}" x-text="name || $el.dataset.empty"></span>
+      <span class="text-xs text-fg-3">{{ _("Bước sau sẽ cho chọn cột ngày, diễn giải, tiền vào, tiền ra…") }}</span>
+      <input type="file" name="file" accept=".csv,.xlsx,.txt" required class="sr-only" @change="name = $event.target.files[0] ? $event.target.files[0].name : ''">
+    </label>
+    <div class="flex justify-end">{{ ui.button(_("Đọc file"), icon_name="arrow-right") }}</div>
+  </form>
+  {% endcall %}
+  {% call ui.card(_("Lưu ý"), icon_name="info") %}
+    <ul class="list-disc space-y-1.5 pl-4 text-[13px] text-fg-2">
+      <li>{{ _("Ghi có / tiền vào → thu tiền gửi (Nợ 112); ghi nợ / tiền ra → chi tiền gửi (Có 112).") }}</li>
+      <li>{{ _("Cách ánh xạ cột được lưu theo từng tài khoản – lần sau chỉ cần tải file lên.") }}</li>
+      <li>{{ _("Sau khi nhập, hệ thống tự khớp với chứng từ đã ghi sổ cùng số tiền, lệch tối đa 3 ngày.") }}</li>
+    </ul>
+  {% endcall %}
+</div>
+{% endblock %}

@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Quản trị hệ thống") }}{% endblock %}
+{% block content %}
+{% call ui.page_header(_("Quản trị hệ thống"), _("Công ty và người dùng trên nền tảng. Quản trị không xem được sổ sách nếu không phải thành viên."), breadcrumbs=breadcrumbs, icon_name="shield") %}
+  {{ ui.link_button(_("Tạo công ty"), "/companies/new", "primary", icon_name="plus") }}
+{% endcall %}
+
+<div class="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+  {{ ui.stat_card(_("Công ty"), company_rows|length, unit="", money_value=False, icon_name="building") }}
+  {{ ui.stat_card(_("Người dùng"), all_users|length, unit="", money_value=False, icon_name="users") }}
+  {{ ui.stat_card(_("Chứng từ"), company_rows|sum(attribute="entries"), unit="", icon_name="file-text") }}
+</div>
+
+{% call ui.card(_("Công ty"), flush=True, cls="mb-6") %}
+<div class="table-wrap">
+  <table class="table">
+    <thead><tr><th>{{ _("Tên") }}</th><th class="w-32">{{ _("MST") }}</th><th class="num w-28">{{ _("Thành viên") }}</th><th class="num w-28">{{ _("Chứng từ") }}</th><th class="w-36 max-md:hidden">{{ _("Tạo lúc") }}</th><th class="w-28">{{ _("Trạng thái") }}</th><th class="w-10"></th></tr></thead>
+    <tbody>
+      {% for row in company_rows %}{% set c = row.c %}
+      <tr class="{{ 'is-muted' if not c.is_active }}">
+        <td class="font-medium text-fg">{{ c.name }}</td>
+        <td class="tabular-nums text-fg-2">{{ c.tax_code or "–" }}</td>
+        <td class="num">{{ row.members }}</td>
+        <td class="num">{{ row.entries|money }}</td>
+        <td class="max-md:hidden tabular-nums text-fg-3">{{ c.created_at|datetime }}</td>
+        <td>{{ ui.status_badge("active" if c.is_active else "inactive") }}</td>
+        <td class="!pr-3 text-right">
+          <form method="post" action="/admin/companies/{{ c.id }}/toggle" data-confirm="{{ _('Đổi trạng thái công ty này?') }}">{{ ui.csrf_field() }}{{ ui.icon_button("ban", _("Khóa / mở khóa"), type="submit") }}</form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endcall %}
+
+{% call ui.card(_("Người dùng"), flush=True) %}
+<div class="table-wrap">
+  <table class="table">
+    <thead><tr><th>{{ _("Người dùng") }}</th><th class="w-40 max-md:hidden">{{ _("Đăng nhập gần nhất") }}</th><th class="w-36">{{ _("Quyền") }}</th><th class="w-28">{{ _("Trạng thái") }}</th><th class="w-10"></th></tr></thead>
+    <tbody>
+      {% for u in all_users %}
+      <tr class="{{ 'is-muted' if not u.is_active }}">
+        <td><p class="font-medium text-fg">{{ u.full_name }}</p><p class="text-xs text-fg-3">{{ u.email }}</p></td>
+        <td class="max-md:hidden tabular-nums text-fg-3">{{ u.last_login_at|datetime if u.last_login_at else "–" }}</td>
+        <td>{% if u.is_superadmin %}{{ ui.badge(_("Quản trị"), "violet", icon_name="shield") }}{% else %}<span class="text-fg-3">–</span>{% endif %}</td>
+        <td>{{ ui.status_badge("active" if u.is_active else "inactive") }}</td>
+        <td class="!pr-3 text-right">
+          {% if u.id != user.id %}
+          <form method="post" action="/admin/users/{{ u.id }}/toggle" data-confirm="{{ _('Đổi trạng thái tài khoản này?') }}">{{ ui.csrf_field() }}{{ ui.icon_button("ban", _("Khóa / mở khóa"), type="submit") }}</form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endcall %}
+{% endblock %}

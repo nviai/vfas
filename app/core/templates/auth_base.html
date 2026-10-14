@@ -1,0 +1,118 @@
+{#- Layout for the login / sign-up / setup / error pages shown before login. Left half introduces the product, right half holds the form. -#}
+{% import "macros.html" as ui with context %}
+{%- set _product = product_name if product_name is defined and product_name else "VFAS" -%}
+{%- set _theme = theme if theme is defined and theme else "system" -%}
+{%- set _lang = lang if lang is defined and lang else "vi" -%}
+{%- set _path = path if path is defined else "/" -%}
+{%- set _csrf = csrf_token if csrf_token is defined else "" -%}
+<!doctype html>
+<html lang="{{ _lang }}" class="h-full{{ ' dark' if _theme == 'dark' }}" data-theme="{{ _theme }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="csrf-token" content="{{ _csrf }}">
+  <title>{% block title %}{{ _("Đăng nhập") }}{% endblock %} · {{ _product }}</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="/static/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/static/fonts/inter-vietnamese-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/static/css/app.css?v={{ asset_version if asset_version is defined else '2' }}">
+  <script src="/static/js/theme-init.js"></script>
+  <script src="/static/vendor/htmx.min.js" defer></script>
+  <script src="/static/js/core.js" defer></script>
+  <script src="/static/js/shell.js" defer></script>
+  <script src="/static/js/forms.js" defer></script>
+  <script src="/static/vendor/alpine-focus.min.js" defer></script>
+  <script src="/static/vendor/alpine.min.js" defer></script>
+</head>
+<body class="min-h-full bg-surface" x-data="{ theme: (window.__theme && window.__theme.get()) || 'system', setTheme(t) { this.theme = t; setCookie('theme', t); window.__theme && window.__theme.set(t); } }">
+<div class="grid min-h-dvh lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
+  {#- ------------------------------------------------ Product introduction #}
+  <aside class="relative hidden overflow-hidden bg-[#06302d] text-white lg:flex lg:flex-col">
+    <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgb(45_212_191/0.28),transparent_55%),radial-gradient(ellipse_at_bottom_right,rgb(20_184_166/0.22),transparent_50%)]"></div>
+    <div class="pointer-events-none absolute inset-0 opacity-[0.07] [background-image:linear-gradient(rgb(255_255_255/0.8)_1px,transparent_1px),linear-gradient(90deg,rgb(255_255_255/0.8)_1px,transparent_1px)] [background-size:44px_44px]"></div>
+    <div class="relative flex flex-1 flex-col px-12 py-10 xl:px-16">
+      <a href="/" class="flex items-center gap-2.5">
+        <span class="flex size-8 items-center justify-center rounded-lg bg-white/10 ring-1 ring-white/20">
+          <svg viewBox="0 0 24 24" class="size-4.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 5.5l6.5 11 6.5-11M8.5 19.5h7"/></svg>
+        </span>
+        <span class="text-[15px] font-semibold tracking-tight">{{ _product }}</span>
+      </a>
+
+      <div class="my-auto max-w-lg py-12">
+        <p class="mb-4 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-brand-100 ring-1 ring-white/15">
+          {{ ui.icon("badge-check", "size-3.5") }}{{ _("Theo chế độ kế toán Thông tư 133/2016/TT-BTC") }}
+        </p>
+        <h1 class="text-[34px] leading-[1.15] font-semibold tracking-tight text-balance">{{ _("Sổ sách đúng chuẩn, nhập liệu nhanh như bảng tính.") }}</h1>
+        <p class="mt-4 text-[15px] leading-relaxed text-brand-100/80">{{ _("Một nơi cho chứng từ, sổ sách, báo cáo tài chính và tờ khai thuế – cho doanh nghiệp tự làm kế toán lẫn kế toán dịch vụ.") }}</p>
+        <ul class="mt-8 space-y-3.5 text-[14px] text-white/90">
+          {% for ic, text in [
+            ("book-open", _("Sổ Nhật ký chung, Sổ Cái, BCTC, tờ khai 01/GTGT tự lập")),
+            ("file-check", _("Nhập hóa đơn điện tử XML hàng loạt, đối chiếu sao kê ngân hàng")),
+            ("sparkles", _("Trợ lý AI hỏi đáp số liệu – chỉ lập chứng từ nháp")),
+            ("shield-check", _("Chứng từ đã ghi sổ không thể sửa, xóa; nhật ký lưu vết đầy đủ")),
+          ] %}
+          <li class="flex items-start gap-3"><span class="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md bg-white/10 text-brand-200 ring-1 ring-white/15">{{ ui.icon(ic, "size-3.5") }}</span>{{ text }}</li>
+          {% endfor %}
+        </ul>
+
+        {#- Illustration: miniature stat cards -#}
+        <div class="mt-10 grid max-w-md grid-cols-2 gap-3" aria-hidden="true">
+          <div class="rounded-xl bg-white/[0.07] p-4 ring-1 ring-white/10 backdrop-blur">
+            <p class="text-xs text-brand-100/70">{{ _("Tiền mặt & tiền gửi") }}</p>
+            <p class="mt-1 text-xl font-semibold tabular-nums">1.284.560.000</p>
+            <p class="mt-1 text-xs text-emerald-300">▲ 8,4%</p>
+          </div>
+          <div class="rounded-xl bg-white/[0.07] p-4 ring-1 ring-white/10 backdrop-blur">
+            <p class="text-xs text-brand-100/70">{{ _("Thuế GTGT phải nộp") }}</p>
+            <p class="mt-1 text-xl font-semibold tabular-nums">42.315.000</p>
+            <p class="mt-1 text-xs text-brand-100/70">{{ _("Hạn nộp 20/11") }}</p>
+          </div>
+        </div>
+      </div>
+
+      <p class="text-xs text-white/50">© {{ today.year if today is defined and today else "2026" }} {{ _product }} · {{ _("Dữ liệu của bạn, xuất được bất cứ lúc nào.") }}</p>
+    </div>
+  </aside>
+
+  {#- ------------------------------------------------ Form #}
+  <main class="flex min-h-dvh flex-col bg-surface">
+    <div class="flex items-center justify-between px-5 py-4 sm:px-8">
+      <a href="/" class="flex items-center gap-2 lg:invisible">
+        <span class="flex size-7 items-center justify-center rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 text-white">
+          <svg viewBox="0 0 24 24" class="size-4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 5.5l6.5 11 6.5-11M8.5 19.5h7"/></svg>
+        </span>
+        <span class="text-sm font-semibold">{{ _product }}</span>
+      </a>
+      <div class="flex items-center gap-2">
+        <div class="segmented">
+          <a href="/lang/vi?next={{ _path|urlencode }}" class="segment {{ 'segment-active' if _lang == 'vi' }}">VI</a>
+          <a href="/lang/en?next={{ _path|urlencode }}" class="segment {{ 'segment-active' if _lang == 'en' }}">EN</a>
+        </div>
+        <div class="segmented">
+          <button type="button" class="segment px-2" :class="theme === 'light' && 'segment-active'" @click="setTheme('light')" aria-label="{{ _('Sáng') }}">{{ ui.icon("sun", "size-3.5") }}</button>
+          <button type="button" class="segment px-2" :class="theme === 'dark' && 'segment-active'" @click="setTheme('dark')" aria-label="{{ _('Tối') }}">{{ ui.icon("moon", "size-3.5") }}</button>
+          <button type="button" class="segment px-2" :class="theme === 'system' && 'segment-active'" @click="setTheme('system')" aria-label="{{ _('Theo hệ thống') }}">{{ ui.icon("monitor", "size-3.5") }}</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex flex-1 items-center justify-center px-5 pb-12 sm:px-8">
+      <div class="w-full {% block width %}max-w-[400px]{% endblock %}">
+        {% for f in (get_flashes() if get_flashes is defined else []) %}
+          {{ ui.alert(_(f.message), f.kind or f.level or "info", cls="mb-4") }}
+        {% endfor %}
+        {% block content %}{% endblock %}
+      </div>
+    </div>
+  </main>
+</div>
+
+<div x-data="toaster()" @ui-toast.window="add($event.detail)" aria-live="polite" class="pointer-events-none fixed right-0 bottom-4 z-[70] flex w-full max-w-sm flex-col gap-2 px-4">
+  <template x-for="t in toasts" :key="t.id">
+    <div class="toast" role="status"><p class="flex-1 whitespace-pre-line text-fg-2" x-text="t.message"></p></div>
+  </template>
+</div>
+{% block scripts %}{% endblock %}
+</body>
+</html>

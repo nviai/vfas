@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Tham số lương & thuế") }}{% endblock %}
+{% block content %}
+{{ ui.page_header(_("Tham số lương & thuế"), _("Mỗi tham số có nhiều mức theo ngày hiệu lực; bảng lương dùng mức hiệu lực tại ngày cuối tháng lương."), breadcrumbs=breadcrumbs, icon_name="settings") }}
+
+{{ ui.alert(_("Giá trị mặc định lấy theo văn bản pháp luật đến tháng 10/2026. Khi Nhà nước điều chỉnh, thêm mức mới với ngày hiệu lực – không sửa mức cũ để bảng lương các tháng trước giữ nguyên."), "info", cls="mb-5") }}
+
+<div class="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+  {{ ui.stat_card(_("Giảm trừ bản thân"), current.self_deduction, hint=_("hôm nay"), icon_name="user") }}
+  {{ ui.stat_card(_("Giảm trừ người phụ thuộc"), current.dependent_deduction, hint=_("hôm nay"), icon_name="users") }}
+  {{ ui.stat_card(_("Lương cơ sở"), current.base_salary, hint=_("trần BHXH {v}", v=(current.cap_multiple * current.base_salary)|money), icon_name="landmark") }}
+  {{ ui.stat_card(_("Biểu thuế"), _("{n} bậc", n=current.brackets|length), unit="", money_value=False, icon_name="percent") }}
+</div>
+
+<div class="space-y-5">
+{% for key, rows in groups.items() %}
+  {% set acts %}{% if can("payroll.manage") %}<button type="button" class="btn-secondary btn-xs" @click="$dispatch('modal-open', 'add-{{ key }}')">{{ ui.icon("plus", "size-3.5") }}{{ _("Thêm mức mới") }}</button>{% endif %}{% endset %}
+  {% call ui.card(_(labels[key]), actions=acts, flush=True, id=key) %}
+  <div class="table-wrap">
+    <table class="table table-compact">
+      <thead><tr><th class="w-36">{{ _("Hiệu lực từ") }}</th><th>{{ _("Giá trị") }}</th><th class="max-lg:hidden">{{ _("Căn cứ") }}</th><th class="w-10"></th></tr></thead>
+      <tbody>
+        {% set current_row = rows|selectattr("effective_from", "le", today)|list|last %}
+        {% for r in rows|reverse %}
+        {% set v = r.value %}
+        <tr class="{{ 'font-medium' if r == current_row else 'text-fg-2' }}">
+          <td class="tabular-nums">{{ r.effective_from|date }}{% if r.effective_from > today %} {{ ui.badge(_("Sắp áp dụng"), "blue") }}{% elif r == current_row %} {{ ui.badge(_("Đang áp dụng"), "green", dot=True) }}{% endif %}</td>
+          <td class="text-[13px]">
+            {% if key == "base_salary" %}{{ v.amount|money }} đ
+            {% elif key == "regional_min_wage" %}{% for reg in ("I", "II", "III", "IV") %}<span class="mr-3 whitespace-nowrap">{{ _("Vùng") }} {{ reg }}: <span class="tabular-nums">{{ v[reg]|money }}</span></span>{% endfor %}
+            {% elif key == "insurance_rates" %}{{ _("NLĐ") }}: BHXH {{ v.emp_bhxh }}% · BHYT {{ v.emp_bhyt }}% · BHTN {{ v.emp_bhtn }}% — {{ _("DN") }}: BHXH {{ v.er_bhxh }}% · BHYT {{ v.er_bhyt }}% · BHTN {{ v.er_bhtn }}% · KPCĐ {{ v.er_kpcd }}% — {{ _("trần {n} lần", n=v.cap_multiple) }}
+            {% elif key == "family_deduction" %}{{ _("Bản thân") }} <span class="tabular-nums">{{ v.self|money }}</span> · {{ _("người phụ thuộc") }} <span class="tabular-nums">{{ v.dependent|money }}</span>
+            {% elif key == "pit_brackets" %}{% for b in v.brackets %}<span class="mr-3 whitespace-nowrap tabular-nums">{% if b[0] is none %}&gt; {{ v.brackets[loop.index0 - 1][0]|money }}{% else %}≤ {{ b[0]|money }}{% endif %}: {{ b[1] }}%</span>{% endfor %}
+            {% elif key == "flat_rates" %}{{ _("HĐ dưới 3 tháng") }} {{ v.short_term_rate }}% {{ _("khi ≥") }} {{ v.short_term_threshold|money }} · {{ _("không cư trú") }} {{ v.non_resident_rate }}%
+            {% endif %}
+          </td>
+          <td class="max-lg:hidden text-xs text-fg-3">{{ r.source }}</td>
+          <td class="!pr-3 text-right">
+            {% if can("payroll.manage") and rows|length > 1 %}
+            <form method="post" action="/payroll/settings/{{ r.id }}/delete" data-confirm="{{ _('Xóa mức tham số này?') }}" data-danger>{{ ui.csrf_field() }}{{ ui.icon_button("trash", _("Xóa"), type="submit") }}</form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endcall %}
+
+  {% if can("payroll.manage") %}
+  {% set last = rows[-1].value if rows else {} %}
+  {% call ui.modal("add-" ~ key, _("Thêm mức mới") ~ ": " ~ _(labels[key]), size="lg") %}
+  <form method="post" action="/payroll/settings">
+    {{ ui.csrf_field() }}<input type="hidden" name="key" value="{{ key }}">
+    <div class="space-y-4 px-5 pb-5">
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {{ ui.date_input("effective_from", _("Hiệu lực từ ngày"), required=True, id="eff-" ~ key) }}
+        {{ ui.input("source", _("Căn cứ (văn bản)"), "", id="src-" ~ key) }}
+      </div>
+      {% if key == "base_salary" %}
+        {{ ui.money_input("amount", _("Lương cơ sở"), last.get("amount"), id="v-" ~ key) }}
+      {% elif key == "regional_min_wage" %}
+        <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">{% for reg in ("I", "II", "III", "IV") %}{{ ui.money_input("region_" ~ reg, _("Vùng") ~ " " ~ reg, last.get(reg), id="v-" ~ key ~ reg) }}{% endfor %}</div>
+      {% elif key == "insurance_rates" %}
+        <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          {% for k, label in [("emp_bhxh", "BHXH NLĐ %"), ("emp_bhyt", "BHYT NLĐ %"), ("emp_bhtn", "BHTN NLĐ %"), ("cap_multiple", "Trần (lần)"), ("er_bhxh", "BHXH DN %"), ("er_bhyt", "BHYT DN %"), ("er_bhtn", "BHTN DN %"), ("er_kpcd", "KPCĐ DN %")] %}
+            {{ ui.input(k, _(label), last.get(k, ""), id="v-" ~ key ~ k, input_cls="tabular-nums") }}
+          {% endfor %}
+        </div>
+      {% elif key == "family_deduction" %}
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {{ ui.money_input("self", _("Bản thân / tháng"), last.get("self"), id="v-self") }}
+          {{ ui.money_input("dependent", _("Mỗi người phụ thuộc / tháng"), last.get("dependent"), id="v-dep") }}
+        </div>
+      {% elif key == "pit_brackets" %}
+        {% set lines = [] %}{% for b in last.get("brackets", []) %}{% do lines.append(((b[0]|money) if b[0] is not none else "") ~ ";" ~ b[1]) %}{% endfor %}
+        {{ ui.textarea("brackets", _("Biểu thuế (mỗi dòng: thu nhập tính thuế tối đa của bậc; thuế suất %)"), lines|join("\n"), rows=7, id="v-brackets", hint=_("Bậc cuối để trống ngưỡng, ví dụ: ;35")) }}
+      {% elif key == "flat_rates" %}
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {{ ui.input("short_term_rate", _("HĐ dưới 3 tháng (%)"), last.get("short_term_rate", ""), id="v-str", input_cls="tabular-nums") }}
+          {{ ui.money_input("short_term_threshold", _("Ngưỡng khấu trừ / lần"), last.get("short_term_threshold"), id="v-stt") }}
+          {{ ui.input("non_resident_rate", _("Không cư trú (%)"), last.get("non_resident_rate", ""), id="v-nr", input_cls="tabular-nums") }}
+        </div>
+      {% endif %}
+    </div>
+    <div class="flex justify-end gap-2 border-t border-line bg-surface-2 px-5 py-3">
+      {{ ui.button(_("Đóng"), "secondary", type="button", attrs="@click=\"$dispatch('modal-close')\"") }}
+      {{ ui.button(_("Lưu"), "primary", icon_name="check") }}
+    </div>
+  </form>
+  {% endcall %}
+  {% endif %}
+{% endfor %}
+</div>
+{% endblock %}
