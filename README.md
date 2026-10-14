@@ -81,18 +81,20 @@ The user interface defaults to Vietnamese and is fully translated into English.
 
 ## Try it in 2 minutes
 
-With Docker, using the prebuilt image (linux/amd64 and linux/arm64):
+**Online:** open <https://vfas.nviai.com> and sign in with `demo@example.com` / `Demo@2026` – nothing to install.
+
+**Locally** with Docker, using the prebuilt image (linux/amd64 and linux/arm64):
 
 ```bash
-docker run -d --name vfas -p 127.0.0.1:8000:8000 -v vfas-data:/data ghcr.io/nviai/vfas:latest
+docker run -d --name vfas -p 127.0.0.1:8000:8000 -v vfas-data:/data nviai/vfas:latest
 docker exec vfas python -m app.cli demo
 ```
 
-Open <http://127.0.0.1:8000> and sign in with `demo@example.com` / `Demo@2026`. The demo company contains about one
+Open <http://127.0.0.1:8000> and sign in with the same account. The demo company contains about one
 year of transactions. Clean up with `docker rm -f vfas && docker volume rm vfas-data`.
 
 To build the image yourself instead: `git clone https://github.com/nviai/vfas.git && cd vfas && docker build -t vfas .`
-and run `vfas` in place of `ghcr.io/nviai/vfas:latest`.
+and run `vfas` in place of `nviai/vfas:latest`.
 
 ## Deploying for a business
 
@@ -146,7 +148,7 @@ openpyxl · SQLite/PostgreSQL.
 - [x] Issue e-invoices through providers (Viettel S-Invoice, MISA meInvoice, VNPT, BKAV) – see [docs/EINVOICE.md](docs/EINVOICE.md)
 - [x] XML export of financial statements, 03/TNDN and 05/QTT-TNCN for HTKK
 - [x] Accounting regimes under Circular 99/2025 and Circular 58/2026 (`app/core/regimes.py`)
-- [x] Prebuilt Docker image (`ghcr.io/nviai/vfas`, amd64/arm64, signed)
+- [x] Prebuilt Docker image ([`nviai/vfas`](https://hub.docker.com/r/nviai/vfas) on Docker Hub, amd64/arm64, signed)
 - [ ] Foreign currencies, bank API connections, production costing
 
 Want to take one? Open an issue to discuss it first.

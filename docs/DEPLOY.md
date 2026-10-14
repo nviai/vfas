@@ -36,7 +36,7 @@ docker network create proxy 2>/dev/null || true
 docker compose up -d
 ```
 
-`docker compose up -d` pulls the prebuilt image `ghcr.io/nviai/vfas` (linux/amd64 and linux/arm64) and only builds from
+`docker compose up -d` pulls the prebuilt image `nviai/vfas` from Docker Hub (linux/amd64 and linux/arm64) and only builds from
 the source when the image cannot be pulled; `docker compose up -d --build` always builds from the source.
 
 | Image tag | Contents |
@@ -50,7 +50,7 @@ Images are built by GitHub Actions (`.github/workflows/docker-publish.yml`) afte
 and provenance attestations and are signed with cosign (keyless). To verify a signature:
 
 ```bash
-cosign verify ghcr.io/nviai/vfas:latest \
+cosign verify nviai/vfas:latest \
   --certificate-identity-regexp '^https://github.com/nviai/vfas/' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
