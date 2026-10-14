@@ -1,15 +1,18 @@
 # VFAS behind Traefik (Traefik terminates HTTPS; the app exposes a single port).
 #
 #   cp .env.example .env      # then edit SECRET_KEY
-#   docker compose up -d --build
+#   docker compose up -d      # pulls the prebuilt image ghcr.io/nviai/vfas (falls back to building it)
 #   docker compose exec vfas python -m app.cli create-admin --email admin@congty.vn --full-name "Director"
+#
+# Build from source instead of pulling: docker compose up -d --build
+# Pin a release with VFAS_VERSION in .env (e.g. 2.1.0, 2.1 or 2); upgrade with: docker compose pull && docker compose up -d
 #
 # PostgreSQL instead of SQLite: uncomment DATABASE_URL and run `docker compose --profile postgres up -d`.
 
 services:
   vfas:
+    image: ghcr.io/nviai/vfas:${VFAS_VERSION:-latest}
     build: .
-    image: vfas:latest
     restart: unless-stopped
     env_file: .env
     environment:

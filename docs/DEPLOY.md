@@ -31,9 +31,28 @@ Requirements: Linux, Docker + Docker Compose, Traefik (handles HTTPS) with a `pr
 git clone https://github.com/nviai/vfas.git && cd vfas
 cp .env.example .env
 python3 -c "import secrets; print(secrets.token_urlsafe(48))"   # paste into SECRET_KEY in .env
-# edit APP_DOMAIN, PUBLIC_URL, ALLOW_SIGNUP…
+# edit APP_DOMAIN, PUBLIC_URL, ALLOW_SIGNUP, VFAS_VERSION…
 docker network create proxy 2>/dev/null || true
-docker compose up -d --build
+docker compose up -d
+```
+
+`docker compose up -d` pulls the prebuilt image `ghcr.io/nviai/vfas` (linux/amd64 and linux/arm64) and only builds from
+the source when the image cannot be pulled; `docker compose up -d --build` always builds from the source.
+
+| Image tag | Contents |
+|---|---|
+| `latest` | Latest release |
+| `2.1.0`, `2.1`, `2` | A release, its minor line or its major line – pin one of these in production (`VFAS_VERSION` in `.env`) |
+| `edge` | Current `main` branch (for testing) |
+| `sha-<commit>` | One exact commit |
+
+Images are built by GitHub Actions (`.github/workflows/docker-publish.yml`) after the same smoke test as CI, carry SBOM
+and provenance attestations and are signed with cosign (keyless). To verify a signature:
+
+```bash
+cosign verify ghcr.io/nviai/vfas:latest \
+  --certificate-identity-regexp '^https://github.com/nviai/vfas/' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
 Create the admin account and the first company using **one** of two options:
@@ -109,7 +128,9 @@ Posting is serialized per company with a row lock, so running several processes 
 
 ```bash
 docker compose exec vfas python -m app.cli backup -o /backups/truoc-cap-nhat.tar.gz
-git pull && docker compose up -d --build      # migrations run automatically on startup
+# set VFAS_VERSION in .env to the new release, then:
+docker compose pull && docker compose up -d   # migrations run automatically on startup
+# building from source instead: git pull && docker compose up -d --build
 ```
 
 Read the [CHANGELOG](../CHANGELOG.md) before upgrading for changes that need attention.

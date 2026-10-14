@@ -8,6 +8,7 @@ Progress of v1 (cash book): `docs/v1/PROGRESS.md`.
 - The Docker image runs in hardened mode (read-only, `cap_drop: ALL`, unprivileged user): migrations, `/healthz`, demo
   data, sign-in, PDF printing; about 140 MB RAM with the demo data.
 - GitHub Actions CI (`.github/workflows/ci.yml`): ruff, pytest on SQLite + PostgreSQL, E2E, image build and smoke run.
+- Release workflow (`.github/workflows/docker-publish.yml`): multi-arch image on GHCR, smoke-tested, SBOM/provenance, cosign signature.
 
 **Security review 14/10/2026:** 4 areas (authentication/sessions, authorization/multi-company, input/files, AI/secrets/deployment);
 every High/Medium finding has been fixed with tests (`tests/core/test_security.py`, `tests/security/`). Details:

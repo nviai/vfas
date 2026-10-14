@@ -118,6 +118,16 @@ Mandatory rules:
    update `README.vi.md` too.
 4. Open the pull request with the template and explain **why** the change is needed and how you tested it.
 
+## Releasing (maintainers)
+
+1. Update the version in `pyproject.toml` and `app/main.py`, move the "Unreleased" entries of `CHANGELOG.md` under the
+   new version with the date.
+2. Tag the commit on `main`: `git tag -s v2.1.0 -m "VFAS 2.1.0" && git push origin v2.1.0`.
+3. The "Docker image" workflow builds `linux/amd64` + `linux/arm64`, runs the smoke test, pushes
+   `ghcr.io/nviai/vfas:2.1.0`, `2.1`, `2` and `latest`, and signs the image with cosign. Every push to `main` also
+   publishes `edge`.
+4. First release only: make the `vfas` package public in the organization's GitHub Packages settings.
+
 ## License of contributions
 
 VFAS is licensed under the [MIT License](LICENSE) (copyright NVIAI CO., LTD.). By submitting a contribution you
