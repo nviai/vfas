@@ -23,6 +23,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - XML for HTKK / the e-tax portal: annual financial statements under TT133 (form 683: B01a, B02, B03, F01), CIT
   finalization 03/TNDN (form 892 v2.9.4 with appendix 03-1A) and PIT finalization 05/QTT-TNCN (form 953 v2.9.3 with
   appendices 05-1 and 05-2). All XML returns validate against the schemas shipped with HTKK 5.6.4.
+- PIT withholding return **05/KK-TNCN** (Thuế → Tờ khai 05/KK-TNCN): built from posted payroll runs, quarterly from
+  period 04/2026 (Resolution 66.16/2026/NQ-CP, Circular 89/2026/TT-BTC Article 22) and following the VAT period
+  before; per-employee details, finalize/reopen, PDF and HTKK XML (form 864 v2.9.3, the layout HTKK 5.8.0 still
+  files). The filing calendar reminds it quarterly and links to the return.
+- Supplementary returns (**01/KHBS**, **01-1/KHBS**) for 01/GTGT and 05/KK-TNCN: once a return is finalized, the
+  return page lists the differences between the books and the latest filed version and creates "Bổ sung lần thứ n"
+  with a reason; late-payment interest at 0.03%/day on an increase (Law 108/2025/QH15 Art. 16); PDF with the
+  explanation page and HTKK XML (`loaiTKhai` B, appendices `PL01_KHBS` + `PL01_1_KHBS`, validated against the KHBS
+  schemas). The latest supplement can be deleted; an original with supplements cannot be reopened.
+- CIT loss carry-forward (**03-2/TNDN**): the worksheet allocates losses of the previous 5 years oldest first (Law
+  67/2025/QH15 Art. 16, Decree 320/2025/ND-CP Art. 7), taking them from earlier finalized worksheets or from a table
+  entered by hand; [C3] is computed and the 03/TNDN XML carries appendix 03-2/TNDN.
+- Dependants of employees (name, birth date, tax code or ID document, relationship, deduction months) on the employee
+  page; the 05/QTT-TNCN XML now includes appendix **05-3/BK-QTT-TNCN**.
 
 ### Fixed
 - The 01/GTGT XML now validates against the HTKK schema: version 2.8.3, the required business-line/sub-item head
@@ -30,7 +44,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ### Upgrade notes
 - Migration `0004` adds `users.email_verified_at`; existing accounts are marked as verified. Migration `0005` adds the
-  e-invoice tables.
+  e-invoice tables. Migration `0006` adds `employee_dependents`.
 - `ALLOW_SIGNUP=true` without SMTP now logs a warning at startup: configure SMTP before opening public sign-up.
 - `docker-compose.yml` now uses the image `ghcr.io/nviai/vfas:${VFAS_VERSION:-latest}` instead of a local `vfas:latest`
   build; add `--build` to keep building from the source.

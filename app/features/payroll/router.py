@@ -1,7 +1,8 @@
 """Payroll routes.
 
 Employees, monthly payroll runs, posting, salary payment, insurance
-and PIT reports, and payroll parameters.
+and PIT reports, the 05/KK-TNCN withholding return, and payroll
+parameters.
 """
 
 from __future__ import annotations
@@ -32,13 +33,21 @@ from app.features.accounts.service import list_accounts
 from app.features.bank.service import list_bank_accounts
 from app.features.journal import service as js
 from app.features.org.models import Company
-from app.features.payroll import htkk, params, service
-from app.features.payroll.models import CONTRACT_TYPES, PayrollRun
+from app.features.payroll import htkk, htkk_kk, params, pit_return, service
+from app.features.payroll.models import (
+    CONTRACT_TYPES,
+    ID_TYPES,
+    RELATIONSHIPS,
+    PayrollRun,
+)
 from app.features.payroll.service import (
     EmployeeInput,
     decimal_field,
     money_field,
 )
+from app.features.vat import khbs
+from app.features.vat.models import FORM_PIT
+from app.features.vat.service import TaxPeriod
 
 router = APIRouter()
 
@@ -546,8 +555,57 @@ def employee_detail(
         if s.employee.id == e.id
     ]
     ctx = _employee_form_ctx(db, user, _employee_form(e), e, {})
-    ctx.update({"summary": summary[0] if summary else None, "year": year})
+    deps = service.list_dependents(db, user.company_id, e.id)
+    ctx.update(
+        {
+            "summary": summary[0] if summary else None,
+            "year": year,
+            "dependents": deps,
+            "active_dependents": service.active_dependents(
+                deps, today().year, today().month
+            ),
+            "relationships": list(RELATIONSHIPS.items()),
+            "id_types": list(ID_TYPES.items()),
+        }
+    )
     return render(request, "payroll/employee_form.html", ctx)
+
+
+@router.post("/payroll/employees/{employee_id}/dependents")
+def dependent_add(
+    request: Request,
+    employee_id: int,
+    form: dict = Depends(form_data),
+    user: CurrentUser = Depends(require("payroll.manage")),
+    db: Session = Depends(get_tenant_db),
+):
+    e = service.get_employee(db, user.company_id, employee_id)
+    d = service.add_dependent(db, get_ctx(request), e, form)
+    return redirect(
+        f"/payroll/employees/{e.id}#dependents",
+        f"Đã thêm người phụ thuộc {d.full_name}",
+        request=request,
+    )
+
+
+@router.post(
+    "/payroll/employees/{employee_id}/dependents/{dependent_id}/delete"
+)
+def dependent_delete(
+    request: Request,
+    employee_id: int,
+    dependent_id: int,
+    user: CurrentUser = Depends(require("payroll.manage")),
+    db: Session = Depends(get_tenant_db),
+):
+    e = service.get_employee(db, user.company_id, employee_id)
+    service.delete_dependent(db, get_ctx(request), e, dependent_id)
+    return redirect(
+        f"/payroll/employees/{e.id}#dependents",
+        "Đã xóa người phụ thuộc",
+        "warning",
+        request=request,
+    )
 
 
 @router.post("/payroll/employees/{employee_id}")
@@ -741,6 +799,263 @@ def reports_xlsx(
     return xlsx_response(
         book.to_bytes(),
         f"{name}-{year}{'-%02d' % month if month else ''}.xlsx",
+    )
+
+
+# ------------------------------------------------ 05/KK-TNCN return
+
+
+def _pit_url(p) -> str:
+    return f"/payroll/pit-returns/{p.period_type}/{p.year}/{p.period}"
+
+
+@router.get("/payroll/pit-returns")
+def pit_returns_page(
+    request: Request,
+    user: CurrentUser = Depends(require("payroll.view")),
+    db: Session = Depends(get_tenant_db),
+):
+    company = _company(db, user)
+    saved, latest = {}, {}
+    for d in pit_return.list_declarations(db, company.id):
+        key = (d.period_type, d.year, d.period)
+        if d.version == 0:
+            saved[key] = d
+        if key not in latest or d.version > latest[key].version:
+            latest[key] = d
+    rows = []
+    p = pit_return.period_of(company, today())
+    for _ in range(8):
+        d = saved.pop((p.period_type, p.year, p.period), None)
+        rows.append({"period": p, "decl": d, "ended": p.end < today()})
+        p = pit_return.previous(company, p)
+    for (pt, y, n), d in sorted(saved.items(), reverse=True):
+        rows.append({"period": TaxPeriod(pt, y, n), "decl": d, "ended": True})
+    for r in rows:
+        p = r["period"]
+        r["url"] = _pit_url(p)
+        r["due"] = pit_return.due_date(p)
+        r["latest"] = latest.get((p.period_type, p.year, p.period))
+    return render(
+        request,
+        "payroll/pit_returns.html",
+        {
+            "rows": rows,
+            "breadcrumbs": [
+                ("Lương", "/payroll"),
+                ("Tờ khai 05/KK-TNCN", None),
+            ],
+        },
+    )
+
+
+def _pit_period(period_type: str, year: int, period: int):
+    return pit_return.parse_period(period_type, year, period)
+
+
+@router.get("/payroll/pit-returns/{period_type}/{year:int}/{period:int}")
+def pit_return_page(
+    request: Request,
+    period_type: str,
+    year: int,
+    period: int,
+    user: CurrentUser = Depends(require("payroll.view")),
+    db: Session = Depends(get_tenant_db),
+):
+    company = _company(db, user)
+    if period_type == "month" and 1 <= period <= 12:
+        start = date(year, period, 1)
+        if start >= pit_return.QUARTERLY_FROM:
+            # Monthly filing ended with 03/2026: open the quarter.
+            return RedirectResponse(
+                _pit_url(pit_return.period_of(company, start)), 303
+            )
+    p = _pit_period(period_type, year, period)
+    decl = pit_return.get_declaration(db, company.id, p)
+    final = bool(decl and decl.status != "draft")
+    rows = pit_return.collect(db, company.id, p)
+    live = pit_return.compute(rows)
+    v = pit_return.latest_values(db, company.id, p) if final else live
+    sups = pit_return.supplements(db, company.id, p) if final else []
+    pending = (
+        khbs.compare(FORM_PIT, v, live, pit_return.KEYS, pit_return.LABELS)
+        if final
+        else []
+    )
+    return render(
+        request,
+        "payroll/pit_return.html",
+        {
+            "period": p,
+            "prev": pit_return.previous(company, p),
+            "next": pit_return.following(company, p),
+            "base": _pit_url(p),
+            "decl": decl,
+            "final": final,
+            "v": v,
+            "changed": final and v != live,
+            "supplements": sups,
+            "pending": pending,
+            "today": today(),
+            "rows": rows,
+            "labels": pit_return.LABELS,
+            "layout": pit_return.LAYOUT,
+            "counts": pit_return.COUNTS,
+            "unposted": pit_return.unposted_months(db, company.id, p),
+            "due": pit_return.due_date(p),
+            "company": company,
+            "breadcrumbs": [
+                ("Lương", "/payroll"),
+                ("Tờ khai 05/KK-TNCN", "/payroll/pit-returns"),
+                (p.label, None),
+            ],
+        },
+    )
+
+
+@router.post(
+    "/payroll/pit-returns/{period_type}/{year:int}/{period:int}/final"
+)
+def pit_return_final(
+    request: Request,
+    period_type: str,
+    year: int,
+    period: int,
+    user: CurrentUser = Depends(require("payroll.manage")),
+    db: Session = Depends(get_tenant_db),
+):
+    p = _pit_period(period_type, year, period)
+    pit_return.finalize(db, get_ctx(request), p)
+    return redirect(
+        _pit_url(p), f"Đã chốt tờ khai 05/KK-TNCN {p.label}", request=request
+    )
+
+
+@router.post(
+    "/payroll/pit-returns/{period_type}/{year:int}/{period:int}/reopen"
+)
+def pit_return_reopen(
+    request: Request,
+    period_type: str,
+    year: int,
+    period: int,
+    user: CurrentUser = Depends(require("payroll.manage")),
+    db: Session = Depends(get_tenant_db),
+):
+    p = _pit_period(period_type, year, period)
+    pit_return.reopen(db, get_ctx(request), p)
+    return redirect(
+        _pit_url(p),
+        f"Đã mở lại tờ khai 05/KK-TNCN {p.label}",
+        "warning",
+        request=request,
+    )
+
+
+@router.post(
+    "/payroll/pit-returns/{period_type}/{year:int}/{period:int}/supplements"
+)
+def pit_return_supplement(
+    request: Request,
+    period_type: str,
+    year: int,
+    period: int,
+    form: dict = Depends(form_data),
+    user: CurrentUser = Depends(require("payroll.manage")),
+    db: Session = Depends(get_tenant_db),
+):
+    p = _pit_period(period_type, year, period)
+    decl = pit_return.supplement(
+        db,
+        get_ctx(request),
+        p,
+        reason=form.get("reason") or "",
+        until=_date(form, "until") or today(),
+    )
+    return redirect(
+        _pit_url(p),
+        f"Đã lập tờ khai bổ sung lần {decl.version}",
+        request=request,
+    )
+
+
+@router.post(
+    "/payroll/pit-returns/{period_type}/{year:int}/{period:int}"
+    "/supplements/{version:int}/delete"
+)
+def pit_return_supplement_delete(
+    request: Request,
+    period_type: str,
+    year: int,
+    period: int,
+    version: int,
+    user: CurrentUser = Depends(require("payroll.manage")),
+    db: Session = Depends(get_tenant_db),
+):
+    p = _pit_period(period_type, year, period)
+    khbs.delete_latest(db, get_ctx(request), FORM_PIT, p, version)
+    return redirect(
+        _pit_url(p),
+        f"Đã xóa tờ khai bổ sung lần {version}",
+        "warning",
+        request=request,
+    )
+
+
+@router.get("/payroll/pit-returns/{period_type}/{year:int}/{period:int}.xml")
+def pit_return_xml(
+    period_type: str,
+    year: int,
+    period: int,
+    version: int = 0,
+    user: CurrentUser = Depends(require("payroll.export")),
+    db: Session = Depends(get_tenant_db),
+):
+    company = _company(db, user)
+    p = _pit_period(period_type, year, period)
+    v, sup = pit_return.export(db, company.id, p, version)
+    appendices = khbs.appendices_xml(company, htkk_kk.FORM, sup) if sup else ""
+    return xml_response(
+        htkk_kk.build_xml(
+            company, p, v, version=version, appendices=appendices
+        ),
+        f"05KK-TNCN-{company.tax_code or 'mst'}-{p.year}-"
+        f"{p.period_type[0].upper()}{p.period:02d}"
+        + (f"-BS{version}" if version else "")
+        + ".xml",
+    )
+
+
+@router.get("/payroll/pit-returns/{period_type}/{year:int}/{period:int}.pdf")
+def pit_return_pdf(
+    period_type: str,
+    year: int,
+    period: int,
+    version: int = 0,
+    user: CurrentUser = Depends(require("payroll.export")),
+    db: Session = Depends(get_tenant_db),
+):
+    company = _company(db, user)
+    p = _pit_period(period_type, year, period)
+    v, sup = pit_return.export(db, company.id, p, version)
+    pdf = render_pdf(
+        "payroll/print/pit_kk.html",
+        {
+            "company": company,
+            "period": p,
+            "v": v,
+            "labels": pit_return.LABELS,
+            "layout": pit_return.LAYOUT,
+            "counts": pit_return.COUNTS,
+            "sup": sup,
+            "form_name": "Tờ khai khấu trừ thuế TNCN (05/KK-TNCN)",
+        },
+    )
+    return pdf_response(
+        pdf,
+        f"to-khai-05KK-TNCN-{p.year}-{p.period}"
+        + (f"-BS{version}" if version else "")
+        + ".pdf",
     )
 
 

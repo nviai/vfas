@@ -82,6 +82,64 @@ class Employee(TenantMixin, Base):
         return CONTRACT_TYPES.get(self.contract_type, self.contract_type)
 
 
+# Relationship codes of HTKK (Catalogue_QHNNT).
+RELATIONSHIPS = {
+    "01": "Con",
+    "02": "Vợ/chồng",
+    "03": "Cha/mẹ",
+    "04": "Khác",
+}
+# Identity document codes of appendix 05-3/BK-QTT-TNCN.
+ID_TYPES = {
+    "2080": "Thẻ CCCD",
+    "1080": "CMND",
+    "1020": "Hộ chiếu",
+    "3000": "Giấy tờ khác",
+}
+
+
+class EmployeeDependent(TenantMixin, Base):
+    """A dependant registered for an employee's family deduction.
+
+    Reported in appendix 05-3/BK-QTT-TNCN of the annual PIT
+    finalization. The payroll still deducts `Employee.dependents`
+    people per month.
+    """
+
+    __tablename__ = "employee_dependents"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    employee_id: Mapped[int] = mapped_column(
+        ForeignKey("employees.id", ondelete="CASCADE"), index=True
+    )
+    full_name: Mapped[str] = mapped_column(String(200))
+    birth_date: Mapped[date | None] = mapped_column(Date)
+    tax_code: Mapped[str] = mapped_column(String(14), default="")
+    id_type: Mapped[str] = mapped_column(String(4), default="2080")
+    id_number: Mapped[str] = mapped_column(String(30), default="")
+    relationship: Mapped[str] = mapped_column(String(2), default="01")
+    # First day of the first and last month of the deduction.
+    from_month: Mapped[date] = mapped_column(Date)
+    to_month: Mapped[date | None] = mapped_column(Date)
+    created_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
+
+    @property
+    def relationship_label(self) -> str:
+        return RELATIONSHIPS.get(self.relationship, self.relationship)
+
+    @property
+    def id_type_label(self) -> str:
+        return ID_TYPES.get(self.id_type, self.id_type)
+
+    def active_in(self, year: int, month: int) -> bool:
+        d = date(year, month, 1)
+        return self.from_month <= d and (
+            self.to_month is None or d <= self.to_month
+        )
+
+
 class PayrollParam(TenantMixin, Base):
     """A payroll/tax parameter effective from `effective_from`.
 

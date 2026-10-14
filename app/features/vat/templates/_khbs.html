@@ -1,0 +1,53 @@
+{# Supplementary returns card. Expects: base (return URL), supplements
+   (list of khbs.Supplement), pending (changes not filed yet),
+   khbs_perm (permission to create/delete), export_perm, today. #}
+{% import "macros.html" as ui with context %}
+{% call ui.card(_("Khai bổ sung (01/KHBS, 01-1/KHBS)"), _("Mỗi lần bổ sung là toàn bộ tờ khai với số liệu đúng kèm bản giải trình"), flush=True, icon_name="git-compare") %}
+  {% if supplements %}
+  <div class="table-wrap">
+    <table class="table table-compact">
+      <thead><tr><th class="w-16">{{ _("Lần") }}</th><th>{{ _("Lý do") }}</th><th class="num w-36">{{ _("Phải nộp tăng/giảm") }}</th><th class="num w-32 max-md:hidden">{{ _("Tiền chậm nộp") }}</th><th class="w-28"></th></tr></thead>
+      <tbody>
+        {% for s in supplements %}
+        <tr>
+          <td class="tabular-nums font-medium">{{ _("BS lần {n}", n=s.version) }}</td>
+          <td class="text-fg-2">{{ s.reason }}
+            <p class="text-xs text-fg-3">{% for c in s.changes %}[{{ c.code }}] {{ c.declared|money }} → {{ c.adjusted|money }}{{ "; " if not loop.last }}{% endfor %}</p></td>
+          <td class="num {{ 'text-rose-600 dark:text-rose-400' if s.payable > 0 }}">{{ ("+" if s.payable > 0 else "") ~ s.payable|money }}
+            {% if s.deductible %}<p class="text-xs text-fg-3">{{ _("Khấu trừ") }} {{ ("+" if s.deductible > 0 else "") ~ s.deductible|money }}</p>{% endif %}</td>
+          <td class="num max-md:hidden">{{ s.interest|money0 }}{% if s.days %}<p class="text-xs text-fg-3">{{ _("{n} ngày", n=s.days) }}</p>{% endif %}</td>
+          <td class="text-right whitespace-nowrap">
+            {% if can(export_perm) %}
+              {{ ui.icon_button("file-text", _("PDF"), href=base ~ ".pdf?version=" ~ s.version, attrs='target="_blank"') }}
+              {{ ui.icon_button("file-down", _("XML"), href=base ~ ".xml?version=" ~ s.version) }}
+            {% endif %}
+            {% if loop.last and can(khbs_perm) %}
+              <form method="post" action="{{ base }}/supplements/{{ s.version }}/delete" class="inline" data-confirm="{{ _('Xóa lần khai bổ sung này?') }}">{{ ui.csrf_field() }}
+                <button type="submit" class="btn-ghost btn-sm btn-icon" aria-label="{{ _('Xóa') }}" data-tooltip="{{ _('Xóa') }}">{{ ui.icon("trash-2", "size-4") }}</button></form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+  <div class="px-5 py-4 {{ 'border-t border-line' if supplements }}">
+  {% if pending %}
+    <p class="text-[13px] font-medium">{{ _("Chênh lệch so với lần khai gần nhất") }}</p>
+    <ul class="mt-1 space-y-0.5 text-[13px] text-fg-2">
+      {% for c in pending %}<li><span class="tabular-nums text-fg-3">[{{ c.code }}]</span> {{ _(c.label) }}: <span class="tabular-nums">{{ c.declared|money }} → {{ c.adjusted|money }}</span></li>{% endfor %}
+    </ul>
+    {% if can(khbs_perm) %}
+    <form method="post" action="{{ base }}/supplements" class="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_11rem_auto] sm:items-end">
+      {{ ui.csrf_field() }}
+      {{ ui.input("reason", _("Lý do khai bổ sung"), required=True, placeholder=_("VD: bổ sung thu nhập tháng 8 chưa kê khai")) }}
+      {{ ui.input("until", _("Ngày nộp tiền dự kiến"), value=today.isoformat(), type="date", hint=_("Để tính tiền chậm nộp")) }}
+      <div>{{ ui.button(_("Lập tờ khai bổ sung"), "primary", icon_name="file-plus") }}</div>
+    </form>
+    {% endif %}
+  {% else %}
+    <p class="text-[13px] text-fg-3">{{ _("Số liệu hiện tại khớp với lần khai gần nhất.") }}</p>
+  {% endif %}
+  </div>
+{% endcall %}

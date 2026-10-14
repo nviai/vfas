@@ -3,7 +3,9 @@
 HTKK form 892, XML version 2.9.4 (CIT Law 67/2025: rates 15/17/20%),
 checked against the official schema 03_TNDN_TT80_294.xsd. Includes
 appendix 03-1A/TNDN (income statement of a production, trading or
-service company) built from B02-DNN.
+service company) built from B02-DNN and, when losses are carried,
+appendix 03-2/TNDN (loss carry-forward of the production and business
+activity; losses from real-estate transfers are not tracked).
 
 The CIT worksheet (vat/cit.py) keeps the short letter keys of the
 main indicators; the mapping to the form is:
@@ -33,7 +35,7 @@ from datetime import date
 from sqlalchemy.orm import Session
 
 from app.core import htkk
-from app.core.htkk import el, num
+from app.core.htkk import el, nil, num
 from app.core.regimes import regime_of
 from app.features.gl import books, periods, statements
 from app.features.org.models import Company
@@ -107,6 +109,39 @@ def appendix_1a(db: Session, company: Company, year: int) -> dict:
     a["21"] = a["19"] - a["20"]
     a["22"] = a["18"] + a["21"]
     return a
+
+
+def appendix_2(losses: list[dict]) -> str:
+    """PLuc_03_2_TNDN: up to 5 loss years, oldest first."""
+    if not losses:
+        return ""
+    rows = []
+    for i in range(5):
+        tag = f"noiDungNamThu{i + 1}"
+        if i < len(losses):
+            r = losses[i]
+            rows.append(
+                f"<{tag}>"
+                + el("ct2", r["year"])
+                + num("ct3", r["loss"])
+                + num("ct4", r["before"])
+                + num("ct5", r["carry"])
+                + num("ct6", r["remaining"])
+                + f"</{tag}>"
+            )
+        else:
+            rows.append(
+                f"<{tag}>"
+                + "".join(nil(f"ct{k}") for k in range(2, 7))
+                + f"</{tag}>"
+            )
+    return (
+        "<PLuc_03_2_TNDN><Lo_HDSXKD><BangChiTietSoLo>"
+        + "".join(rows)
+        + "</BangChiTietSoLo>"
+        + num("tongCong", sum(r["carry"] for r in losses))
+        + "</Lo_HDSXKD></PLuc_03_2_TNDN>"
+    )
 
 
 def main_values(v: dict) -> dict:
@@ -232,6 +267,7 @@ def build_xml(
         "<PLuc_03_1A_TNDN>"
         + "".join(num(f"ct{k:02d}", a[f"{k:02d}"]) for k in range(4, 23))
         + "</PLuc_03_1A_TNDN>"
+        + appendix_2(values.get("_losses") or [])
     )
     return htkk.document(
         company,

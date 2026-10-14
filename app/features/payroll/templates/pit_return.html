@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Tờ khai 05/KK-TNCN") }} {{ _(period.label) }}{% endblock %}
+{% block content %}
+{% set crumbs = [] %}{% for b in breadcrumbs %}{% do crumbs.append((_(b[0]), b[1])) %}{% endfor %}
+{% call ui.page_header(_("Tờ khai khấu trừ thuế TNCN") ~ " " ~ _(period.label), _("Mẫu số 05/KK-TNCN – tiền lương, tiền công"), breadcrumbs=crumbs, back="/payroll/pit-returns",
+                       badge=(ui.badge(_("Đã chốt"), "green", dot=True) if final else ui.status_badge("draft"))) %}
+  {{ ui.icon_button("chevron-left", _("Kỳ trước"), href="/payroll/pit-returns/" ~ prev.period_type ~ "/" ~ prev.year ~ "/" ~ prev.period, variant="secondary") }}
+  {{ ui.icon_button("chevron-right", _("Kỳ sau"), href="/payroll/pit-returns/" ~ next.period_type ~ "/" ~ next.year ~ "/" ~ next.period, variant="secondary") }}
+  {% if can("payroll.export") %}
+    {% call ui.dropdown(_("Xuất"), icon_name="download", width="w-64") %}
+      {{ ui.menu_item(_("Tờ khai PDF"), base ~ ".pdf", "file-text", attrs='target="_blank"') }}
+      {{ ui.menu_item(_("XML nộp qua HTKK / eTax"), base ~ ".xml", "file-down") }}
+    {% endcall %}
+  {% endif %}
+{% endcall %}
+
+{% if unposted %}{{ ui.alert(_("Bảng lương chưa ghi sổ không được tính vào tờ khai:") ~ " " ~ unposted|join(", "), "warning", cls="mb-5") }}{% endif %}
+{% if changed %}{{ ui.alert(_("Số liệu bảng lương đã thay đổi sau khi chốt tờ khai. Nếu tờ khai đã nộp, lập tờ khai bổ sung."), "warning", cls="mb-5") }}{% endif %}
+{% set khbs_perm, export_perm = "payroll.manage", "payroll.export" %}
+
+<div class="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_20rem]">
+  <div class="min-w-0 space-y-5">
+    {% call ui.card(flush=True) %}
+    <div class="border-b border-line px-5 py-4">{{ ui.official_header(company, "05/KK-TNCN", regime_note="Ban hành kèm theo Thông tư số 80/2021/TT-BTC ngày 29/9/2021 của Bộ Tài chính") }}
+      <p class="mt-3 text-[13px]"><span class="font-semibold">[01]</span> {{ _("Kỳ tính thuế") }}: {{ _(period.label) }} · {% if supplements %}<span class="font-semibold">[03]</span> {{ _("Bổ sung lần thứ {n}", n=supplements[-1].version) }}{% else %}<span class="font-semibold">[02]</span> {{ _("Lần đầu") }}{% endif %} · <span class="font-semibold">[04]</span> {{ company.name }} · <span class="font-semibold">[05]</span> {{ company.tax_code or "–" }}</p>
+    </div>
+    <div class="table-wrap">
+      <table class="table table-compact">
+        <thead><tr><th class="w-12 text-center">{{ _("STT") }}</th><th class="sm:min-w-64">{{ _("Chỉ tiêu") }}</th><th class="w-16 text-center max-sm:hidden">{{ _("Mã") }}</th><th class="w-16 max-sm:hidden">{{ _("ĐVT") }}</th><th class="num w-40">{{ _("Số người/Số tiền") }}</th></tr></thead>
+        <tbody>
+          {% for no, code, formula, level in layout %}
+          <tr class="{{ 'bg-surface-2/60' if level == 0 }}">
+            <td class="text-center text-fg-3 tabular-nums">{{ no }}</td>
+            <td class="{{ 'font-semibold' if level == 0 }}" style="padding-left: {{ 0.75 + level * 1.1 }}rem">{{ _(labels[code]) }}{% if formula %} <span class="text-xs font-normal text-fg-3">{{ formula }}</span>{% endif %}
+              <span class="ml-1 text-xs text-fg-3 tabular-nums sm:hidden">[{{ code }}]</span></td>
+            <td class="text-center text-xs text-fg-3 tabular-nums max-sm:hidden">[{{ code }}]</td>
+            <td class="text-fg-3 max-sm:hidden">{{ _("Người") if code in counts else "VNĐ" }}</td>
+            <td class="num {{ 'font-semibold' if code == '29' }}">{{ v.get(code, 0)|money }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endcall %}
+
+    {% if final %}{% include "vat/_khbs.html" %}{% endif %}
+
+    {% call ui.card(_("Chi tiết theo nhân viên"), _("Bảng lương đã ghi sổ của các tháng trong kỳ"), flush=True) %}
+    {% if not rows %}
+      {{ ui.empty_state(_("Chưa có bảng lương đã ghi sổ trong kỳ"), "file-spreadsheet", compact=True) }}
+    {% else %}
+    <div class="table-wrap">
+      <table class="table table-compact">
+        <thead><tr><th>{{ _("Nhân viên") }}</th><th class="max-md:hidden">{{ _("Diện") }}</th><th class="num">{{ _("Thu nhập chịu thuế") }}</th><th class="num max-lg:hidden">{{ _("TNCT thuộc diện khấu trừ") }}</th><th class="num">{{ _("Thuế đã khấu trừ") }}</th></tr></thead>
+        <tbody>
+          {% for r in rows %}
+          <tr><td><p class="font-medium">{{ r.employee.full_name }}</p><p class="text-xs text-fg-3">{{ r.employee.code }} · {{ r.months }} {{ _("tháng") }}</p></td>
+            <td class="max-md:hidden text-fg-2">{{ _("Cư trú") if r.resident else _("Không cư trú") }}{% if r.long_contract %} · {{ _("HĐLĐ ≥ 3 tháng") }}{% endif %}</td>
+            <td class="num">{{ r.taxable_income|money }}</td><td class="num max-lg:hidden text-fg-2">{{ r.withheld_income|money0 }}</td><td class="num font-medium">{{ r.pit|money0 }}</td></tr>
+          {% endfor %}
+        </tbody>
+        <tfoot><tr class="row-total"><td>{{ _("Cộng") }}</td><td class="max-md:hidden"></td><td class="num">{{ rows|sum(attribute="taxable_income")|money }}</td><td class="num max-lg:hidden">{{ rows|sum(attribute="withheld_income")|money }}</td><td class="num">{{ rows|sum(attribute="pit")|money }}</td></tr></tfoot>
+      </table>
+    </div>
+    {% endif %}
+    {% endcall %}
+  </div>
+
+  <aside class="space-y-5">
+    <section class="card p-5">
+      <p class="text-[13px] font-medium text-fg-3">{{ _("Thuế TNCN đã khấu trừ [29]") }}</p>
+      <p class="mt-1 text-3xl font-semibold tracking-tight tabular-nums">{{ v.get("29", 0)|money }} <span class="text-base font-normal text-fg-3">đ</span></p>
+      <p class="mt-2 text-[13px] text-fg-3">{{ period.start|date }} – {{ period.end|date }}</p>
+      <p class="text-[13px] text-fg-3">{{ _("Hạn nộp") }}: {{ due|date }}</p>
+      {% if can("payroll.manage") %}
+      <div class="mt-4">
+        {% if not final %}
+        <form method="post" action="{{ base }}/final" data-confirm="{{ _('Chốt tờ khai? Số liệu được lưu lại để đối chiếu khi khai bổ sung.') }}">{{ ui.csrf_field() }}
+          <button type="submit" class="btn-primary w-full">{{ ui.icon("lock") }}<span>{{ _("Chốt tờ khai") }}</span></button></form>
+        {% else %}
+        <form method="post" action="{{ base }}/reopen" data-confirm="{{ _('Mở lại tờ khai đã chốt?') }}">{{ ui.csrf_field() }}
+          <button type="submit" class="btn-secondary w-full">{{ ui.icon("unlock") }}<span>{{ _("Mở lại để sửa") }}</span></button></form>
+        {% endif %}
+      </div>
+      {% endif %}
+    </section>
+    {{ ui.alert(_("File XML theo mẫu HTKK 05/KK-TNCN (TT80/2021) mà HTKK và eTax đang nhận. Mở bằng HTKK (Nhập tờ khai từ XML) để kiểm tra trước khi ký và nộp."), "info") }}
+  </aside>
+</div>
+{% endblock %}

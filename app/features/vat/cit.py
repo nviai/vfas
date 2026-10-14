@@ -9,6 +9,14 @@ total revenue is <= VND 3 billion; 17% if > 3 billion and <= 50
 billion; 20% otherwise. The 15%/17% rates do not apply to subsidiaries
 or affiliates that do not meet the conditions, so the rate can be
 chosen manually.
+
+Loss carry-forward (appendix 03-2/TNDN): a loss is carried to the 5
+following years (CIT Law 67/2025/QH15, Article 16(1); Decree
+320/2025/ND-CP, Article 7). The loss of a year is its negative income
+after exempt income ([B12] - [C2]) in a finalized worksheet of VFAS,
+or entered by hand; the amounts already carried come from later
+finalized worksheets. The carry of the year is allocated oldest loss
+first, up to the year's [B12] - [C2].
 """
 
 from __future__ import annotations
@@ -24,14 +32,15 @@ from app.core.errors import BusinessError
 from app.features.journal.queries import account_match, ledger_source
 from app.features.vat.models import FORM_CIT, TaxDeclaration
 
-MANUAL = ("B1", "B8", "C2", "C3", "C5", "C9")
+MANUAL = ("B1", "B8", "C2", "C5", "C9")
+LOSS_YEARS = 5
 LABELS = {
     "A1": "Tổng lợi nhuận kế toán trước thuế TNDN",
     "B1": "Điều chỉnh tăng lợi nhuận trước thuế (chi phí không được trừ, …)",
     "B8": "Điều chỉnh giảm lợi nhuận trước thuế",
     "B12": "Tổng thu nhập chịu thuế (A1 + B1 − B8)",
     "C2": "Thu nhập miễn thuế",
-    "C3": "Lỗ từ các năm trước được chuyển",
+    "C3": "Lỗ từ các năm trước được chuyển (phụ lục 03-2/TNDN)",
     "C4": "Thu nhập tính thuế (B12 − C2 − C3)",
     "C5": "Trích lập quỹ phát triển khoa học và công nghệ",
     "C6": "Thu nhập tính thuế sau khi trích quỹ (C4 − C5)",
@@ -135,12 +144,77 @@ def rate_for_revenue(prev_revenue: int | None) -> int:
     return 20
 
 
+def loss_history(db: Session, company_id: int, year: int) -> list[dict]:
+    """Losses of the previous 5 years found in finalized worksheets.
+
+    Each row: {year, loss, before} where `before` is what later
+    finalized worksheets (up to `year` - 1) already carried.
+    """
+    decls = {
+        d.year: d
+        for d in db.scalars(
+            select(TaxDeclaration).where(
+                TaxDeclaration.company_id == company_id,
+                TaxDeclaration.form == FORM_CIT,
+                TaxDeclaration.version == 0,
+                TaxDeclaration.status != "draft",
+                TaxDeclaration.year >= year - LOSS_YEARS,
+                TaxDeclaration.year < year,
+            )
+        )
+    }
+    rows = []
+    for y in range(year - LOSS_YEARS, year):
+        d = decls.get(y)
+        loss = (
+            int(d.values.get("C2") or 0) - int(d.values.get("B12") or 0)
+            if d
+            else 0
+        )
+        if loss <= 0:
+            continue
+        before = sum(
+            int(r.get("carry") or 0)
+            for later in decls.values()
+            if later.year > y
+            for r in later.values.get("_losses") or []
+            if int(r.get("year") or 0) == y
+        )
+        rows.append({"year": y, "loss": loss, "before": before})
+    return rows
+
+
+def carry_losses(rows: list[dict], year: int, available: int) -> list[dict]:
+    """Allocate the carry of the year, oldest loss first."""
+    out = []
+    left = max(0, available)
+    for r in sorted(rows, key=lambda r: int(r.get("year") or 0)):
+        y = int(r.get("year") or 0)
+        loss = max(0, int(r.get("loss") or 0))
+        before = min(loss, max(0, int(r.get("before") or 0)))
+        if not (year - LOSS_YEARS <= y < year) or not loss:
+            continue
+        carry = min(loss - before, left)
+        left -= carry
+        out.append(
+            {
+                "year": y,
+                "loss": loss,
+                "before": before,
+                "carry": carry,
+                "remaining": loss - before - carry,
+            }
+        )
+    return out
+
+
 def compute(
     db: Session,
     company_id: int,
     year: int,
     manual: dict | None = None,
     rate: int | None = None,
+    losses: list[dict] | None = None,
 ) -> dict:
     m = {k: int((manual or {}).get(k) or 0) for k in MANUAL}
     start, end = date(year, 1, 1), date(year, 12, 31)
@@ -152,6 +226,10 @@ def compute(
     r = rate if rate in (15, 17, 20, 25) else auto_rate
     v: dict = {"A1": pl.profit_before_tax, **m}
     v["B12"] = v["A1"] + v["B1"] - v["B8"]
+    if losses is None:
+        losses = loss_history(db, company_id, year)
+    v["_losses"] = carry_losses(losses, year, v["B12"] - v["C2"])
+    v["C3"] = sum(r["carry"] for r in v["_losses"])
     v["C4"] = max(0, v["B12"] - v["C2"] - v["C3"])
     v["C5"] = min(v["C5"], v["C4"])
     v["C6"] = v["C4"] - v["C5"]
@@ -194,7 +272,12 @@ def build(
         return dict(decl.values), decl
     stored = (decl.values or {}) if decl else {}
     return compute(
-        db, company_id, year, stored.get("manual"), stored.get("rate")
+        db,
+        company_id,
+        year,
+        stored.get("manual"),
+        stored.get("rate"),
+        stored.get("losses"),
     ), decl
 
 
@@ -205,12 +288,25 @@ def save(
     manual: dict,
     rate: int | None,
     finalize: bool = False,
+    losses: list[dict] | None = None,
 ) -> TaxDeclaration:
     decl = get(db, ctx.company_id, year)
     if decl is not None and decl.status != "draft":
         raise BusinessError(f"Bảng tính thuế TNDN năm {year} đã chốt")
     if any(int(manual.get(k) or 0) < 0 for k in MANUAL):
         raise BusinessError("Số điều chỉnh không được âm")
+    for r in losses or []:
+        if not (year - LOSS_YEARS <= int(r["year"]) < year):
+            raise BusinessError(
+                f"Lỗ năm {r['year']} không còn được chuyển sang năm {year} "
+                f"(tối đa {LOSS_YEARS} năm)"
+            )
+        if int(r["loss"]) < 0 or int(r["before"]) < 0:
+            raise BusinessError("Số lỗ không được âm")
+        if int(r["before"]) > int(r["loss"]):
+            raise BusinessError(
+                f"Lỗ năm {r['year']}: số đã chuyển lớn hơn số lỗ phát sinh"
+            )
     if decl is None:
         decl = TaxDeclaration(
             company_id=ctx.company_id,
@@ -228,12 +324,14 @@ def save(
         "manual": {k: int(manual.get(k) or 0) for k in MANUAL},
         "rate": rate,
     }
-    values = compute(db, ctx.company_id, year, stored["manual"], rate)
-    decl.values = (
-        values | {"manual": stored["manual"], "rate": rate}
-        if finalize
-        else stored
+    if losses is not None:
+        stored["losses"] = [
+            {k: int(r[k]) for k in ("year", "loss", "before")} for r in losses
+        ]
+    values = compute(
+        db, ctx.company_id, year, stored["manual"], rate, stored.get("losses")
     )
+    decl.values = values | stored if finalize else stored
     decl.updated_at = _now()
     if finalize:
         decl.status = "final"
@@ -260,6 +358,7 @@ def reopen(db: Session, ctx, year: int) -> None:
     decl.values = {
         "manual": values.get("manual", {}),
         "rate": values.get("rate"),
+        **({"losses": values["losses"]} if "losses" in values else {}),
     }
     decl.status = "draft"
     write_audit(

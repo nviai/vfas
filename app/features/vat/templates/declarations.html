@@ -15,14 +15,15 @@
       <thead><tr><th>{{ _("Kỳ tính thuế") }}</th><th class="w-36 max-sm:hidden">{{ _("Từ – đến") }}</th>
         <th class="num w-40">{{ _("Phải nộp [40]") }}</th><th class="num w-40 max-md:hidden">{{ _("Chuyển kỳ sau [43]") }}</th><th class="w-36">{{ _("Trạng thái") }}</th><th class="w-10"></th></tr></thead>
       <tbody>
-        {% for r in rows %}{% set p = r.period %}{% set d = r.decl %}
+        {% for r in rows %}{% set p = r.period %}{% set d = r.decl %}{% set last = r.latest %}
         <tr class="is-link">
           <td><a class="font-medium text-fg hover:underline" href="/vat/declarations/{{ p.period_type }}/{{ p.year }}/{{ p.period }}">{{ _(p.label) }}</a></td>
           <td class="max-sm:hidden tabular-nums text-fg-3">{{ p.start|date }} – {{ p.end|date }}</td>
-          <td class="num">{{ d.values["40"]|money if d and "40" in d.values else "–" }}</td>
-          <td class="num max-md:hidden">{{ d.values["43"]|money if d and "43" in d.values else "–" }}</td>
+          <td class="num">{{ last.values["40"]|money if last and "40" in last.values else "–" }}</td>
+          <td class="num max-md:hidden">{{ last.values["43"]|money if last and "43" in last.values else "–" }}</td>
           <td>
-            {% if d and d.status != "draft" %}{{ ui.badge(_("Đã chốt"), "green", dot=True) }}
+            {% if last and last.version %}{{ ui.badge(_("BS lần {n}", n=last.version), "violet", dot=True) }}
+            {% elif d and d.status != "draft" %}{{ ui.badge(_("Đã chốt"), "green", dot=True) }}
             {% elif d %}{{ ui.status_badge("draft") }}
             {% elif r.ended %}{{ ui.badge(_("Chưa lập"), "amber", dot=True) }}
             {% else %}{{ ui.badge(_("Kỳ hiện tại"), "blue", dot=True) }}{% endif %}

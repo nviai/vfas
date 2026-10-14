@@ -21,6 +21,15 @@
     {% endfor %}
   </tbody>
 </table>
+{% if v._losses %}
+<p class="b" style="margin-top:3mm">Chuyển lỗ (phụ lục 03-2/TNDN)</p>
+<table class="grid">
+  <thead><tr><th>Năm phát sinh lỗ</th><th>Số lỗ phát sinh</th><th>Số lỗ đã chuyển trong các kỳ tính thuế trước</th><th>Số lỗ được chuyển trong kỳ tính thuế này</th><th>Số lỗ còn được chuyển sang các kỳ tính thuế sau</th></tr></thead>
+  <tbody>
+    {% for r in v._losses %}<tr><td class="c">{{ r.year }}</td><td class="num">{{ r.loss|money }}</td><td class="num">{{ r.before|money }}</td><td class="num">{{ r.carry|money }}</td><td class="num">{{ r.remaining|money }}</td></tr>{% endfor %}
+  </tbody>
+</table>
+{% endif %}
 <p class="note">Lợi nhuận kế toán lấy từ phát sinh các tài khoản 511, 515, 711, 632, 635, 642, 811 trong năm (không gồm bút toán kết chuyển). Thuế suất theo Luật Thuế TNDN số 67/2025/QH15.</p>
 <table class="signatures"><tr>
   <td style="width:33%"><p class="role">Người lập biểu</p><p class="hint">(Ký, họ tên)</p><p class="name">{{ company.preparer }}</p></td>

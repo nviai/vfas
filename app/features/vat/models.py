@@ -1,7 +1,8 @@
-"""Prepared tax returns (01/GTGT, 03/TNDN).
+"""Prepared tax returns (01/GTGT, 03/TNDN, 05/KK-TNCN).
 
 Figures are stored so that [43] of one period can be carried forward
-to [22] of the next.
+to [22] of the next, and so that a supplementary return can be
+compared with what was filed.
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ from app.core.db import Base, TenantMixin
 
 FORM_VAT = "01/GTGT"
 FORM_CIT = "03/TNDN"
+FORM_PIT = "05/KK-TNCN"
 
 
 class TaxDeclaration(TenantMixin, Base):

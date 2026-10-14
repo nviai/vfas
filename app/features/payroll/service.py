@@ -29,7 +29,10 @@ from app.features.partners.models import Partner
 from app.features.payroll import calc, params
 from app.features.payroll.models import (
     CONTRACT_TYPES,
+    ID_TYPES,
+    RELATIONSHIPS,
     Employee,
+    EmployeeDependent,
     PayrollLine,
     PayrollRun,
 )
@@ -784,9 +787,17 @@ def create_payment(
 # ------------------------------------------------------------ summaries
 
 
-def _posted_lines(
-    db: Session, company_id: int, year: int, month: int | None = None
+def posted_lines(
+    db: Session,
+    company_id: int,
+    year: int,
+    month: int | None = None,
+    *,
+    months: tuple[int, ...] | None = None,
 ) -> list[PayrollLine]:
+    """Lines of posted payroll runs of a year, one month or a set of
+    months (a quarter).
+    """
     stmt = (
         select(PayrollLine)
         .join(PayrollRun, PayrollRun.id == PayrollLine.run_id)
@@ -803,6 +814,8 @@ def _posted_lines(
     )
     if month:
         stmt = stmt.where(PayrollRun.month == month)
+    if months:
+        stmt = stmt.where(PayrollRun.month.in_(months))
     return list(db.scalars(stmt))
 
 
@@ -833,7 +846,7 @@ def year_summary(
 ) -> list[EmpSummary]:
     """Per-employee totals of posted payroll runs in a year or month."""
     by_emp: dict[int, EmpSummary] = {}
-    for ln in _posted_lines(db, company_id, year, month):
+    for ln in posted_lines(db, company_id, year, month):
         s = by_emp.get(ln.employee_id)
         if s is None:
             s = by_emp[ln.employee_id] = EmpSummary(
@@ -871,3 +884,117 @@ def months_unposted(
         if period_end(run.year, run.month) < before and run.status != POSTED:
             out.append(run)
     return out
+
+
+# ----------------------------------------------------------- dependants
+
+
+def list_dependents(
+    db: Session, company_id: int, employee_id: int | None = None
+) -> list[EmployeeDependent]:
+    stmt = select(EmployeeDependent).where(
+        EmployeeDependent.company_id == company_id
+    )
+    if employee_id is not None:
+        stmt = stmt.where(EmployeeDependent.employee_id == employee_id)
+    return list(
+        db.scalars(
+            stmt.order_by(EmployeeDependent.from_month, EmployeeDependent.id)
+        )
+    )
+
+
+def _month(value, label: str, required: bool = True) -> date | None:
+    """First day of a month typed as YYYY-MM (or a full date)."""
+    raw = (str(value or "")).strip()
+    if not raw:
+        if required:
+            raise BusinessError(f"Chưa nhập {label}")
+        return None
+    try:
+        y, m = (int(x) for x in raw.split("-")[:2])
+        return date(y, m, 1)
+    except ValueError as e:
+        raise BusinessError(f"{label.capitalize()} không hợp lệ") from e
+
+
+def add_dependent(
+    db: Session, ctx, employee: Employee, form: dict
+) -> EmployeeDependent:
+    name = (form.get("full_name") or "").strip()
+    if not name:
+        raise BusinessError("Chưa nhập họ tên người phụ thuộc")
+    tax_code = (form.get("tax_code") or "").strip()
+    id_number = (form.get("id_number") or "").strip()
+    if tax_code and not (tax_code.isdigit() and len(tax_code) in (10, 12)):
+        raise BusinessError("Mã số thuế người phụ thuộc phải có 10 hoặc 12 số")
+    if not tax_code and not id_number:
+        raise BusinessError(
+            "Nhập mã số thuế hoặc số giấy tờ của người phụ thuộc"
+        )
+    relationship = form.get("relationship") or "01"
+    id_type = form.get("id_type") or "2080"
+    if relationship not in RELATIONSHIPS or id_type not in ID_TYPES:
+        raise BusinessError("Dữ liệu không hợp lệ")
+    start = _month(form.get("from_month"), "tháng bắt đầu giảm trừ")
+    end = _month(form.get("to_month"), "tháng kết thúc", required=False)
+    if end is not None and end < start:
+        raise BusinessError("Tháng kết thúc trước tháng bắt đầu giảm trừ")
+    birth = (form.get("birth_date") or "").strip()
+    try:
+        birth_date = date.fromisoformat(birth) if birth else None
+    except ValueError as e:
+        raise BusinessError("Ngày sinh không hợp lệ") from e
+    d = EmployeeDependent(
+        company_id=ctx.company_id,
+        employee_id=employee.id,
+        full_name=name,
+        birth_date=birth_date,
+        tax_code=tax_code,
+        id_type=id_type,
+        id_number=id_number,
+        relationship=relationship,
+        from_month=start,
+        to_month=end,
+        created_at=_now(),
+    )
+    db.add(d)
+    db.flush()
+    write_audit(
+        db,
+        ctx,
+        action="payroll.dependent_add",
+        entity_type="employee",
+        entity_id=employee.id,
+        summary=f"Thêm người phụ thuộc {name} của {employee.full_name}",
+    )
+    db.commit()
+    return d
+
+
+def delete_dependent(
+    db: Session, ctx, employee: Employee, dependent_id: int
+) -> None:
+    d = db.get(EmployeeDependent, dependent_id)
+    if (
+        d is None
+        or d.company_id != ctx.company_id
+        or d.employee_id != employee.id
+    ):
+        raise NotFoundError("Không tìm thấy người phụ thuộc")
+    db.delete(d)
+    write_audit(
+        db,
+        ctx,
+        action="payroll.dependent_delete",
+        entity_type="employee",
+        entity_id=employee.id,
+        summary=f"Xóa người phụ thuộc {d.full_name} của {employee.full_name}",
+    )
+    db.commit()
+
+
+def active_dependents(
+    dependents: list[EmployeeDependent], year: int, month: int
+) -> int:
+    return sum(1 for d in dependents if d.active_in(year, month))

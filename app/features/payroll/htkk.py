@@ -8,10 +8,12 @@ Built from posted payroll runs of the year:
 - appendix 05-1/BK-QTT-TNCN: residents with a labor contract of 3
   months or more (progressive schedule);
 - appendix 05-2/BK-QTT-TNCN: everyone taxed at a flat rate (short
-  contracts, probation, no contract, non-residents).
-Appendix 05-3 (dependants) needs names, birth dates and ID numbers of
-dependants, which the payroll does not store: add it in HTKK. The
-company does not settle on behalf of employees here (indicators
+  contracts, probation, no contract, non-residents);
+- appendix 05-3/BK-QTT-TNCN: the dependants registered in the
+  employee profiles of the 05-1 people, for the months of the year in
+  which they are deducted (relationship codes of HTKK
+  Catalogue_QHNNT, document codes of the schema).
+The company does not settle on behalf of employees here (indicators
 [35]–[41] are 0).
 """
 
@@ -23,9 +25,10 @@ from datetime import date
 from sqlalchemy.orm import Session
 
 from app.core import htkk
-from app.core.htkk import el, num, tin
+from app.core.htkk import el, nil, num, tin
 from app.features.org.models import Company
 from app.features.payroll import service
+from app.features.payroll.models import ID_TYPES, RELATIONSHIPS
 
 FORM = htkk.FormInfo(
     code="953",
@@ -154,6 +157,46 @@ def _appendix_05_2(rows: list) -> str:
     )
 
 
+def _appendix_05_3(db: Session, company_id: int, st: Settlement) -> str:
+    people = {s.employee.id: s.employee for s in st.progressive}
+    if not people:
+        return ""
+    first, last = date(st.year, 1, 1), date(st.year, 12, 1)
+    rows = []
+    for d in service.list_dependents(db, company_id):
+        e = people.get(d.employee_id)
+        start = max(d.from_month, first)
+        end = min(d.to_month or last, last)
+        if e is None or start > end:
+            continue
+        rows.append(
+            f'<BKeTTinNPT id="ID_{len(rows) + 1}">'
+            + el("ct07", e.full_name)
+            + tin("ct08", e.partner.tax_code if e.partner else "")
+            + el("ct09", d.full_name)
+            + (
+                el("ct10", d.birth_date.isoformat())
+                if d.birth_date
+                else nil("ct10")
+            )
+            + tin("ct11", d.tax_code)
+            + num("nguoiVNSongNN_NguoiNN", 0)
+            + el("ct12_ma", d.id_type if d.id_number else "")
+            + el(
+                "ct12_ten", ID_TYPES.get(d.id_type, "") if d.id_number else ""
+            )
+            + el("ct13", d.id_number)
+            + el("ct14_ma", d.relationship)
+            + el("ct14_ten", RELATIONSHIPS.get(d.relationship, ""))
+            + el("ct15", start.strftime("%m/%Y"))
+            + el("ct16", end.strftime("%m/%Y"))
+            + "</BKeTTinNPT>"
+        )
+    if not rows:
+        return ""
+    return "<PLuc_05_3_BK_QTT>" + "".join(rows) + "</PLuc_05_3_BK_QTT>"
+
+
 def main_values(st: Settlement) -> dict:
     people = st.everyone
     resident = [s for s in people if s.employee.is_resident]
@@ -208,7 +251,11 @@ def build_xml(
         + "".join(num(f"ct{k}", 0) for k in range(35, 42))
         + "</NVuQToanThay>"
     )
-    appendices = _appendix_05_1(st.progressive) + _appendix_05_2(st.flat)
+    appendices = (
+        _appendix_05_1(st.progressive)
+        + _appendix_05_2(st.flat)
+        + _appendix_05_3(db, company.id, st)
+    )
     return htkk.document(
         company,
         FORM,

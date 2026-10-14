@@ -38,10 +38,11 @@
             <td class="text-center text-xs text-fg-3">{{ code }}</td>
             <td>{{ _(label) }}
               {% if code == "C7" %}<p class="text-xs font-normal text-fg-3">{{ _("Doanh thu năm trước {v} đ → thuế suất {r}% (Luật 67/2025/QH15)", v=v._prev_revenue|money, r=v._auto_rate) }}</p>{% endif %}
+              {% if code == "C3" %}<p class="text-xs font-normal text-fg-3">{{ _("Tính từ bảng chuyển lỗ bên dưới") }}</p>{% endif %}
               {% if code == "E" %}<p class="text-xs font-normal text-fg-3">{{ _("Phát sinh Nợ TK 3334 đối ứng tiền mặt, tiền gửi trong năm") }}</p>{% endif %}
             </td>
             <td class="num">
-              {% if code in ("B1", "B8", "C2", "C3", "C5", "C9") and editable %}
+              {% if code in ("B1", "B8", "C2", "C5", "C9") and editable %}
                 {% set mv = v.get(code) or 0 %}
                 <div x-data='moneyInput({{ mv }})'>
                   <input type="text" inputmode="decimal" value="{{ mv|money }}" class="input input-sm input-num" aria-label="{{ code }}" @input="onInput($event)" @blur="onBlur($event)">
@@ -57,6 +58,35 @@
             </td>
           </tr>
           {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="border-t border-line px-5 py-4">
+      <p class="font-semibold">{{ _("Chuyển lỗ (phụ lục 03-2/TNDN)") }}</p>
+      <p class="text-[13px] text-fg-3">{{ _("Lỗ được chuyển liên tục tối đa 5 năm, năm cũ trước (Điều 16 Luật 67/2025/QH15). Số lỗ lấy từ bảng tính các năm trước đã chốt; nhập tay nếu năm đó không lập trên phần mềm.") }}</p>
+    </div>
+    <div class="table-wrap">
+      <table class="table table-compact">
+        <thead><tr><th class="w-24">{{ _("Năm phát sinh lỗ") }}</th><th class="num">{{ _("Số lỗ phát sinh") }}</th><th class="num">{{ _("Đã chuyển các kỳ trước") }}</th><th class="num">{{ _("Chuyển kỳ này") }}</th><th class="num max-md:hidden">{{ _("Còn được chuyển") }}</th></tr></thead>
+        <tbody>
+          {% if editable %}
+            <input type="hidden" name="losses_form" value="1">
+            {% for i in range(5) %}{% set r = v._losses[i] if i < v._losses|length else none %}
+            <tr>
+              <td><input name="loss_year_{{ i }}" value="{{ r.year if r else '' }}" class="input input-sm w-20 tabular-nums" inputmode="numeric" aria-label="{{ _('Năm phát sinh lỗ') }}"></td>
+              <td><input name="loss_amount_{{ i }}" value="{{ r.loss|money if r else '' }}" class="input input-sm input-num" inputmode="decimal" aria-label="{{ _('Số lỗ phát sinh') }}"></td>
+              <td><input name="loss_before_{{ i }}" value="{{ r.before|money if r else '' }}" class="input input-sm input-num" inputmode="decimal" aria-label="{{ _('Đã chuyển các kỳ trước') }}"></td>
+              <td class="num">{{ r.carry|money if r else "" }}</td>
+              <td class="num max-md:hidden">{{ r.remaining|money if r else "" }}</td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            {% for r in v._losses %}
+            <tr><td class="tabular-nums">{{ r.year }}</td><td class="num">{{ r.loss|money }}</td><td class="num">{{ r.before|money }}</td><td class="num">{{ r.carry|money }}</td><td class="num max-md:hidden">{{ r.remaining|money }}</td></tr>
+            {% else %}
+            <tr><td colspan="5" class="text-center text-fg-3">{{ _("Không có lỗ được chuyển") }}</td></tr>
+            {% endfor %}
+          {% endif %}
         </tbody>
       </table>
     </div>
