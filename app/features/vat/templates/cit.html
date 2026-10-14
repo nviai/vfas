@@ -9,7 +9,11 @@
   {% call ui.dropdown(_("Năm {y}", y=year), icon_name="calendar", width="w-36") %}
     {% for y in years %}{{ ui.menu_item(_("Năm {y}", y=y), "/vat/cit?year=" ~ y) }}{% endfor %}
   {% endcall %}
-  {% if can("vat.export") %}{{ ui.report_toolbar(pdf_href="/vat/cit.pdf?year=" ~ year, xlsx_href="/vat/cit.xlsx?year=" ~ year) }}{% endif %}
+  {% if can("vat.export") %}
+    {% call ui.report_toolbar(pdf_href="/vat/cit.pdf?year=" ~ year, xlsx_href="/vat/cit.xlsx?year=" ~ year) %}
+      <a href="/vat/cit.xml?year={{ year }}" class="btn-secondary btn-sm" title="{{ _('Tờ khai 03/TNDN dạng XML để nhập vào HTKK – kiểm tra lại trước khi nộp') }}">{{ ui.icon("file-down", "size-4") }}<span>{{ _("XML 03/TNDN") }}</span></a>
+    {% endcall %}
+  {% endif %}
 {% endcall %}
 
 {% set pl = v._pl %}

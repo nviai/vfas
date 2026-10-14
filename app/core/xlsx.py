@@ -342,3 +342,13 @@ def pdf_response(data: bytes, filename: str, inline: bool = True):
             "Content-Disposition": content_disposition(filename, inline=inline)
         },
     )
+
+
+def xml_response(data: bytes, filename: str):
+    from fastapi.responses import Response
+
+    return Response(
+        data,
+        media_type="application/xml",
+        headers={"Content-Disposition": content_disposition(filename)},
+    )

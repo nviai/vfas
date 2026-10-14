@@ -29,13 +29,14 @@ from app.core.web import (
     redirect,
     render,
 )
-from app.core.xlsx import pdf_response, xlsx_response
+from app.core.xlsx import pdf_response, xlsx_response, xml_response
 from app.features.bank.models import BankAccount
 from app.features.gl import (
     books,
     closing,
     entries,
     exports,
+    htkk,
     notes,
     opening_io,
     periods,
@@ -1217,6 +1218,22 @@ def report_b01_terms(
         "/reports/b01a?" + (form.get("query") or "mode=year"),
         "Đã lưu cách trình bày ngắn hạn/dài hạn",
     )
+
+
+@router.get("/reports/bctc.xml")
+def report_bctc_xml(
+    request: Request,
+    year: int,
+    user: CurrentUser = Depends(require("reports.export")),
+    db: Session = Depends(get_tenant_db),
+):
+    company = _company(db, user)
+    if (company.regime or "tt133") != "tt133":
+        raise BusinessError(
+            "XML bộ báo cáo tài chính hiện chỉ có cho chế độ Thông tư 133"
+        )
+    data = htkk.build_xml(db, company, year)
+    return xml_response(data, f"BCTC-{company.tax_code or 'mst'}-{year}.xml")
 
 
 @router.get("/reports/b09")

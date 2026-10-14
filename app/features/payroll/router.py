@@ -21,12 +21,18 @@ from app.core.pdf import render_pdf
 from app.core.regimes import account as regime_account
 from app.core.security import CurrentUser, require
 from app.core.web import form_data, get_ctx, get_tenant_db, redirect, render
-from app.core.xlsx import Col, ReportBook, pdf_response, xlsx_response
+from app.core.xlsx import (
+    Col,
+    ReportBook,
+    pdf_response,
+    xlsx_response,
+    xml_response,
+)
 from app.features.accounts.service import list_accounts
 from app.features.bank.service import list_bank_accounts
 from app.features.journal import service as js
 from app.features.org.models import Company
-from app.features.payroll import params, service
+from app.features.payroll import htkk, params, service
 from app.features.payroll.models import CONTRACT_TYPES, PayrollRun
 from app.features.payroll.service import (
     EmployeeInput,
@@ -617,6 +623,19 @@ def reports_page(
                 ("Báo cáo lương, BH, TNCN", None),
             ],
         },
+    )
+
+
+@router.get("/payroll/reports/qtt.xml")
+def reports_qtt_xml(
+    year: int,
+    user: CurrentUser = Depends(require("payroll.export")),
+    db: Session = Depends(get_tenant_db),
+):
+    company = _company(db, user)
+    data = htkk.build_xml(db, company, year)
+    return xml_response(
+        data, f"05QTT-TNCN-{company.tax_code or 'mst'}-{year}.xml"
     )
 
 

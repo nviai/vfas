@@ -4,7 +4,11 @@
 {% block content %}
 {% set period_label = (_("Tháng {m}/{y}", m="%02d"|format(month), y=year)) if month else _("Năm {y}", y=year) %}
 {% call ui.page_header(_("Báo cáo lương, BH, TNCN"), period_label ~ " · " ~ _("chỉ gồm bảng lương đã ghi sổ"), breadcrumbs=breadcrumbs, icon_name="file-spreadsheet") %}
-  {% if can("payroll.export") %}{{ ui.report_toolbar(xlsx_href="/payroll/reports.xlsx?year=" ~ year ~ "&month=" ~ month ~ "&tab=" ~ tab) }}{% endif %}
+  {% if can("payroll.export") %}
+    {% call ui.report_toolbar(xlsx_href="/payroll/reports.xlsx?year=" ~ year ~ "&month=" ~ month ~ "&tab=" ~ tab) %}
+      {% if not month %}<a href="/payroll/reports/qtt.xml?year={{ year }}" class="btn-secondary btn-sm" title="{{ _('Tờ khai quyết toán 05/QTT-TNCN dạng XML để nhập vào HTKK – kiểm tra lại trước khi nộp') }}">{{ ui.icon("file-down", "size-4") }}<span>{{ _("XML 05/QTT-TNCN") }}</span></a>{% endif %}
+    {% endcall %}
+  {% endif %}
 {% endcall %}
 
 <div class="card mb-5 p-3 sm:px-5">

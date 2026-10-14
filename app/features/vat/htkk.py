@@ -1,33 +1,35 @@
-"""Build 01/GTGT VAT return XML in the HTKK export format.
+"""Build the 01/GTGT VAT return XML in the HTKK export format.
 
-The file is meant for filing through the e-tax portal.
-
-WARNING: no Ministry of Finance XSD was at hand when this module was
-written; the structure below follows common HTKK files
-(HSoThueDTu/HSoKhaiThue/TTinChung + CTieuTKhaiChinh with ctNN
-elements). Before filing, open the file in HTKK
-("Nhập tờ khai từ XML") or use the e-tax portal's validation to
-compare. See docs/requests/vat.md.
+The file is meant for filing through the e-tax portal or for HTKK's
+"Nhập tờ khai từ XML" import. Structure: HTKK form 842, version 2.8.3,
+checked against the official validation schema 01_GTGT_TT80_283.xsd
+(see app/core/htkk.py and docs/DECISIONS.md D-v2-12). Open the file in
+HTKK before filing: Circular 89/2026 will bring a new version.
 """
 
 from __future__ import annotations
 
 from datetime import date
-from xml.sax.saxutils import escape
 
+from app.core import htkk
+from app.core.htkk import el
 from app.features.org.models import Company
 from app.features.vat.service import TaxPeriod
 
-NAMESPACE = "http://kekhaithue.gdt.gov.vn/TKhaiThue"
-# HTKK form code of 01/GTGT (Circular 80) – check it against the HTKK
-# version in use.
-MA_TKHAI = "842"
-PBAN_XML = "2.7.1"
-FORM_NOTE = (
-    "(Ban hành kèm theo Thông tư số 80/2021/TT-BTC ngày 29 tháng 9 "
-    "năm 2021 của Bộ trưởng Bộ Tài chính, "
-    "được sửa đổi, bổ sung bởi Thông tư số 40/2025/TT-BTC)"
+NAMESPACE = htkk.NAMESPACE
+FORM = htkk.FormInfo(
+    code="842",
+    name="TỜ KHAI THUẾ GIÁ TRỊ GIA TĂNG (Mẫu số 01/GTGT)",
+    note=(
+        "(Ban hành kèm theo Thông tư số 80/2021/TT-BTC ngày 29 tháng 9 "
+        "năm 2021 của Bộ trưởng Bộ Tài chính)"
+    ),
+    version="2.8.3",
 )
+# Ordinary business activity, VAT sub-item 1701 (HTKK catalogue
+# catalogue_dm_nnkd.xml, key 01_GTGT_TT80).
+BUSINESS_LINE = ("00", "Hoạt động sản xuất kinh doanh thông thường")
+SUB_ITEM = "1701"
 
 # Element order inside CTieuTKhaiChinh; nested groups follow the form
 # layout.
@@ -57,12 +59,6 @@ LAYOUT: list = [
 ]
 
 
-def _el(tag: str, value) -> str:
-    if value is None or value == "":
-        return f"<{tag}/>"
-    return f"<{tag}>{escape(str(value))}</{tag}>"
-
-
 def _num(values: dict, key: str) -> str:
     if key == "21":
         return "1" if values.get("21") else "0"
@@ -78,66 +74,45 @@ def build_xml(
     signed_on: date | None = None,
     version: int = 0,
 ) -> bytes:
-    signed_on = signed_on or date.today()
-    kieu_ky = "M" if period.period_type == "month" else "Q"
-    body = []
+    body = [
+        el("ma_NganhNghe", BUSINESS_LINE[0]),
+        el("ten_NganhNghe", BUSINESS_LINE[1]),
+        el("tieuMucHachToan", SUB_ITEM),
+        # Dependent unit / business location in another province: none.
+        "<Header>"
+        + el("ct09")
+        + el("ct10")
+        + "<DiaChiHDSXKDKhacTinhNDTSC>"
+        + "".join(
+            el(t)
+            for t in (
+                "ct11a_phuongXa_ma",
+                "ct11a_phuongXa_ten",
+                "ct11b_quanHuyen_ma",
+                "ct11b_quanHuyen_ten",
+                "ct11c_tinhTP_ma",
+                "ct11c_tinhTP_ten",
+            )
+        )
+        + "</DiaChiHDSXKDKhacTinhNDTSC></Header>",
+    ]
     for item in LAYOUT:
         if isinstance(item, tuple):
             group, keys = item
             body.append(
                 f"<{group}>"
-                + "".join(_el(f"ct{k}", _num(values, k)) for k in keys)
+                + "".join(el(f"ct{k}", _num(values, k)) for k in keys)
                 + f"</{group}>"
             )
         else:
-            body.append(_el(f"ct{item}", _num(values, item)))
-    xml = (
-        '<?xml version="1.0" encoding="UTF-8"?>'
-        f'<HSoThueDTu xmlns="{NAMESPACE}" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">'
-        "<HSoKhaiThue><TTinChung>"
-        "<TTinDVu>"
-        + _el("maDVu", "VFAS")
-        + _el("tenDVu", "VFAS")
-        + _el("pbanDVu", "2.0")
-        + _el("ttinNhaCCapDVu", "")
-        + "</TTinDVu>"
-        "<TTinTKhaiThue><TKhaiThue>"
-        + _el("maTKhai", MA_TKHAI)
-        + _el("tenTKhai", "TỜ KHAI THUẾ GIÁ TRỊ GIA TĂNG (Mẫu số 01/GTGT)")
-        + _el("moTaBMau", FORM_NOTE)
-        + _el("pbanTKhaiXML", PBAN_XML)
-        + _el("loaiTKhai", "C" if version == 0 else "B")
-        + _el("soLan", version)
-        + "<KyKKhaiThue>"
-        + _el("kieuKy", kieu_ky)
-        + _el("kyKKhai", period.code)
-        + _el("kyKKhaiTuNgay", period.start.strftime("%d/%m/%Y"))
-        + _el("kyKKhaiDenNgay", period.end.strftime("%d/%m/%Y"))
-        + _el("kyKKhaiTuThang", "")
-        + _el("kyKKhaiDenThang", "")
-        + "</KyKKhaiThue>"
-        + _el("maCQTNoiNop", "")
-        + _el("tenCQTNoiNop", company.tax_office or "")
-        + _el("ngayLapTKhai", signed_on.isoformat())
-        + _el("nguoiKy", signer or company.legal_rep or "")
-        + _el("ngayKy", signed_on.isoformat())
-        + _el("nganhNgheKD", "")
-        + "</TKhaiThue>"
-        "<NNT>"
-        + _el("mst", company.tax_code)
-        + _el("tenNNT", company.name)
-        + _el("dchiNNT", company.address)
-        + _el("phuongXa", "")
-        + _el("maHuyenNNT", "")
-        + _el("tenHuyenNNT", "")
-        + _el("maTinhNNT", "")
-        + _el("tenTinhNNT", company.province or "")
-        + _el("dthoaiNNT", company.phone)
-        + _el("faxNNT", "")
-        + _el("emailNNT", company.email)
-        + "</NNT>"
-        "</TTinTKhaiThue></TTinChung>"
-        "<CTieuTKhaiChinh>" + "".join(body) + "</CTieuTKhaiChinh>"
-        "</HSoKhaiThue><CKyDTu/></HSoThueDTu>"
+            body.append(el(f"ct{item}", _num(values, item)))
+    kind = "M" if period.period_type == "month" else "Q"
+    return htkk.document(
+        company,
+        FORM,
+        htkk.Period(kind, period.code, period.start, period.end),
+        "".join(body),
+        signer=signer,
+        signed_on=signed_on,
+        version=version,
     )
-    return xml.encode("utf-8")

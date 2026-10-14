@@ -16,6 +16,7 @@ from app.features.partners import service as ps
 from app.features.vat import cit, htkk
 from app.features.vat import service as vs
 from tests.conftest import post
+from tests.htkk_schema import validate
 from tests.sales.helpers import buy, line, sell
 
 
@@ -228,6 +229,19 @@ def test_htkk_xml(db, company, q1):
         and root.find(".//t:ct40", ns).text == "860000"
     )
     assert root.find(".//t:ct32a", ns).text == "1000000"
+    # Schema 2.8.3: business line + sub-item before [21], no empty
+    # signature element
+    assert root.find(".//t:pbanTKhaiXML", ns).text == "2.8.3"
+    main = root.find(".//t:CTieuTKhaiChinh", ns)
+    assert [c.tag.split("}")[1] for c in main][:5] == [
+        "ma_NganhNghe",
+        "ten_NganhNghe",
+        "tieuMucHachToan",
+        "Header",
+        "ct21",
+    ]
+    assert root.find(".//t:CKyDTu", ns) is None
+    validate(data, "01_GTGT_TT80_283.xsd")
 
 
 def test_vat_offset_entry(db, ctx, company, q1):

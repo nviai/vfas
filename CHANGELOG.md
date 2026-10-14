@@ -16,6 +16,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   **Circular 58/2026** for micro enterprises (B01-DNSN, B02-DNSN); chosen when creating a company and changeable in
   Settings while the books are empty. Default accounts of payroll, fixed assets, purchases, cash purposes and CIT
   follow the regime; printed and Excel forms carry the regime's form codes and "Kèm theo Thông tư…" line.
+- XML for HTKK / the e-tax portal: annual financial statements under TT133 (form 683: B01a, B02, B03, F01), CIT
+  finalization 03/TNDN (form 892 v2.9.4 with appendix 03-1A) and PIT finalization 05/QTT-TNCN (form 953 v2.9.3 with
+  appendices 05-1 and 05-2). All XML returns validate against the schemas shipped with HTKK 5.6.4.
+
+### Fixed
+- The 01/GTGT XML now validates against the HTKK schema: version 2.8.3, the required business-line/sub-item head
+  elements, and no empty signature element.
 
 ### Upgrade notes
 - Migration `0004` adds `users.email_verified_at`; existing accounts are marked as verified.

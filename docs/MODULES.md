@@ -163,12 +163,14 @@ new functions in service – keep the `Item` model and the existing function sig
 - **VAT** (`vat`): purchase/sales invoice listings per period (from the `VatRecord`s of posted vouchers); **01/GTGT** return
   (line item formulas in PLAN section 5), monthly/quarterly per `company.vat_period`; saved returns (`TaxDeclaration`:
   period, JSON values, status draft/final) so that [43] of the previous period is carried to [22]; [37][38] entered manually;
-  PDF + Excel + **HTKK XML** (best-effort structure, clearly stating it must be checked in HTKK); Decree 174/2025/ND-CP tax-reduction
+  PDF + Excel + **HTKK XML** (form 842 v2.8.3, validated against the HTKK schema; still to be checked in HTKK); Decree 174/2025/ND-CP tax-reduction
   appendix (8% lines); period-end VAT offset entry (Debit 33311 / Credit 1331 for the smaller amount) created as a draft PK voucher.
   **03/TNDN** (main line items from profit/loss + manual adjustments; CIT rate 15/17/20% depending on the previous year's revenue –
   Law 67/2025). **Tax calendar** `vat/calendar.py`: `deadlines(company, today) -> list[{title, due, period, url}]` (monthly VAT:
   the 20th of the following month; quarterly: the last day of the first month of the next quarter; CIT finalization and financial
   statements: the last day of the 3rd month after year-end) – the dashboard will call this function.
+- **XML returns for HTKK**: shared envelope `app/core/htkk.py`; `gl/htkk.py` (financial statements, form 683, TT133 only),
+  `vat/htkk_cit.py` (03/TNDN, form 892, with 03-1A), `payroll/htkk.py` (05/QTT-TNCN, form 953, with 05-1/05-2).
 - **Receivables/payables** (`debts`): receivables (131) / payables (331): summary by partner (opening, turnover, closing), detailed
   payment ledger per partner, FIFO aging (due date = voucher date + `payment_terms_days`, or `due_date`), balance confirmation
   letter (PDF).

@@ -4,7 +4,8 @@
 - [2. AI assistant](#2-ai-assistant)
 - [3. API and OpenAI-style integration](#3-api-and-openai-style-integration)
 - [4. Keyboard shortcuts](#4-keyboard-shortcuts)
-- [5. Accounting regimes](#5-accounting-regimes)
+- [5. Tax returns for HTKK](#5-tax-returns-for-htkk)
+- [6. Accounting regimes](#6-accounting-regimes)
 
 ## 1. Roles and permissions
 
@@ -86,7 +87,21 @@ Limit: 60 requests/minute/token.
 
 Amount fields accept shorthand: `2tr` = 2.000.000, `500k` = 500.000, `1,5tr` = 1.500.000 (Vietnamese number format: `.` thousands separator, `,` decimal; "tr" = triệu, million).
 
-## 5. Accounting regimes
+## 5. Tax returns for HTKK
+
+| Return | Where | File |
+|---|---|---|
+| 01/GTGT VAT return | Thuế → Tờ khai 01/GTGT → XML | form 842, version 2.8.3 |
+| Financial statements (TT133) | Sổ sách & báo cáo → Báo cáo tài chính (year view) → "Tờ khai BCTC dạng XML" | form 683: B01a, B02, B03, F01 |
+| 03/TNDN CIT finalization | Thuế → Quyết toán TNDN → XML 03/TNDN | form 892, version 2.9.4, with appendix 03-1A |
+| 05/QTT-TNCN PIT finalization | Lương → Báo cáo (whole year) → XML 05/QTT-TNCN | form 953, version 2.9.3, with 05-1 and 05-2 |
+
+The files follow the validation schemas shipped with HTKK 5.6.4. Import them in HTKK ("Nhập tờ khai từ XML"), check the
+figures and the lines VFAS cannot know (dependants in 05-3, real-estate transfers, tax incentives, related-party
+adjustments…), then file from HTKK or the e-tax portal. The notes to the financial statements (B09) are attached as a
+separate file.
+
+## 6. Accounting regimes
 
 | Regime | For | Chart of accounts | Financial statements |
 |---|---|---|---|
@@ -103,4 +118,5 @@ Amount fields accept shorthand: `2tr` = 2.000.000, `500k` = 500.000, `1,5tr` = 1
   The books do not store maturities, so balances go to the short-term lines by default (investments in other entities
   to long term) and the statement lists the accounts that need a judgement. On the B01-DN page, **Trình bày ngắn hạn /
   dài hạn** sets the accounts (or detail accounts, e.g. a `34112` long-term loan) presented the other way.
+- The XML of the financial statements for HTKK (form 683) exists for TT133 only.
 

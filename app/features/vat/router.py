@@ -21,10 +21,11 @@ from app.core.xlsx import (
     content_disposition,
     pdf_response,
     xlsx_response,
+    xml_response,
 )
 from app.features.org.models import Company
 from app.features.sales.common import VAT_LABELS, parse_money
-from app.features.vat import calendar, cit, htkk
+from app.features.vat import calendar, cit, htkk, htkk_cit
 from app.features.vat import service as vs
 
 router = APIRouter()
@@ -625,6 +626,19 @@ def cit_pdf(
         },
     )
     return pdf_response(pdf, f"thue-tndn-{year}.pdf")
+
+
+@router.get("/vat/cit.xml")
+def cit_xml(
+    request: Request,
+    year: int,
+    user: CurrentUser = Depends(require("vat.export")),
+    db: Session = Depends(get_tenant_db),
+):
+    company = _company(db, user)
+    values, _decl = cit.build(db, user.company_id, year)
+    data = htkk_cit.build_xml(db, company, year, values)
+    return xml_response(data, f"03TNDN-{company.tax_code or 'mst'}-{year}.xml")
 
 
 @router.get("/vat/cit.xlsx")

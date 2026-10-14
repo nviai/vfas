@@ -44,5 +44,15 @@
     {% endif %}
   </div>
   {% endfor %}
+  {% if period.mode == "year" and can("reports.export") and regime.code == "tt133" %}
+  <div class="card flex items-start gap-4 p-4">
+    <span class="flex size-10 shrink-0 items-center justify-center rounded-lg border border-line bg-surface-2 text-fg-2">{{ ui.icon("file-down", "size-5") }}</span>
+    <div class="min-w-0 flex-1">
+      <a href="/reports/bctc.xml?year={{ period.year }}" class="text-[14.5px] font-medium text-fg hover:underline">{{ _("Tờ khai BCTC dạng XML (HTKK)") }}</a>
+      <p class="text-xs text-fg-3">{{ _("B01a, B02, B03 và F01 trong một file để nhập vào HTKK hoặc nộp trên cổng thuế điện tử") }}</p>
+      <p class="mt-1 text-[13px] text-fg-2">{{ _("Thuyết minh B09 đính kèm riêng. Mở file bằng HTKK để kiểm tra trước khi nộp.") }}</p>
+    </div>
+  </div>
+  {% endif %}
 </div>
 {% endblock %}

@@ -71,7 +71,7 @@ every High/Medium finding has been fixed with tests (`tests/core/test_security.p
 - The `export-company` command failed when the company had an AI configuration (shadowed variable name) – caught by a new CLI test.
 
 ## Still open
-- The 01/GTGT return XML has not been checked against an official XSD (must be opened in HTKK); XML for financial statements, 03/TNDN, 05/QTT-TNCN not done yet.
+- HTKK XML (01/GTGT, BCTC TT133, 03/TNDN, 05/QTT-TNCN) validates against the HTKK 5.6.4 schemas, but the period encoding of the BCTC file and the Circular 89/2026 versions are still to be confirmed with a real HTKK export.
 - Codes of some book templates (inventory, fixed assets, payroll) follow advisory sources and need checking against the original TT133 text; the TT99 codes of the inventory and fixed-asset books (S10–S12, S21, S23-DN) follow the TT200 numbering kept by TT99 and the TT99 B01–B03 computation rules come from one transcription of Appendix IV.
 - Issuing e-invoices, bank API connections, foreign currency, product costing, manual receivable/payable matching.
 - The general journal voucher grid uses a partial of its own in the gl module (the shared `line_grid` macro has no debit/credit partner columns yet).

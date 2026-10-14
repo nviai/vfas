@@ -206,6 +206,7 @@ def test_tt99_pages_and_print_headers(db, tt99, web):
     web.login("chu@tt99.vn")
     page = web.get("/reports?mode=year&year=2026").text
     assert "B01-DN" in page and "S06-DN" in page and "B09-DN" in page
+    assert "/reports/bctc.xml" not in page  # HTKK set 683 is TT133-only
     r = web.get("/reports/b01a?mode=year&year=2026")
     assert r.status_code == 200 and "Mẫu số B01-DN" in r.text
     assert "Kèm theo Thông tư số 99/2025/TT-BTC" in r.text
@@ -213,6 +214,8 @@ def test_tt99_pages_and_print_headers(db, tt99, web):
     assert "S03a-DN" in web.get("/reports/s03a?mode=month&month=2026-03").text
     assert web.get("/reports/b01a.pdf?mode=year&year=2026").status_code == 200
     assert web.get("/reports/b03.xlsx?mode=year&year=2026").status_code == 200
+    r = web.get("/reports/bctc.xml?year=2026", follow_redirects=False)
+    assert r.status_code == 303  # refused with a message
     r = web.post(
         "/reports/b01-terms",
         {
