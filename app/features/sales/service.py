@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.core.db import like_contains, like_prefix, ulower
 from app.core.errors import BusinessError, NotFoundError
+from app.core.registry import emit
 from app.features.journal import service as js
 from app.features.journal.models import JournalEntry
 from app.features.org.models import Company
@@ -338,6 +339,8 @@ def update(db: Session, ctx, doc: SalesDoc, inp: SalesInput) -> SalesDoc:
         )
     if inp.kind != doc.kind:
         raise BusinessError("Không đổi được loại chứng từ")
+    # Lets other modules refuse the change (an issued e-invoice).
+    emit("sales.before_update", db, ctx, doc)
     partner = _resolve_partner(db, ctx, inp)
     _apply_doc(doc, inp, partner)
     db.flush()

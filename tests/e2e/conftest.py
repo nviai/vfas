@@ -87,6 +87,7 @@ def e2e_env(tmp_path_factory):
         SECRET_KEY="e2e-secret-key-0123456789-abcdefghijkl",
         COOKIE_SECURE="false",
         ALLOW_SIGNUP="false",
+        EINVOICE_SIMULATOR="true",
         PYTHONPATH=str(ROOT),
         VFAS_TOLERANT_FEATURES="0",
     )

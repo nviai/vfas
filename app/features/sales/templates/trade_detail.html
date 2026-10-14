@@ -145,6 +145,10 @@
       {% endif %}
     </section>
 
+    {% if is_sale and doc and can("einvoice.view") %}
+    {#- Provided by the einvoice module; loaded separately so this page does not depend on it. -#}
+    <div hx-get="/einvoice/entries/{{ entry.id }}/panel" hx-trigger="load" hx-swap="outerHTML">{{ ui.skeleton(3, cls="card p-5") }}</div>
+    {% endif %}
     {% set upload %}{% if not entry.is_cancelled and can(cfg.perm ~ ".create") %}<button type="button" class="btn-ghost btn-xs" @click="$dispatch('modal-open', 'upload')">{{ ui.icon("upload", "size-3.5") }}{{ _("Tải lên") }}</button>{% endif %}{% endset %}
     {% call ui.card(_("Đính kèm"), actions=upload) %}
       {% if attachments %}

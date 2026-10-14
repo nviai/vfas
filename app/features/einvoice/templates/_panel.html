@@ -1,0 +1,59 @@
+{#- E-invoice card on a sales document (loaded with HTMX from sales/trade_detail.html). -#}
+{% import "macros.html" as ui with context %}
+{% set badge_color = {"issued": "green", "signed": "amber", "unknown": "amber", "pending": "amber", "failed": "red"} %}
+{% call ui.card(_("Hóa đơn điện tử"), icon_name="receipt-text") %}
+  {% if active %}
+    <div class="space-y-3 text-[13px]">
+      <div class="flex items-center justify-between gap-2">
+        <span class="font-mono text-[14px] font-semibold text-fg">{{ active.display_number or "–" }}</span>
+        {{ ui.badge(_(status_labels[active.status]), badge_color[active.status], dot=True) }}
+      </div>
+      {{ ui.desc_list([
+        (_("Loại"), _("Hóa đơn điều chỉnh giảm") if active.kind == "adjust_down" else _("Hóa đơn gốc")),
+        (_("Ngày hóa đơn"), active.issue_date|date),
+        (_("Mã của CQT"), active.tax_authority_code),
+        (_("Mã tra cứu"), active.lookup_code),
+        (_("Môi trường"), _("Chính thức") if active.environment == "production" else _("Thử nghiệm")),
+      ], cols="") }}
+      {% if active.error %}{{ ui.alert(active.error, "warning") }}{% endif %}
+      {% if active.status == "unknown" %}
+        {{ ui.alert(_("Chưa nhận được kết quả từ nhà cung cấp. Bấm Kiểm tra trạng thái – không phát hành lại cho đến khi có kết quả."), "warning") }}
+      {% endif %}
+      <div class="flex flex-wrap gap-2 pt-1">
+        {% if active.status in ("unknown", "signed", "issued") and can("einvoice.issue") %}
+        <form method="post" action="/einvoice/{{ active.id }}/refresh">{{ ui.csrf_field() }}{{ ui.button(_("Kiểm tra trạng thái"), "secondary", size="sm", icon_name="refresh-cw") }}</form>
+        {% endif %}
+        {% if active.status in ("signed", "issued") and can("einvoice.export") %}
+        {{ ui.link_button(_("PDF"), "/einvoice/" ~ active.id ~ "/file.pdf", "ghost", size="sm", icon_name="file-down") }}
+        {{ ui.link_button(_("XML"), "/einvoice/" ~ active.id ~ "/file.xml", "ghost", size="sm", icon_name="file-down") }}
+        {% endif %}
+      </div>
+    </div>
+  {% else %}
+    {% for f in failed %}
+      {{ ui.alert(_("Lần phát hành trước bị từ chối: {e}", e=f.error), "error", cls="mb-3") }}
+    {% endfor %}
+    {% if not cfg or not cfg.is_active %}
+      <p class="text-[13px] text-fg-3">{{ _("Chưa bật phát hành hóa đơn điện tử.") }}
+        {% if can("einvoice.manage") %}<a href="/einvoice/settings" class="font-medium text-primary hover:underline">{{ _("Cài đặt") }}</a>{% endif %}</p>
+    {% elif doc.invoice_no %}
+      <p class="text-[13px] text-fg-3">{{ _("Chứng từ đã có số hóa đơn (nhập từ hóa đơn có sẵn).") }}</p>
+    {% elif not entry.is_draft %}
+      <p class="text-[13px] text-fg-3">{{ _("Chỉ phát hành hóa đơn cho chứng từ nháp: số hóa đơn phải có trước khi ghi sổ.") }}</p>
+    {% elif is_return and not original_ok %}
+      <p class="text-[13px] text-fg-3">{{ _("Hóa đơn điều chỉnh chỉ lập được khi hóa đơn gốc đã phát hành qua phần mềm.") }}</p>
+    {% elif can_issue %}
+      <p class="mb-3 text-[13px] text-fg-2">
+        {{ _("Lập hóa đơn điều chỉnh giảm cho hóa đơn gốc, ký hiệu {s}, ngày hôm nay.", s=cfg.series) if is_return else _("Phát hành hóa đơn ký hiệu {s}, ngày hôm nay.", s=cfg.series) }}
+        {% if cfg.auto_post %}{{ _("Chứng từ được ghi sổ ngay sau khi phát hành.") }}{% endif %}
+      </p>
+      <form method="post" action="/einvoice/entries/{{ entry.id }}/issue">
+        {{ ui.csrf_field() }}
+        {{ ui.button(_("Phát hành HĐĐT"), "primary", icon_name="stamp", cls="btn-block",
+                     confirm=_("Phát hành hóa đơn điện tử? Hóa đơn đã có mã không hủy được.")) }}
+      </form>
+    {% else %}
+      <p class="text-[13px] text-fg-3">{{ _("Chưa phát hành hóa đơn điện tử.") }}</p>
+    {% endif %}
+  {% endif %}
+{% endcall %}

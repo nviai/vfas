@@ -62,6 +62,9 @@ class Settings(BaseSettings):
     # auto: required when ALLOW_SIGNUP=true and SMTP is configured;
     # required | off.
     email_verification: str = "auto"
+    # Offer the simulated e-invoice provider (no legal value). For
+    # demos and tests only – never on a real installation.
+    einvoice_simulator: bool = False
     # Show the /ui-kit page to every logged-in user (default:
     # superadmin only).
     debug_ui: bool = False

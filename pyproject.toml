@@ -1,7 +1,7 @@
 [project]
 name = "vfas"
 version = "2.0.0"
-description = "VFAS – Vietnam Free Accounting Software: free, open-source accounting for Vietnamese SMEs (Circular 133/2016/TT-BTC)"
+description = "VFAS – VietNam Free Accounting Software: free, open-source accounting for Vietnamese SMEs (Circular 133/2016/TT-BTC)"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]

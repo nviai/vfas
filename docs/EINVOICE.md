@@ -1,7 +1,44 @@
-# Issuing e-invoices through a provider – research and design (14/10/2026)
+# Issuing e-invoices through a provider
 
-Status: **not implemented** (currently only invoice XML import exists). This document is the basis for the work.
-Confidence: [VB] read in the original legal text · [NCC] official provider documentation · [TP3] third-party source · [SL] inference.
+Status: **implemented** (module `app/features/einvoice`, October 2026) for Viettel S-Invoice, MISA meInvoice, VNPT
+Invoice and BKAV eHoadon, plus a simulator for demos and tests. This document records the legal research, the design and
+what was verified against which source.
+Confidence: [VB] read in the original legal text · [NCC] official provider documentation or WSDL · [CODE] working
+open-source client · [TP3] third-party source · [SL] inference.
+
+## 0. How it works
+
+1. **Settings → Hóa đơn điện tử** (`/einvoice/settings`, owner/chief accountant): provider, environment (test or
+   production), API account (secrets encrypted with `SECRET_KEY`), template number (1 = VAT invoice, 2 = sales invoice)
+   and series (`C26TAA`, a new one every year), "post the voucher after issuing".
+2. On a **draft** sales voucher the "Hóa đơn điện tử" card offers **Phát hành HĐĐT**. The invoice is dated today
+   (never back-dated) and built from the voucher lines; its number is written to the voucher and its VAT lines before
+   posting, because posted vouchers and VAT lines are immutable.
+3. A draft **sales return/allowance** (TL) whose original sale was issued here produces a **decrease adjustment
+   invoice** (Viettel, BKAV; MISA and VNPT do not publish how to express a decrease, so it is refused with a message).
+4. Every attempt is an outbox row (`einvoice_issues`) written **before** the provider is called, with a fresh
+   idempotency key (`transactionUuid` / `RefID` / `Fkey` / `PartnerInvoiceStringID`). A timeout leaves the row
+   `unknown`; it is looked up by key, never sent blindly again. Refusals (`failed`) can be fixed and issued with a new
+   key. Invoices without the tax authority code yet (`signed`) are polled with backoff: `python -m app.cli
+   einvoice-poll` from cron, or **Kiểm tra trạng thái** on the voucher.
+5. Once the code is assigned the signed XML is downloaded and kept under `DATA_DIR/attachments/einvoice/` with its
+   SHA-256 (it is the legal original); PDF/XML are also downloadable on demand.
+6. An issued invoice locks its voucher: no edit, delete or cancel (corrections go through an adjustment invoice). A tax
+   authority refusal (`failed` after signing) unlocks it again.
+
+| Provider | Protocol | Issue | Lookup / tax code | Adjustment | Evidence |
+|---|---|---|---|---|---|
+| Viettel S-Invoice | REST/JSON, cookie token | `createInvoice` (HSM) | `searchInvoiceByTransactionUuid` | ✅ type 5, decrease lines | [CODE] Odoo `l10n_vn_edi_viettel` field names, Viettel sample DTOs, a 2026 production plugin |
+| MISA meInvoice | REST/JSON v3, Bearer + `CompanyTaxCode` | `publishhsm` | status by RefID / TransactionID | ❌ not documented | [NCC] doc.meinvoice.vn; no open-source client |
+| VNPT Invoice | SOAP, per-customer host | `ImportAndPublishInv` (HSM accounts) | `listInvByCusFkey`, `GetMCCQThueByFkeys` | ❌ TT78 XML not published | [NCC] WSDL, [CODE] two clients + VNPT's add-in |
+| BKAV eHoadon | SOAP `ExecCommand`, gzip + AES-256-CBC | CmdType 112 + 205 (HSM sign) | 800 / 850 | ✅ CmdType 124 | [NCC] WSDL + Bkav guide, [CODE] four clients |
+| Simulator | in process | – | – | ✅ | only with `EINVOICE_SIMULATOR=true`, no legal value |
+
+**Before production:** none of the adapters could be run against a provider's test account while writing them (no
+credentials). Issue test invoices in the provider's test environment and compare them on the provider's site. Known
+open points: MISA's flag for the 8% rate in 2025–2026 (`IsTaxReduction43` is sent), the negative tax-rate codes of
+VNPT/BKAV (KCT = −1, KKKNT = −2; Viettel uses the opposite), and whether VNPT refuses a repeated Fkey. Not implemented:
+replacement invoices, form 04/SS (no provider offers a documented API), USB-token/SmartCA signing (HSM only).
 
 ## 1. Legal framework (changed from 01/7/2026)
 - **Decree 254/2026/ND-CP** and **Circular 91/2026/TT-BTC** (issued 30/6/2026, effective 01/7/2026) replace Decree 123/2020, Decree 70/2025,
@@ -34,7 +71,7 @@ Confidence: [VB] read in the original legal text · [NCC] official provider docu
 None of the providers offers webhooks in the documentation reviewed → status must be polled. All require partner registration/agreements
 (appid, partner key, web service user). MISA is also a competing accounting software vendor – risk of not being granted an `appid` [SL].
 
-## 3. Proposed design
+## 3. Design (as implemented)
 - `EInvoiceProvider` interface: `authenticate`, `list_series`, `issue(canonical, idem_key)`, `get_status`,
   `download(xml|pdf)`, `adjust`, `replace`, `send_error_notice_04ss`; capability flags `hsm_sync`, `hsm_async`, `usb_hash`, `batch`.
 - `CanonicalInvoice` built from the sales document (`SalesDoc`); each adapter maps it to its own payload.

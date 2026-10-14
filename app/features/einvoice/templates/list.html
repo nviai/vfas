@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Hóa đơn điện tử") }}{% endblock %}
+{% block content %}
+{% call ui.page_header(_("Hóa đơn điện tử"), _("Hóa đơn phát hành từ chứng từ bán hàng qua nhà cung cấp."), breadcrumbs=breadcrumbs, icon_name="receipt-text") %}
+  {% if can("einvoice.manage") %}{{ ui.link_button(_("Cài đặt"), "/einvoice/settings", "secondary", icon_name="settings") }}{% endif %}
+  {% if can("sales.create") %}{{ ui.link_button(_("Chứng từ bán hàng"), "/sales/new", "primary", icon_name="plus") }}{% endif %}
+{% endcall %}
+
+{% if not cfg or not cfg.is_active %}
+  {{ ui.alert(_("Chưa bật phát hành hóa đơn điện tử. Khai báo tài khoản nhà cung cấp và ký hiệu hóa đơn trong Cài đặt."), "info", cls="mb-5") }}
+{% elif cfg.environment != "production" %}
+  {{ ui.alert(_("Đang dùng môi trường Thử nghiệm: hóa đơn không gửi cơ quan thuế."), "warning", cls="mb-5") }}
+{% endif %}
+
+<div class="mb-4 flex flex-wrap gap-2">
+  {% set tabs = [("", _("Tất cả"))] %}
+  {% for k, v in status_labels.items() %}{% do tabs.append((k, _(v))) %}{% endfor %}
+  {% for k, label in tabs %}
+    <a href="/einvoice{{ '?status=' ~ k if k }}" class="{{ 'btn-primary' if k == status else 'btn-secondary' }} btn-sm">{{ label }}</a>
+  {% endfor %}
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr>
+        <th class="w-28">{{ _("Ngày") }}</th><th class="w-40">{{ _("Số hóa đơn") }}</th><th>{{ _("Người mua") }}</th>
+        <th class="num w-36">{{ _("Tổng thanh toán") }}</th><th class="w-44 max-lg:hidden">{{ _("Mã của CQT") }}</th><th class="w-40">{{ _("Trạng thái") }}</th><th class="w-10"></th>
+      </tr></thead>
+      <tbody>
+        {% for i in issues %}
+        <tr>
+          <td class="tabular-nums text-fg-2">{{ i.issue_date|date }}</td>
+          <td><a href="/sales/{{ i.entry_id }}" class="font-mono font-medium text-fg hover:underline">{{ i.display_number or ("#" ~ i.id) }}</a>
+            {% if i.kind == "adjust_down" %}<p>{{ ui.badge(_("Điều chỉnh giảm"), "amber") }}</p>{% endif %}</td>
+          <td><p class="truncate text-fg">{{ i.request.get("buyer_legal_name") or i.request.get("buyer_name") or _("Khách lẻ") }}</p>
+            <p class="text-xs text-fg-3">{{ i.request.get("buyer_tax_code") or "" }}</p></td>
+          <td class="num">{{ i.total_amount|money }}</td>
+          <td class="max-lg:hidden font-mono text-xs text-fg-2">{{ i.tax_authority_code or "–" }}</td>
+          <td>{{ ui.badge(_(status_labels[i.status]), {"issued": "green", "failed": "red"}.get(i.status, "amber"), dot=True, title=i.error or None) }}</td>
+          <td class="!pr-3 text-right">
+            {% if i.status in ("unknown", "signed") and can("einvoice.issue") %}
+            <form method="post" action="/einvoice/{{ i.id }}/refresh">{{ ui.csrf_field() }}<input type="hidden" name="next" value="list">{{ ui.icon_button("refresh-cw", _("Kiểm tra trạng thái"), type="submit") }}</form>
+            {% elif i.status in ("signed", "issued") and can("einvoice.export") %}
+            {{ ui.icon_button("file-down", _("Tải PDF"), href="/einvoice/" ~ i.id ~ "/file.pdf") }}
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7">{{ ui.empty_state(_("Chưa có hóa đơn điện tử"), "receipt-text", _("Mở một chứng từ bán hàng nháp và bấm Phát hành HĐĐT."), compact=True) }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

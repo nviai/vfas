@@ -4,7 +4,7 @@
 
 # VFAS
 
-**Vietnam Free Accounting Software**<br>
+**VietNam Free Accounting Software**<br>
 Free, open-source accounting for Vietnamese businesses – Circular 133/2016 (SMEs), 99/2025 (enterprises) and 58/2026
 (micro enterprises) regimes
 
@@ -34,7 +34,7 @@ Free, open-source accounting for Vietnamese businesses – Circular 133/2016 (SM
 - **Clean books** – posted vouchers cannot be edited or deleted (enforced in the database); mistakes are fixed by a
   reasoned cancellation or an adjusting entry; the audit log is append-only.
 - **Statutory coverage** – ledgers and financial statements under TT133, TT99 or TT58, VAT return 01/GTGT, XML returns
-  for HTKK, personal income tax and social
+  for HTKK, e-invoice issuing, personal income tax and social
   insurance with effective-dated parameters.
 - **OpenAI-style AI agent** – ask about your figures in Vietnamese and let the agent draft vouchers; works with Claude,
   OpenAI, OpenRouter or self-hosted Ollama. The agent only drafts – a person with the right role posts.
@@ -60,7 +60,7 @@ The user interface defaults to Vietnamese and is fully translated into English.
 | **Ledger & reports** | Double-entry journal, opening balances (Excel import), general journal, general ledger, account detail ledgers, trial balance, financial statements of the company's regime, period-end closing entries, monthly/yearly period locks |
 | **Cash** | Cash receipts 01-TT and payments 02-TT (quick phone form for cashiers), cash books S04a/S04b-DNN, cash counts 08a-TT, import of legacy cash books from Excel |
 | **Bank** | Deposits/withdrawals, internal transfers, bank book S05-DNN, payment orders, CSV/XLSX statement import with auto-matching |
-| **Sales & purchases** | Goods and services, sales and purchase vouchers, returns and allowances, **e-invoice XML import** (single files or ZIP) |
+| **Sales & purchases** | Goods and services, sales and purchase vouchers, returns and allowances, **e-invoice XML import** (single files or ZIP), **e-invoice issuing** through Viettel S-Invoice, MISA meInvoice, VNPT or BKAV (with adjustment invoices) |
 | **Tax** | Purchase/sales listings, **01/GTGT** VAT return (PDF, Excel, XML in the HTKK layout), 8% VAT reduction appendix, corporate income tax worksheet with the **03/TNDN** XML, **05/QTT-TNCN** XML, filing calendar |
 | **Receivables & payables** | Balances per customer/supplier, payment ledgers, aging, balance confirmation letters |
 | **Inventory** | Multiple warehouses, receipts/issues/transfers, periodic weighted-average costing, stock cards, stock summary |
@@ -133,7 +133,7 @@ openpyxl · SQLite/PostgreSQL.
 | [docs/DEPLOY.md](docs/DEPLOY.md) | Installation, environment variables, PostgreSQL, upgrades, backups, admin commands |
 | [docs/USAGE.md](docs/USAGE.md) | Roles and permissions, AI assistant, OpenAI-style API, keyboard shortcuts |
 | [docs/SECURITY-GUIDE.md](docs/SECURITY-GUIDE.md) | Security model, latest review, cloud and self-host checklists |
-| [docs/EINVOICE.md](docs/EINVOICE.md) | Research and design for issuing e-invoices through Vietnamese providers |
+| [docs/EINVOICE.md](docs/EINVOICE.md) | Issuing e-invoices through Vietnamese providers: how it works, legal research, provider APIs |
 | [docs/PLAN.md](docs/PLAN.md) | Product plan and architecture |
 | [docs/MODULES.md](docs/MODULES.md) · [docs/CONTRACTS.md](docs/CONTRACTS.md) · [docs/UI.md](docs/UI.md) | Module specs, core–module contracts, design system |
 | [docs/DECISIONS.md](docs/DECISIONS.md) | Design decisions and the legal sources they were checked against |
@@ -143,7 +143,7 @@ openpyxl · SQLite/PostgreSQL.
 ## Roadmap
 
 - [x] Email (SMTP): address verification, password reset, invitation emails – required before opening public sign-up
-- [ ] Issue e-invoices through providers (Viettel S-Invoice, MISA meInvoice, VNPT, BKAV) – design in [docs/EINVOICE.md](docs/EINVOICE.md)
+- [x] Issue e-invoices through providers (Viettel S-Invoice, MISA meInvoice, VNPT, BKAV) – see [docs/EINVOICE.md](docs/EINVOICE.md)
 - [x] XML export of financial statements, 03/TNDN and 05/QTT-TNCN for HTKK
 - [x] Accounting regimes under Circular 99/2025 and Circular 58/2026 (`app/core/regimes.py`)
 - [x] Prebuilt Docker image (`ghcr.io/nviai/vfas`, amd64/arm64, signed)
@@ -170,6 +170,9 @@ Found a vulnerability? **Do not open a public issue** – report it privately as
 - The **XML returns** (01/GTGT, financial statements, 03/TNDN, 05/QTT-TNCN) follow the schemas shipped with HTKK 5.6.4 and
   validate against them, but they are not signed and HTKK updates its forms often: **open them in HTKK ("Nhập tờ khai từ
   XML") before filing**.
+- **E-invoices** are issued with the company's own provider account; the company is responsible for their content. The
+  provider adapters follow the providers' documentation and working clients but were written without test accounts:
+  **issue test invoices in the provider's test environment first** (see [docs/EINVOICE.md](docs/EINVOICE.md)).
 - Under **TT99**, B01-DN needs the short/long-term split of balances; the books do not store maturities, so check the
   "Trình bày ngắn hạn / dài hạn" setting before filing.
 - Some ledger form codes (S06/S07/S08/S09/S11-DNN, 02-LĐTL, 06-TSCĐ…) come from advisory sources and still need to be

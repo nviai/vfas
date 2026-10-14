@@ -252,6 +252,19 @@ def cmd_send_test_email(args) -> int:
     return 0
 
 
+def cmd_einvoice_poll(_args) -> int:
+    from app.features.einvoice import service as einvoice
+
+    _engine()
+    with session_scope() as db:
+        counts = einvoice.poll(db)
+    print(
+        f"Đã kiểm tra {counts['checked']} hóa đơn: "
+        f"{counts['issued']} đã cấp mã, {counts['failed']} lỗi."
+    )
+    return 0
+
+
 # --------------------------------------------------------------- backup
 
 
@@ -614,6 +627,9 @@ def export_company(company_id: int, output: Path) -> Path:
                 k: v for k, v in cfg["ai"].items() if k != "api_key_enc"
             }
         row["settings"] = cfg
+    # ...and the (encrypted) e-invoice provider passwords.
+    for row in data.get("einvoice_configs", []):
+        row["secrets"] = None
     output.parent.mkdir(parents=True, exist_ok=True)
     with tarfile.open(output, "w:gz") as tar:
         payload = json.dumps(
@@ -692,6 +708,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     p.add_argument("--to", required=True)
     p.set_defaults(func=cmd_send_test_email)
+
+    sub.add_parser(
+        "einvoice-poll",
+        help="Cập nhật trạng thái hóa đơn điện tử đang chờ (chạy theo cron)",
+    ).set_defaults(func=cmd_einvoice_poll)
 
     p = sub.add_parser("demo", help="Tạo công ty mẫu có dữ liệu ~1 năm")
     p.add_argument("--email", default="demo@example.com")

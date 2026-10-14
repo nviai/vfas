@@ -85,8 +85,8 @@ The container runs as an unprivileged user with a read-only file system, `cap_dr
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `SECRET_KEY` | auto-generated in `DATA_DIR/.secret_key` | Key for signing cookies, email links and encrypting AI API keys, ≥ 32 characters (required for SaaS); the app refuses to start with the sample value |
-| `SECRET_KEY_OLD` | empty | Previous key when rotating `SECRET_KEY` (stored AI API keys can still be decrypted) |
+| `SECRET_KEY` | auto-generated in `DATA_DIR/.secret_key` | Key for signing cookies, email links and encrypting AI API keys and e-invoice provider passwords, ≥ 32 characters (required for SaaS); the app refuses to start with the sample value |
+| `SECRET_KEY_OLD` | empty | Previous key when rotating `SECRET_KEY` (stored AI API keys and e-invoice passwords can still be decrypted) |
 | `SETUP_TOKEN` | auto-generated, printed to the log | Code required by the first-run `/setup` page |
 | `FORWARDED_ALLOW_IPS` | `127.0.0.1` (compose: `172.16.0.0/12`) | Proxies whose `X-Forwarded-*` headers are trusted (real client IP for brute-force protection and the audit log) |
 | `SESSION_HOURS` | `12` | Sign-in session lifetime |
@@ -104,6 +104,7 @@ The container runs as an unprivileged user with a read-only file system, `cap_dr
 | `SMTP_SECURITY` | `starttls` | `starttls` (port 587), `ssl` (port 465) or `none` (local relay only) |
 | `MAIL_FROM` | `SMTP_USERNAME` | Sender, e.g. `VFAS <no-reply@example.com>` |
 | `EMAIL_VERIFICATION` | `auto` | `auto`: required when `ALLOW_SIGNUP=true` and SMTP is configured; `required`; `off` |
+| `EINVOICE_SIMULATOR` | `false` | Offer the simulated e-invoice provider (demos and tests only – its invoices have no legal value) |
 | `COOKIE_SECURE` | `false` | `true` when running behind HTTPS (cookies also switch to Secure automatically when the request arrives over https) |
 | `MAX_UPLOAD_MB` | `10` | Maximum upload size |
 | `TIMEZONE` | `Asia/Ho_Chi_Minh` | Time zone |
@@ -146,13 +147,19 @@ docker compose exec vfas python -m app.cli export-company 3 -o /backups/cong-ty-
 - A backup contains the whole DB (SQLite: a consistent copy via the backup API; any DB: `data.json`) and the attachments, written with
   permissions 600.
 - Set `BACKUP_PASSPHRASE` to encrypt it (`.tar.gz.enc` file; restoring needs the same passphrase – lose the passphrase and you lose the backup).
-- A single-company export contains no passwords, API tokens or AI API keys.
-- Also back up `SECRET_KEY` (or the `/data/.secret_key` file): without the key, stored AI API keys cannot be decrypted.
+- A single-company export contains no passwords, API tokens, AI API keys or e-invoice provider passwords.
+- Also back up `SECRET_KEY` (or the `/data/.secret_key` file): without the key, stored AI API keys and e-invoice provider passwords cannot be decrypted.
 
 Daily backup with cron on the server:
 
 ```cron
 0 2 * * * cd /opt/vfas && docker compose exec -T vfas python -m app.cli backup -o /backups/vfas-$(date +\%F).tar.gz
+```
+
+When e-invoices are issued from VFAS, also poll the tax authority codes:
+
+```cron
+*/5 * * * * cd /opt/vfas && docker compose exec -T vfas python -m app.cli einvoice-poll > /dev/null
 ```
 
 ## 7. Admin commands
@@ -166,6 +173,7 @@ Run inside the container (`docker compose exec vfas …`) or in the venv when ru
 | `python -m app.cli create-company --owner-email … --name …` | Create a company for a user |
 | `python -m app.cli reset-password --email …` | Reset a password |
 | `python -m app.cli send-test-email --to …` | Send a test email to check the SMTP settings |
+| `python -m app.cli einvoice-poll` | Fetch the tax authority code of issued e-invoices that are still waiting (run from cron, e.g. every 5 minutes) |
 | `python -m app.cli backup [-o FILE]` / `restore FILE --yes [--json]` | Back up / restore |
 | `python -m app.cli export-company ID [-o FILE]` | Export one company's data |
 | `python -m app.cli demo` | Create a sample company with one year of transactions (sign in with `demo@example.com` / `Demo@2026`) |

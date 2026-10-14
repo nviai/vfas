@@ -1,0 +1,48 @@
+{#- PDF of a SIMULATED invoice (simulator provider). Always Vietnamese; clearly marked as having no legal value. -#}
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Hóa đơn mô phỏng {{ res.series }}-{{ res.number }}</title>
+<style>
+  @page { size: A4; margin: 16mm 14mm; }
+  body { font-family: "Liberation Serif", "Times New Roman", serif; font-size: 12pt; color: #111; }
+  .watermark { position: fixed; top: 40%; left: 0; right: 0; text-align: center; font-size: 46pt; color: rgba(200, 0, 0, 0.12); transform: rotate(-24deg); }
+  h1 { text-align: center; font-size: 16pt; margin: 0 0 2mm; }
+  .center { text-align: center; }
+  .warn { color: #b00; font-weight: bold; text-align: center; margin: 2mm 0 5mm; }
+  table { width: 100%; border-collapse: collapse; }
+  td, th { border: 1px solid #555; padding: 1.5mm 2mm; vertical-align: top; }
+  th { background: #eee; }
+  .num { text-align: right; white-space: nowrap; }
+  .meta td { border: none; padding: 0.6mm 0; }
+</style>
+</head>
+<body>
+<div class="watermark">MÔ PHỎNG</div>
+<h1>HÓA ĐƠN GIÁ TRỊ GIA TĂNG</h1>
+<p class="warn">BẢN MÔ PHỎNG – KHÔNG CÓ GIÁ TRỊ PHÁP LÝ</p>
+<table class="meta">
+  <tr><td>Mẫu số: {{ res.template }}</td><td>Ký hiệu: {{ res.series }}</td><td>Số: {{ res.number }}</td></tr>
+  <tr><td colspan="3">Ngày {{ (res.issue_date or inv.issue_date).strftime("%d") }} tháng {{ (res.issue_date or inv.issue_date).strftime("%m") }} năm {{ (res.issue_date or inv.issue_date).strftime("%Y") }}</td></tr>
+  <tr><td colspan="3">Mã của cơ quan thuế: {{ res.tax_authority_code }}</td></tr>
+  <tr><td colspan="3">Mã số thuế người bán: {{ inv.seller_tax_code }}</td></tr>
+  <tr><td colspan="3">Người mua: {{ inv.buyer_legal_name or inv.buyer_name }}{% if inv.buyer_tax_code %} – MST {{ inv.buyer_tax_code }}{% endif %}</td></tr>
+  <tr><td colspan="3">Địa chỉ: {{ inv.buyer_address }}</td></tr>
+  <tr><td colspan="3">Hình thức thanh toán: {{ inv.payment_method }}</td></tr>
+  {% if inv.original %}<tr><td colspan="3">Điều chỉnh giảm cho hóa đơn ký hiệu {{ inv.original.series }} số {{ inv.original.number }} ngày {{ inv.original.issue_date.strftime("%d/%m/%Y") if inv.original.issue_date else "" }}</td></tr>{% endif %}
+</table>
+<br>
+<table>
+  <tr><th>STT</th><th>Tên hàng hóa, dịch vụ</th><th>ĐVT</th><th>Số lượng</th><th>Đơn giá</th><th>Thành tiền</th><th>Thuế suất</th><th>Tiền thuế</th></tr>
+  {% for ln in inv.lines %}
+  <tr><td class="center">{{ ln.line_no }}</td><td>{{ ln.name }}</td><td>{{ ln.unit }}</td>
+    <td class="num">{{ ln.quantity|qty if ln.quantity is not none else "" }}</td><td class="num">{{ ln.unit_price|money if ln.unit_price is not none else "" }}</td>
+    <td class="num">{{ ln.amount|money }}</td><td class="center">{{ rate_label(ln.vat_rate) }}</td><td class="num">{{ ln.vat_amount|money }}</td></tr>
+  {% endfor %}
+  <tr><td colspan="5"><b>Cộng tiền hàng</b></td><td class="num">{{ inv.total_before_tax|money }}</td><td></td><td class="num">{{ inv.total_vat|money }}</td></tr>
+  <tr><td colspan="5"><b>Tổng cộng tiền thanh toán</b></td><td class="num" colspan="3"><b>{{ inv.total|money }}</b></td></tr>
+</table>
+<p>Số tiền viết bằng chữ: {{ inv.amount_in_words }}</p>
+</body>
+</html>
