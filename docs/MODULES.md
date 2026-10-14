@@ -170,7 +170,11 @@ new functions in service – keep the `Item` model and the existing function sig
   the 20th of the following month; quarterly: the last day of the first month of the next quarter; CIT finalization and financial
   statements: the last day of the 3rd month after year-end) – the dashboard will call this function.
 - **XML returns for HTKK**: shared envelope `app/core/htkk.py`; `gl/htkk.py` (financial statements, form 683, TT133 only),
-  `vat/htkk_cit.py` (03/TNDN, form 892, with 03-1A), `payroll/htkk.py` (05/QTT-TNCN, form 953, with 05-1/05-2).
+  `vat/htkk_cit.py` (03/TNDN, form 892, with 03-1A and 03-2), `payroll/htkk.py` (05/QTT-TNCN, form 953, with
+  05-1/05-2/05-3 – dependants in `EmployeeDependent`, `/payroll/employees/{id}/dependents`),
+  `payroll/htkk_kk.py` (05/KK-TNCN, form 864). Supplementary returns: `vat/khbs.py` (versions ≥ 1 of
+  `TaxDeclaration`, 01/KHBS + 01-1/KHBS appendices, late-payment interest), used by 01/GTGT and 05/KK-TNCN; routes
+  `…/supplements` (create) and `…/supplements/{n}/delete`, exports take `?version=n` (D-v2-33).
 - **E-invoice issuing** (`einvoice`, see docs/EINVOICE.md): `EInvoiceConfig` (provider, environment, encrypted secrets,
   template/series), outbox `EInvoiceIssue` (idempotency key, status pending/unknown/signed/issued/failed, number, tax
   authority code, stored XML + SHA-256); adapters in `einvoice/providers/` (viettel, misa, vnpt, bkav, simulator); a card
@@ -251,12 +255,15 @@ new functions in service – keep the `Item` model and the existing function sig
   Posting: Debit expense account / Credit 334 (total salary); Debit expense account / Credit 3383, 3384, 3385, 3382 (employer part);
   Debit 334 / Credit 3383, 3384, 3385 (employee part); Debit 334 / Credit 3335 (PIT) – doc type LG. The "Trả lương" (Pay salaries)
   button creates a **draft** cash payment/bank payment (doc_type PC or BN, Debit 334 / Credit 1111 or 1121). Reports: payroll
-  sheet (A4 landscape), payslip, insurance summary, PIT summary (monthly; yearly per employee).
+  sheet (A4 landscape), payslip, insurance summary, PIT summary (monthly; yearly per employee). **05/KK-TNCN** return
+  (`payroll/pit_return.py`, `/payroll/pit-returns`): quarterly from 04/2026, finalized figures stored as a
+  `TaxDeclaration` (form `05/KK-TNCN`), PDF + HTKK XML (D-v2-32).
 - **Permissions**: `assets.view|export` READERS, `assets.create|post|cancel|manage` ACCOUNTANTS; `payroll.view|export|create|
   post|cancel|manage` ACCOUNTANTS (read-only users and cashiers cannot see payroll).
 - **Doc types**: KH, TS, PB `/assets/entries/{id}` or `/entries/{id}` perm assets; LG `/payroll/entries/{id}` perm payroll.
 - **Nav**: `assets`: "Tài sản cố định" (Fixed assets), "Khấu hao" (Depreciation), "CCDC & chi phí trả trước" (Tools & prepaid
-  expenses); `payroll`: "Nhân viên" (Employees), "Bảng lương" (Payroll), "Tham số lương & thuế" (Payroll & tax parameters).
+  expenses); `payroll`: "Nhân viên" (Employees), "Bảng lương" (Payroll), "Tham số lương & thuế" (Payroll & tax parameters);
+  `tax`: "Tờ khai 05/KK-TNCN" (PIT withholding return).
 - **AI tools**: `list_fixed_assets(status?)`, `get_depreciation_schedule(year)`, `get_payroll_summary(year, month)`
   (perm `payroll.view`), `calculate_pit(gross, dependents, insurance_salary?, date?)` (read-only).
 - **Checks**: fixed asset register cost/accumulated depreciation ≠ balances of 211/214; past months without depreciation/allocation;

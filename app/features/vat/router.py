@@ -10,8 +10,8 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
-from app.core.dates import today
-from app.core.errors import BusinessError
+from app.core.dates import parse_date, today
+from app.core.errors import BusinessError, NotFoundError
 from app.core.pdf import render_pdf
 from app.core.security import CurrentUser, require
 from app.core.web import form_data, get_ctx, get_tenant_db, redirect, render
@@ -25,8 +25,9 @@ from app.core.xlsx import (
 )
 from app.features.org.models import Company
 from app.features.sales.common import VAT_LABELS, parse_money
-from app.features.vat import calendar, cit, htkk, htkk_cit
+from app.features.vat import calendar, cit, htkk, htkk_cit, khbs
 from app.features.vat import service as vs
+from app.features.vat.models import FORM_VAT
 
 router = APIRouter()
 
@@ -200,11 +201,13 @@ def declarations(
     db: Session = Depends(get_tenant_db),
 ):
     company = _company(db, user)
-    saved = {
-        (d.period_type, d.year, d.period): d
-        for d in vs.list_declarations(db, company.id)
-        if d.version == 0
-    }
+    saved, latest = {}, {}
+    for d in vs.list_declarations(db, company.id):
+        key = (d.period_type, d.year, d.period)
+        if d.version == 0:
+            saved[key] = d
+        if key not in latest or d.version > latest[key].version:
+            latest[key] = d
     rows = []
     p = vs.period_of(company, today())
     for _ in range(8 if company.vat_period == "quarter" else 12):
@@ -215,6 +218,9 @@ def declarations(
         rows.append(
             {"period": vs.TaxPeriod(pt, y, n), "decl": d, "ended": True}
         )
+    for r in rows:
+        p = r["period"]
+        r["latest"] = latest.get((p.period_type, p.year, p.period))
     return render(
         request,
         "vat/declarations.html",
@@ -230,12 +236,25 @@ def _decl_context(db: Session, company: Company, period: vs.TaxPeriod) -> dict:
     decl = vs.get_declaration(db, company.id, period)
     values = vs.build(db, company.id, period, decl)
     deductible, output, offset = vs.offset_amounts(db, company.id, period.end)
+    final = bool(decl and decl.status != "draft")
+    supplements = vs.supplements(db, company.id, period) if final else []
+    if supplements:
+        # Show what was filed last.
+        latest = vs.get_declaration(
+            db, company.id, period, supplements[-1].version
+        )
+        values = dict(latest.values)
     return {
         "period": period,
         "decl": decl,
+        "supplements": supplements,
+        "pending": vs.pending_changes(db, company.id, period) if final else [],
+        "khbs_perm": "vat.manage",
+        "export_perm": "vat.export",
+        "today": today(),
         "v": values,
         "labels": vs.LABELS,
-        "final": bool(decl and decl.status != "draft"),
+        "final": final,
         "offset": {
             "deductible": deductible,
             "output": output,
@@ -345,12 +364,85 @@ def declaration_offset(
     )
 
 
-def _decl_values(
-    db: Session, company: Company, period_type: str, year: int, period: int
+@router.post(
+    "/vat/declarations/{period_type}/{year:int}/{period:int}/supplements"
+)
+def declaration_supplement(
+    request: Request,
+    period_type: str,
+    year: int,
+    period: int,
+    form: dict = Depends(form_data),
+    user: CurrentUser = Depends(require("vat.manage")),
+    db: Session = Depends(get_tenant_db),
 ):
+    company = _company(db, user)
     p = vs.parse_period(company, period_type, year, period)
+    try:
+        until = parse_date(form.get("until")) or today()
+    except ValueError as e:
+        raise BusinessError("Ngày không hợp lệ") from e
+    decl = vs.supplement(
+        db, get_ctx(request), p, reason=form.get("reason") or "", until=until
+    )
+    return redirect(
+        f"/vat/declarations/{p.period_type}/{p.year}/{p.period}",
+        f"Đã lập tờ khai bổ sung lần {decl.version}",
+        request=request,
+    )
+
+
+@router.post(
+    "/vat/declarations/{period_type}/{year:int}/{period:int}"
+    "/supplements/{version:int}/delete"
+)
+def declaration_supplement_delete(
+    request: Request,
+    period_type: str,
+    year: int,
+    period: int,
+    version: int,
+    user: CurrentUser = Depends(require("vat.manage")),
+    db: Session = Depends(get_tenant_db),
+):
+    company = _company(db, user)
+    p = vs.parse_period(company, period_type, year, period)
+    khbs.delete_latest(db, get_ctx(request), FORM_VAT, p, version)
+    return redirect(
+        f"/vat/declarations/{p.period_type}/{p.year}/{p.period}",
+        f"Đã xóa tờ khai bổ sung lần {version}",
+        "warning",
+        request=request,
+    )
+
+
+def _decl_values(
+    db: Session,
+    company: Company,
+    period_type: str,
+    year: int,
+    period: int,
+    version: int = 0,
+):
+    """(period, figures, declaration, supplement summary or None)."""
+    p = vs.parse_period(company, period_type, year, period)
+    if version:
+        decl = vs.get_declaration(db, company.id, p, version)
+        if decl is None:
+            raise NotFoundError("Không tìm thấy tờ khai bổ sung")
+        sup = khbs.summary_of(
+            db,
+            company.id,
+            FORM_VAT,
+            p,
+            version,
+            vs.KHBS_KEYS,
+            vs.LABELS,
+            vs.deadline(p),
+        )
+        return p, dict(decl.values), decl, sup
     decl = vs.get_declaration(db, company.id, p)
-    return p, vs.build(db, company.id, p, decl), decl
+    return p, vs.build(db, company.id, p, decl), decl, None
 
 
 @router.get("/vat/declarations/{period_type}/{year:int}/{period:int}.xml")
@@ -359,15 +451,26 @@ def declaration_xml(
     period_type: str,
     year: int,
     period: int,
+    version: int = 0,
     user: CurrentUser = Depends(require("vat.export")),
     db: Session = Depends(get_tenant_db),
 ):
     company = _company(db, user)
-    p, v, _decl = _decl_values(db, company, period_type, year, period)
-    data = htkk.build_xml(company, p, v)
+    p, v, _decl, sup = _decl_values(
+        db, company, period_type, year, period, version
+    )
+    data = htkk.build_xml(
+        company,
+        p,
+        v,
+        version=version,
+        appendices=khbs.appendices_xml(company, htkk.FORM, sup) if sup else "",
+    )
     name = (
         f"01GTGT-{company.tax_code or 'mst'}-{p.year}-"
-        f"{p.period_type[0].upper()}{p.period:02d}.xml"
+        f"{p.period_type[0].upper()}{p.period:02d}"
+        + (f"-BS{version}" if version else "")
+        + ".xml"
     )
     return Response(
         data,
@@ -382,11 +485,14 @@ def declaration_pdf(
     period_type: str,
     year: int,
     period: int,
+    version: int = 0,
     user: CurrentUser = Depends(require("vat.export")),
     db: Session = Depends(get_tenant_db),
 ):
     company = _company(db, user)
-    p, v, decl = _decl_values(db, company, period_type, year, period)
+    p, v, decl, sup = _decl_values(
+        db, company, period_type, year, period, version
+    )
     pdf = render_pdf(
         "vat/print/gtgt01.html",
         {
@@ -395,10 +501,17 @@ def declaration_pdf(
             "v": v,
             "labels": vs.LABELS,
             "decl": decl,
+            "sup": sup,
+            "form_name": "Tờ khai thuế GTGT (01/GTGT)",
             "today": today(),
         },
     )
-    return pdf_response(pdf, f"to-khai-01GTGT-{p.year}-{p.period}.pdf")
+    return pdf_response(
+        pdf,
+        f"to-khai-01GTGT-{p.year}-{p.period}"
+        + (f"-BS{version}" if version else "")
+        + ".pdf",
+    )
 
 
 @router.get("/vat/declarations/{period_type}/{year:int}/{period:int}.xlsx")
@@ -411,7 +524,7 @@ def declaration_xlsx(
     db: Session = Depends(get_tenant_db),
 ):
     company = _company(db, user)
-    p, v, _decl = _decl_values(db, company, period_type, year, period)
+    p, v, _decl, _sup = _decl_values(db, company, period_type, year, period)
     book = ReportBook()
     ws = book.add_sheet(
         "01-GTGT",
@@ -465,7 +578,7 @@ def reduction_pdf(
     db: Session = Depends(get_tenant_db),
 ):
     company = _company(db, user)
-    p, v, _decl = _decl_values(db, company, period_type, year, period)
+    p, v, _decl, _sup = _decl_values(db, company, period_type, year, period)
     pdf = render_pdf(
         "vat/print/reduction.html",
         {
@@ -584,12 +697,50 @@ def cit_save(
         return redirect("/vat/cit", str(e), "error", request=request)
     rate = int(form["rate"]) if (form.get("rate") or "").isdigit() else None
     finalize = form.get("action") == "final"
-    cit.save(db, get_ctx(request), year, manual, rate, finalize=finalize)
+    try:
+        losses = _loss_rows(form)
+    except ValueError as e:
+        return redirect(
+            f"/vat/cit?year={year}", str(e), "error", request=request
+        )
+    cit.save(
+        db,
+        get_ctx(request),
+        year,
+        manual,
+        rate,
+        finalize=finalize,
+        losses=losses,
+    )
     return redirect(
         f"/vat/cit?year={year}",
         "Đã chốt bảng tính thuế TNDN" if finalize else "Đã lưu",
         request=request,
     )
+
+
+def _loss_rows(form: dict) -> list[dict] | None:
+    """Rows of the 03-2/TNDN table; None when the table was not
+    submitted (the losses then come from the history).
+    """
+    if form.get("losses_form") != "1":
+        return None
+    rows = []
+    for i in range(cit.LOSS_YEARS):
+        y = (form.get(f"loss_year_{i}") or "").strip()
+        loss = parse_money(form.get(f"loss_amount_{i}"))
+        if not y and not loss:
+            continue
+        if not y.isdigit():
+            raise ValueError("Năm phát sinh lỗ không hợp lệ")
+        rows.append(
+            {
+                "year": int(y),
+                "loss": loss,
+                "before": parse_money(form.get(f"loss_before_{i}")),
+            }
+        )
+    return rows
 
 
 @router.post("/vat/cit/reopen")

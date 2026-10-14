@@ -115,12 +115,13 @@ Amount fields accept shorthand: `2tr` = 2.000.000, `500k` = 500.000, `1,5tr` = 1
 |---|---|---|
 | 01/GTGT VAT return | Thuế → Tờ khai 01/GTGT → XML | form 842, version 2.8.3 |
 | Financial statements (TT133) | Sổ sách & báo cáo → Báo cáo tài chính (year view) → "Tờ khai BCTC dạng XML" | form 683: B01a, B02, B03, F01 |
-| 03/TNDN CIT finalization | Thuế → Quyết toán TNDN → XML 03/TNDN | form 892, version 2.9.4, with appendix 03-1A |
-| 05/QTT-TNCN PIT finalization | Lương → Báo cáo (whole year) → XML 05/QTT-TNCN | form 953, version 2.9.3, with 05-1 and 05-2 |
+| 03/TNDN CIT finalization | Thuế → Quyết toán TNDN → XML 03/TNDN | form 892, version 2.9.4, with appendices 03-1A and 03-2 (loss carry-forward) |
+| 05/QTT-TNCN PIT finalization | Lương → Báo cáo (whole year) → XML 05/QTT-TNCN | form 953, version 2.9.3, with 05-1, 05-2 and 05-3 (dependants from the employee pages) |
+| 05/KK-TNCN PIT withholding | Thuế → Tờ khai 05/KK-TNCN → Xuất → XML | form 864, version 2.9.3; quarterly from 04/2026 |
+| Supplementary return (01/KHBS) | open a finalized 01/GTGT or 05/KK-TNCN → "Khai bổ sung" card → Lập tờ khai bổ sung → XML/PDF of "BS lần n" | same form + `PL01_KHBS` and `PL01_1_KHBS` |
 
 The files follow the validation schemas shipped with HTKK 5.6.4. Import them in HTKK ("Nhập tờ khai từ XML"), check the
-figures and the lines VFAS cannot know (dependants in 05-3, real-estate transfers, tax incentives, related-party
-adjustments…), then file from HTKK or the e-tax portal. The notes to the financial statements (B09) are attached as a
+figures and the lines VFAS cannot know (real-estate transfers, tax incentives, related-party adjustments…), then file from HTKK or the e-tax portal. The notes to the financial statements (B09) are attached as a
 separate file.
 
 ## 7. Accounting regimes

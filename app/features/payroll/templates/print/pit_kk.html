@@ -1,0 +1,43 @@
+{% extends "vat/print/_layout.html" %}
+{% block title %}Tờ khai khấu trừ thuế TNCN {{ period.label }}{% endblock %}
+{% block body %}
+<table class="doc-head"><tr>
+  <td class="left"></td>
+  <td class="right"><p class="b">Mẫu số: 05/KK-TNCN</p><p class="i small">(Ban hành kèm theo Thông tư số 80/2021/TT-BTC ngày 29 tháng 9 năm 2021 của Bộ trưởng Bộ Tài chính)</p></td>
+</tr></table>
+<p class="nation">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
+<p class="motto">Độc lập - Tự do - Hạnh phúc</p>
+<p class="title">TỜ KHAI KHẤU TRỪ THUẾ THU NHẬP CÁ NHÂN</p>
+<p class="subtitle i">(Áp dụng cho tổ chức, cá nhân trả thu nhập từ tiền lương, tiền công)</p>
+<div class="info" style="margin-top:3mm">
+  <p>[01] Kỳ tính thuế: {{ period.label }} (từ ngày {{ period.start|date }} đến ngày {{ period.end|date }})</p>
+  <p>[02] Lần đầu: [{{ " " if sup else "X" }}] &nbsp;&nbsp; [03] Bổ sung lần thứ: {{ sup.version if sup else "...." }}</p>
+  <p>[04] Tên người nộp thuế: <span class="b">{{ company.name }}</span></p>
+  <p>[05] Mã số thuế: <span class="b">{{ company.tax_code }}</span></p>
+  <p>[06] Địa chỉ: {{ company.address }}</p>
+  <p>[15] Phân bổ thuế do có đơn vị hạch toán phụ thuộc tại địa bàn cấp tỉnh khác nơi có trụ sở chính: [ ]</p>
+</div>
+<p class="r i small" style="margin-top:2mm">Đơn vị tiền: Đồng Việt Nam</p>
+<table class="grid">
+  <colgroup><col style="width:8%"><col style="width:56%"><col style="width:9%"><col style="width:9%"><col style="width:18%"></colgroup>
+  <thead><tr><th>STT</th><th>Chỉ tiêu</th><th>Mã chỉ tiêu</th><th>Đơn vị tính</th><th>Số người/ Số tiền</th></tr></thead>
+  <tbody>
+    {% for no, code, formula, level in layout %}
+    <tr class="{{ 'head' if level == 0 }}">
+      <td class="c">{{ no }}</td>
+      <td style="padding-left: {{ 1.3 + level * 4 }}mm">{{ labels[code] }}{% if formula %} ({{ formula }}){% endif %}</td>
+      <td class="code">[{{ code }}]</td>
+      <td class="c">{{ "Người" if code in counts else "VNĐ" }}</td>
+      <td class="num">{{ v.get(code, 0)|money }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<p class="note">Tôi cam đoan số liệu khai trên là đúng và chịu trách nhiệm trước pháp luật về những số liệu đã khai./.</p>
+<table class="signatures"><tr>
+  <td style="width:50%"><p class="b">NHÂN VIÊN ĐẠI LÝ THUẾ</p><p>Họ và tên: ........................</p><p>Chứng chỉ hành nghề số: ............</p></td>
+  <td style="width:50%"><p class="i">..........., ngày ..... tháng ..... năm ..........</p><p class="role">NGƯỜI NỘP THUẾ hoặc ĐẠI DIỆN HỢP PHÁP CỦA NGƯỜI NỘP THUẾ</p><p class="hint">(Chữ ký, ghi rõ họ tên; chức vụ và đóng dấu (nếu có)/Ký điện tử)</p><p class="name">{{ company.legal_rep }}</p></td>
+</tr></table>
+<p class="note">Bản in từ phần mềm để đối chiếu. Tờ khai chính thức nộp điện tử qua thuedientu.gdt.gov.vn.</p>
+{% if sup %}{% include "vat/print/_khbs.html" %}{% endif %}
+{% endblock %}

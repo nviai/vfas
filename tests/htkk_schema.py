@@ -25,9 +25,14 @@ def validate(data: bytes, xsd_name: str) -> None:
     # space ("PL_CDTK "); XSD collapses whitespace in names, libxml2
     # does not.
     text = re.sub(r'name="([A-Za-z0-9_.]+) "', r'name="\1"', text)
+    # The schemas include their base with a Windows path
+    # ("..\TKhaiThue_DBHC.xsd"); a file URI base resolves it on every
+    # platform.
+    text = text.replace('schemaLocation="..\\', 'schemaLocation="../')
+    base = Path(folder).resolve().as_uri() + "/"
     parser = etree.XMLParser(no_network=True, resolve_entities=False)
     schema = etree.XMLSchema(
-        etree.fromstring(text.encode("utf-8"), parser, base_url=folder + "/")
+        etree.fromstring(text.encode("utf-8"), parser, base_url=base)
     )
     doc = etree.fromstring(data, parser)
     assert schema.validate(doc), [e.message for e in schema.error_log][:5]

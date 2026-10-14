@@ -5,7 +5,8 @@ Based on the Law on Tax Administration 2019 and Decree
 
 - VAT and withheld PIT: monthly period -> the 20th of the following
   month; quarterly period -> the last day of the first month of the
-  next quarter.
+  next quarter. Withheld PIT on salaries is quarterly from 04/2026
+  (see app/features/payroll/pit_return.py).
 - Provisional quarterly CIT: the 30th of the first month of the next
   quarter (Q4 is paid with the annual finalization).
 - Annual CIT finalization and annual financial statements: the last
@@ -23,7 +24,7 @@ from datetime import date, timedelta
 from app.features.org.models import Company
 
 
-def _shift(d: date) -> date:
+def next_workday(d: date) -> date:
     while d.weekday() >= 5:
         d += timedelta(days=1)
     return d
@@ -49,7 +50,7 @@ def vat_periods_due(company: Company, today: date, window: int = 75):
             while mm <= 0:
                 yy, mm = yy - 1, mm + 12
             ny, nm = _next_month(yy, mm)
-            due = _shift(date(ny, nm, 20))
+            due = next_workday(date(ny, nm, 20))
             out.append(("month", yy, mm, due))
     else:
         q = (today.month - 1) // 3 + 1
@@ -59,7 +60,7 @@ def vat_periods_due(company: Company, today: date, window: int = 75):
                 yy, qq = yy - 1, qq + 4
             end_m = qq * 3
             ny, nm = _next_month(yy, end_m)
-            due = _shift(_last_day(ny, nm))
+            due = next_workday(_last_day(ny, nm))
             out.append(("quarter", yy, qq, due))
     return [p for p in out if abs((p[3] - today).days) <= window]
 
@@ -74,10 +75,16 @@ def deadlines(
     """
     final_vat: set = set()
     final_cit: set = set()
+    final_pit: set = set()
     if db is not None:
         from sqlalchemy import select
 
-        from app.features.vat.models import FORM_VAT, TaxDeclaration
+        from app.features.vat.models import (
+            FORM_CIT,
+            FORM_PIT,
+            FORM_VAT,
+            TaxDeclaration,
+        )
 
         rows = db.execute(
             select(
@@ -93,7 +100,9 @@ def deadlines(
         for form, pt, y, p in rows:
             if form == FORM_VAT:
                 final_vat.add((pt, y, p))
-            else:
+            elif form == FORM_PIT:
+                final_pit.add((pt, y, p))
+            elif form == FORM_CIT:
                 final_cit.add(y)
 
     items: list[dict] = []
@@ -129,15 +138,27 @@ def deadlines(
             "vat",
             "submitted" if (pt, y, p) in final_vat else "pending",
         )
-        if due >= today:
+    # Withheld PIT on salaries (05/KK-TNCN). Past deadlines are only
+    # shown once finalized: not every company pays salaries.
+    from app.features.payroll import pit_return
+
+    p = pit_return.period_of(company, today)
+    for _ in range(4):
+        due = next_workday(pit_return.due_date(p))
+        key = (p.period_type, p.year, p.period)
+        if abs((due - today).days) <= window and (
+            due >= today or key in final_pit
+        ):
+            label = p.label[0].lower() + p.label[1:]
             add(
-                f"Tờ khai thuế TNCN khấu trừ {label} "
-                "(nếu có chi trả thu nhập)",
+                f"Tờ khai khấu trừ thuế TNCN {label} (05/KK-TNCN)",
                 due,
                 label,
-                "/vat/calendar",
+                f"/payroll/pit-returns/{p.period_type}/{p.year}/{p.period}",
                 "pit",
+                "submitted" if key in final_pit else "pending",
             )
+        p = pit_return.previous(company, p)
     # Provisional CIT for Q1–Q3 (Q4 is paid with the annual
     # finalization).
     q = (today.month - 1) // 3 + 1
@@ -148,7 +169,7 @@ def deadlines(
         if qq == 4:
             continue
         ny, nm = _next_month(yy, qq * 3)
-        due = _shift(date(ny, nm, 30))
+        due = next_workday(date(ny, nm, 30))
         if abs((due - today).days) <= window:
             add(
                 f"Tạm nộp thuế TNDN quý {qq}/{yy}",
@@ -159,7 +180,7 @@ def deadlines(
             )
     # CIT finalization and financial statements for the previous year.
     prev = today.year - 1
-    due = _shift(_last_day(today.year, 3))
+    due = next_workday(_last_day(today.year, 3))
     if -window <= (due - today).days <= 120:
         add(
             f"Quyết toán thuế TNDN năm {prev}",

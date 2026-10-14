@@ -61,7 +61,7 @@ The user interface defaults to Vietnamese and is fully translated into English.
 | **Cash** | Cash receipts 01-TT and payments 02-TT (quick phone form for cashiers), cash books S04a/S04b-DNN, cash counts 08a-TT, import of legacy cash books from Excel |
 | **Bank** | Deposits/withdrawals, internal transfers, bank book S05-DNN, payment orders, CSV/XLSX statement import with auto-matching |
 | **Sales & purchases** | Goods and services, sales and purchase vouchers, returns and allowances, **e-invoice XML import** (single files or ZIP), **e-invoice issuing** through Viettel S-Invoice, MISA meInvoice, VNPT or BKAV (with adjustment invoices) |
-| **Tax** | Purchase/sales listings, **01/GTGT** VAT return (PDF, Excel, XML in the HTKK layout), 8% VAT reduction appendix, corporate income tax worksheet with the **03/TNDN** XML, **05/QTT-TNCN** XML, filing calendar |
+| **Tax** | Purchase/sales listings, **01/GTGT** VAT return (PDF, Excel, XML in the HTKK layout), 8% VAT reduction appendix, corporate income tax worksheet with loss carry-forward and the **03/TNDN** XML (03-1A, 03-2), **05/KK-TNCN** PIT withholding return (quarterly, PDF + XML), **05/QTT-TNCN** XML with dependants (05-3), supplementary returns **01/KHBS** with late-payment interest, filing calendar |
 | **Receivables & payables** | Balances per customer/supplier, payment ledgers, aging, balance confirmation letters |
 | **Inventory** | Multiple warehouses, receipts/issues/transfers, periodic weighted-average costing, stock cards, stock summary |
 | **Fixed assets** | Asset cards and register, monthly straight-line depreciation, disposals; tools and prepaid expenses with allocation |
@@ -169,7 +169,7 @@ Found a vulnerability? **Do not open a public issue** – report it privately as
 - The software is provided "as is", without warranty (see [LICENSE](LICENSE)). Managers and chief accountants remain
   responsible for the accuracy of the figures (Article 28, Circular 99/2025/TT-BTC); have the chief accountant review
   reports before filing.
-- The **XML returns** (01/GTGT, financial statements, 03/TNDN, 05/QTT-TNCN) follow the schemas shipped with HTKK 5.6.4 and
+- The **XML returns** (01/GTGT, financial statements, 03/TNDN, 05/KK-TNCN, 05/QTT-TNCN) follow the schemas shipped with HTKK 5.6.4 and
   validate against them, but they are not signed and HTKK updates its forms often: **open them in HTKK ("Nhập tờ khai từ
   XML") before filing**.
 - **E-invoices** are issued with the company's own provider account; the company is responsible for their content. The

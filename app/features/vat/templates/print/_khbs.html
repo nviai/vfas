@@ -1,0 +1,41 @@
+{# 01/KHBS and 01-1/KHBS pages of a supplementary return. Expects sup
+   (khbs.Supplement), company, period, form_name. #}
+<div style="page-break-before: always"></div>
+<table class="doc-head"><tr>
+  <td class="left"></td>
+  <td class="right"><p class="b">Mẫu số: 01-1/KHBS</p><p class="i small">(Kèm theo hồ sơ khai bổ sung)</p></td>
+</tr></table>
+<p class="nation">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
+<p class="motto">Độc lập - Tự do - Hạnh phúc</p>
+<p class="title">BẢN GIẢI TRÌNH KHAI BỔ SUNG, ĐIỀU CHỈNH</p>
+<div class="info" style="margin-top:3mm">
+  <p>Bổ sung lần thứ: <span class="b">{{ sup.version }}</span> – {{ form_name }}, kỳ tính thuế {{ period.label }}</p>
+  <p>Tên người nộp thuế: <span class="b">{{ company.name }}</span> – Mã số thuế: <span class="b">{{ company.tax_code }}</span></p>
+</div>
+<p class="b" style="margin-top:3mm">A. Thông tin khai bổ sung</p>
+<table class="grid">
+  <colgroup><col style="width:6%"><col style="width:30%"><col style="width:9%"><col style="width:14%"><col style="width:14%"><col style="width:13%"><col style="width:14%"></colgroup>
+  <thead><tr><th>STT</th><th>Tên chỉ tiêu điều chỉnh</th><th>Mã số chỉ tiêu</th><th>Số đã kê khai</th><th>Số điều chỉnh</th><th>Chênh lệch</th><th>Điều chỉnh tăng/giảm nghĩa vụ thuế</th></tr>
+    <tr class="small"><th>(1)</th><th>(2)</th><th>(3)</th><th>(4)</th><th>(5)</th><th>(6)=(5)-(4)</th><th>(7)</th></tr></thead>
+  <tbody>
+    {% for c in sup.changes %}
+    <tr><td class="c">{{ loop.index }}</td><td>{{ c.label }}</td><td class="code">[{{ c.code }}]</td>
+      <td class="num">{{ c.declared|money }}</td><td class="num">{{ c.adjusted|money }}</td><td class="num">{{ c.diff|money }}</td>
+      <td class="num">{{ c.diff|money if c.effect else "" }}</td></tr>
+    {% endfor %}
+    <tr class="total"><td colspan="6">Tổng cộng điều chỉnh số thuế phải nộp (tăng +, giảm -)</td><td class="num">{{ sup.payable|money }}</td></tr>
+    {% if sup.deductible %}<tr class="total"><td colspan="6">Tổng cộng điều chỉnh số thuế được khấu trừ (tăng +, giảm -)</td><td class="num">{{ sup.deductible|money }}</td></tr>{% endif %}
+    {% if sup.refund %}<tr class="total"><td colspan="6">Tổng cộng điều chỉnh số thuế đề nghị hoàn (tăng +, giảm -)</td><td class="num">{{ sup.refund|money }}</td></tr>{% endif %}
+  </tbody>
+</table>
+<p style="margin-top:2mm">Lý do điều chỉnh: {{ sup.reason }}</p>
+<p class="b" style="margin-top:3mm">Tiền chậm nộp (tờ khai 01/KHBS, mục A.I.3)</p>
+{% if sup.payable > 0 %}
+<p>Số thuế tăng thêm: {{ sup.payable|money }} đồng; hạn nộp của kỳ: {{ sup.due|date }}; tính đến ngày: {{ sup.until|date }}; số ngày chậm nộp: {{ sup.days }}; tiền chậm nộp (0,03%/ngày): <span class="b">{{ sup.interest|money }}</span> đồng.</p>
+{% else %}
+<p>Không phát sinh tiền chậm nộp (số thuế phải nộp không tăng).</p>
+{% endif %}
+<table class="signatures"><tr>
+  <td style="width:50%"></td>
+  <td style="width:50%"><p class="i">..........., ngày ..... tháng ..... năm ..........</p><p class="role">NGƯỜI NỘP THUẾ hoặc ĐẠI DIỆN HỢP PHÁP CỦA NGƯỜI NỘP THUẾ</p><p class="hint">(Chữ ký, ghi rõ họ tên; chức vụ và đóng dấu (nếu có)/Ký điện tử)</p><p class="name">{{ company.legal_rep }}</p></td>
+</tr></table>

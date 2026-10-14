@@ -59,7 +59,7 @@ Phần mềm kế toán **miễn phí, mã nguồn mở** cho doanh nghiệp Vi�
 | **Tiền mặt** | Phiếu thu 01-TT, phiếu chi 02-TT (form nhanh cho thủ quỹ trên điện thoại), sổ quỹ S04a/S04b-DNN, kiểm kê quỹ 08a-TT, nhập sổ quỹ cũ từ Excel |
 | **Ngân hàng** | Thu/chi tiền gửi, chuyển tiền nội bộ, sổ tiền gửi S05-DNN, ủy nhiệm chi, nhập sao kê CSV/XLSX, tự đối chiếu |
 | **Mua bán** | Hàng hóa/dịch vụ, chứng từ bán hàng, mua hàng, trả lại/giảm giá, **nhập hóa đơn điện tử XML** (file lẻ hoặc ZIP), **phát hành hóa đơn điện tử** qua Viettel S-Invoice, MISA meInvoice, VNPT hoặc BKAV (kèm hóa đơn điều chỉnh) |
-| **Thuế** | Bảng kê mua vào/bán ra, tờ khai **01/GTGT** (PDF, Excel, XML theo cấu trúc HTKK), phụ lục giảm thuế 8%, bảng tính TNDN kèm XML **03/TNDN**, XML **05/QTT-TNCN**, lịch nộp thuế |
+| **Thuế** | Bảng kê mua vào/bán ra, tờ khai **01/GTGT** (PDF, Excel, XML theo cấu trúc HTKK), phụ lục giảm thuế 8%, bảng tính TNDN có chuyển lỗ kèm XML **03/TNDN** (03-1A, 03-2), tờ khai khấu trừ TNCN **05/KK-TNCN** (theo quý, PDF + XML), XML **05/QTT-TNCN** kèm người phụ thuộc (05-3), khai bổ sung **01/KHBS** kèm tiền chậm nộp, lịch nộp thuế |
 | **Công nợ** | Phải thu/phải trả theo đối tượng, sổ chi tiết thanh toán, tuổi nợ, biên bản đối chiếu công nợ |
 | **Kho** | Nhiều kho, nhập/xuất/chuyển kho, giá xuất bình quân gia quyền cả kỳ, thẻ kho, tổng hợp nhập–xuất–tồn |
 | **Tài sản** | TSCĐ (thẻ, sổ, khấu hao đường thẳng, ghi giảm), CCDC / chi phí trả trước (phân bổ) |
@@ -164,7 +164,7 @@ Phát hiện lỗ hổng? **Đừng mở issue công khai** – báo riêng theo
 - Phần mềm cung cấp "nguyên trạng", không kèm bảo hành (xem [LICENSE](LICENSE)). Người quản lý, kế toán trưởng chịu
   trách nhiệm về tính chính xác của số liệu (Điều 28 Thông tư 99/2025/TT-BTC); nên để kế toán trưởng duyệt báo cáo
   trước khi nộp.
-- **Các tờ khai XML** (01/GTGT, BCTC, 03/TNDN, 05/QTT-TNCN) dựng theo bộ XSD đi kèm HTKK 5.6.4 và hợp lệ theo XSD đó,
+- **Các tờ khai XML** (01/GTGT, BCTC, 03/TNDN, 05/KK-TNCN, 05/QTT-TNCN) dựng theo bộ XSD đi kèm HTKK 5.6.4 và hợp lệ theo XSD đó,
   nhưng chưa ký số và HTKK cập nhật mẫu thường xuyên: **mở bằng HTKK ("Nhập tờ khai từ XML") để kiểm tra trước khi nộp**.
 - **Hóa đơn điện tử** phát hành bằng tài khoản của chính công ty tại nhà cung cấp; công ty chịu trách nhiệm về nội dung
   hóa đơn. Phần kết nối viết theo tài liệu và client thực tế của nhà cung cấp nhưng chưa chạy thử trên tài khoản test:

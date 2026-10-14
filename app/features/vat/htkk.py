@@ -73,6 +73,7 @@ def build_xml(
     signer: str = "",
     signed_on: date | None = None,
     version: int = 0,
+    appendices: str = "",
 ) -> bytes:
     body = [
         el("ma_NganhNghe", BUSINESS_LINE[0]),
@@ -112,6 +113,7 @@ def build_xml(
         FORM,
         htkk.Period(kind, period.code, period.start, period.end),
         "".join(body),
+        appendices,
         signer=signer,
         signed_on=signed_on,
         version=version,

@@ -27,6 +27,14 @@ NAV = [
         order=30,
     ),
     NavItem(
+        section="tax",
+        label="Tờ khai 05/KK-TNCN",
+        href="/payroll/pit-returns",
+        icon="file-text",
+        perm="payroll.view",
+        order=25,
+    ),
+    NavItem(
         section="payroll",
         label="Tham số lương & thuế",
         href="/payroll/settings",

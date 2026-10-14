@@ -25,7 +25,7 @@ Indicators (formulas per form 01/GTGT):
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -40,6 +40,12 @@ from app.features.org.models import Company
 from app.features.vat.models import FORM_VAT, TaxDeclaration
 
 MANUAL_FIELDS = ("37", "38", "39a", "40b", "42")
+# Indicators compared in a supplementary return.
+KHBS_KEYS = (
+    "22", "23", "23a", "24", "24a", "25", "26", "27", "28", "29", "30",
+    "31", "32", "32a", "33", "34", "35", "36", "37", "38", "39a", "40a",
+    "40b", "40", "41", "42", "43",
+)  # fmt: skip
 LABELS = {
     "21": "Không phát sinh hoạt động mua, bán trong kỳ",
     "22": "Thuế GTGT còn được khấu trừ kỳ trước chuyển sang",
@@ -132,6 +138,18 @@ class TaxPeriod:
         if self.period < limit:
             return TaxPeriod(self.period_type, self.year, self.period + 1)
         return TaxPeriod(self.period_type, self.year + 1, 1)
+
+
+def deadline(period: TaxPeriod) -> date:
+    """Filing deadline moved off a weekend: the 20th of the next month,
+    or the last day of the first month of the next quarter.
+    """
+    from app.features.vat.calendar import next_workday
+
+    nxt = period.end + timedelta(days=1)
+    if period.period_type == "month":
+        return next_workday(nxt.replace(day=20))
+    return next_workday(month_bounds(nxt.year, nxt.month)[1])
 
 
 def period_of(company: Company, d: date) -> TaxPeriod:
@@ -429,9 +447,15 @@ def save(
 
 
 def reopen(db: Session, ctx, period: TaxPeriod) -> TaxDeclaration:
+    from app.features.vat import khbs
+
     decl = get_declaration(db, ctx.company_id, period)
     if decl is None:
         raise NotFoundError("Chưa có tờ khai kỳ này")
+    if khbs.has_supplements(db, ctx.company_id, FORM_VAT, period):
+        raise BusinessError(
+            "Tờ khai đã có khai bổ sung: xóa các lần bổ sung trước khi mở lại"
+        )
     nxt = get_declaration(db, ctx.company_id, period.next())
     if nxt is not None and nxt.status != "draft":
         raise BusinessError(
@@ -472,6 +496,88 @@ def list_declarations(db: Session, company_id: int) -> list[TaxDeclaration]:
             .order_by(TaxDeclaration.year.desc(), TaxDeclaration.period.desc())
         )
     )
+
+
+# ------------------------------------------------ supplementary returns
+
+
+def recompute(
+    db: Session, company_id: int, period: TaxPeriod, decl: TaxDeclaration
+) -> dict:
+    """The return of a filed version recomputed from the ledger, keeping
+    its manual indicators and the [22] it declared.
+    """
+    stored = decl.values or {}
+    manual = stored.get("manual", {})
+    v = compute(
+        db,
+        company_id,
+        period.start,
+        period.end,
+        carried=int(stored.get("22") or 0),
+        manual=manual,
+    )
+    v["manual"] = manual
+    v["_22_source"] = "đã kê khai"
+    return v
+
+
+def pending_changes(db: Session, company_id: int, period: TaxPeriod) -> list:
+    """Differences between the ledger and the latest filed version."""
+    from app.features.vat import khbs
+
+    rows = khbs.versions(db, company_id, FORM_VAT, period)
+    if not rows or rows[0].status == "draft":
+        return []
+    latest = rows[-1]
+    return khbs.compare(
+        FORM_VAT,
+        latest.values,
+        recompute(db, company_id, period, latest),
+        KHBS_KEYS,
+        LABELS,
+    )
+
+
+def supplement(
+    db: Session, ctx, period: TaxPeriod, *, reason: str, until: date
+) -> TaxDeclaration:
+    from app.features.vat import khbs
+
+    rows = khbs.versions(db, ctx.company_id, FORM_VAT, period)
+    if not rows or rows[0].status == "draft":
+        raise BusinessError(f"Chưa chốt tờ khai lần đầu {period.label}")
+    return khbs.create(
+        db,
+        ctx,
+        FORM_VAT,
+        period,
+        recompute(db, ctx.company_id, period, rows[-1]),
+        keys=KHBS_KEYS,
+        labels=LABELS,
+        due=deadline(period),
+        until=until,
+        reason=reason,
+    )
+
+
+def supplements(db: Session, company_id: int, period: TaxPeriod) -> list:
+    from app.features.vat import khbs
+
+    return [
+        khbs.summary_of(
+            db,
+            company_id,
+            FORM_VAT,
+            period,
+            d.version,
+            KHBS_KEYS,
+            LABELS,
+            deadline(period),
+        )
+        for d in khbs.versions(db, company_id, FORM_VAT, period)
+        if d.version > 0
+    ]
 
 
 # ------------------------------------------------ period-end VAT offset

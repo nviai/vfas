@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ _("Tờ khai 05/KK-TNCN") }}{% endblock %}
+{% block content %}
+{% set crumbs = [] %}{% for b in breadcrumbs %}{% do crumbs.append((_(b[0]), b[1])) %}{% endfor %}
+{{ ui.page_header(_("Tờ khai khấu trừ thuế TNCN (mẫu 05/KK-TNCN)"), _("Tiền lương, tiền công · khai theo quý từ kỳ 04/2026"), breadcrumbs=crumbs, icon_name="file-text") }}
+<div class="card">
+  <div class="table-wrap">
+    <table class="table table-hover">
+      <thead><tr><th>{{ _("Kỳ tính thuế") }}</th><th class="w-36 max-sm:hidden">{{ _("Hạn nộp") }}</th>
+        <th class="num w-40 max-md:hidden">{{ _("Thu nhập chịu thuế [21]") }}</th><th class="num w-40">{{ _("Thuế đã khấu trừ [29]") }}</th><th class="w-36">{{ _("Trạng thái") }}</th><th class="w-10"></th></tr></thead>
+      <tbody>
+        {% for r in rows %}{% set p = r.period %}{% set d = r.decl %}{% set last = r.latest %}
+        <tr class="is-link">
+          <td><a class="font-medium text-fg hover:underline" href="{{ r.url }}">{{ _(p.label) }}</a></td>
+          <td class="max-sm:hidden tabular-nums text-fg-3">{{ r.due|date }}</td>
+          <td class="num max-md:hidden">{{ last.values["21"]|money if last and last.status != "draft" else "–" }}</td>
+          <td class="num">{{ last.values["29"]|money if last and last.status != "draft" else "–" }}</td>
+          <td>
+            {% if last and last.version %}{{ ui.badge(_("BS lần {n}", n=last.version), "violet", dot=True) }}
+            {% elif d and d.status != "draft" %}{{ ui.badge(_("Đã chốt"), "green", dot=True) }}
+            {% elif r.ended %}{{ ui.badge(_("Chưa chốt"), "amber", dot=True) }}
+            {% else %}{{ ui.badge(_("Kỳ hiện tại"), "blue", dot=True) }}{% endif %}
+          </td>
+          <td class="!pr-3 text-right">{{ ui.icon("chevron-right", "size-4 text-fg-3") }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+<p class="mt-3 text-[13px] text-fg-3">{{ _("Tổ chức trả tiền lương, tiền công phải nộp tờ khai cho mọi quý có chi trả thu nhập, kể cả khi không khấu trừ thuế. Trước kỳ 04/2026, kỳ khai theo kỳ khai thuế GTGT.") }}</p>
+{% endblock %}

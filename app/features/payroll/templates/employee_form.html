@@ -66,4 +66,50 @@
   </div>
   {% endif %}
 </form>
+
+{% if editing %}
+<div id="dependents" class="mt-5">
+{% call ui.card(_("Người phụ thuộc"), _("Đăng ký giảm trừ gia cảnh – kê khai vào phụ lục 05-3/BK-QTT-TNCN khi quyết toán"), flush=True, icon_name="users") %}
+  {% if dependents and emp.dependents != active_dependents %}
+    <div class="px-5 pt-4">{{ ui.alert(_("Bảng lương đang giảm trừ {n} người phụ thuộc/tháng, danh sách có {m} người được giảm trừ tháng này. Kiểm tra lại số người phụ thuộc trong hồ sơ.", n=emp.dependents, m=active_dependents), "warning") }}</div>
+  {% endif %}
+  {% if dependents %}
+  <div class="table-wrap">
+    <table class="table table-compact">
+      <thead><tr><th>{{ _("Họ và tên") }}</th><th class="max-md:hidden">{{ _("Quan hệ") }}</th><th class="max-lg:hidden">{{ _("MST / Giấy tờ") }}</th><th>{{ _("Giảm trừ") }}</th><th class="w-10"></th></tr></thead>
+      <tbody>
+        {% for d in dependents %}
+        <tr>
+          <td><p class="font-medium">{{ d.full_name }}</p>{% if d.birth_date %}<p class="text-xs text-fg-3">{{ d.birth_date|date }}</p>{% endif %}</td>
+          <td class="max-md:hidden">{{ _(d.relationship_label) }}</td>
+          <td class="max-lg:hidden tabular-nums text-fg-2">{{ d.tax_code or "–" }}{% if d.id_number %}<p class="text-xs text-fg-3">{{ _(d.id_type_label) }} {{ d.id_number }}</p>{% endif %}</td>
+          <td class="tabular-nums">{{ d.from_month.strftime("%m/%Y") }} – {{ d.to_month.strftime("%m/%Y") if d.to_month else _("nay") }}</td>
+          <td class="text-right">{% if can("payroll.manage") %}
+            <form method="post" action="/payroll/employees/{{ emp.id }}/dependents/{{ d.id }}/delete" data-confirm="{{ _('Xóa người phụ thuộc này?') }}">{{ ui.csrf_field() }}
+              <button type="submit" class="btn-ghost btn-sm btn-icon" aria-label="{{ _('Xóa') }}" data-tooltip="{{ _('Xóa') }}">{{ ui.icon("trash-2", "size-4") }}</button></form>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+  {% if can("payroll.manage") %}
+  <form method="post" action="/payroll/employees/{{ emp.id }}/dependents" class="grid grid-cols-1 gap-3 border-t border-line px-5 py-4 sm:grid-cols-2 lg:grid-cols-4">
+    {{ ui.csrf_field() }}
+    {{ ui.input("full_name", _("Họ và tên"), required=True, id="dep-full_name") }}
+    {{ ui.input("birth_date", _("Ngày sinh"), type="date", id="dep-birth_date") }}
+    {{ ui.select("relationship", _("Quan hệ"), relationships, "01", id="dep-relationship") }}
+    {{ ui.input("tax_code", _("Mã số thuế"), input_cls="tabular-nums", id="dep-tax_code") }}
+    {{ ui.select("id_type", _("Loại giấy tờ"), id_types, "2080", id="dep-id_type") }}
+    {{ ui.input("id_number", _("Số giấy tờ"), input_cls="tabular-nums", id="dep-id_number") }}
+    {{ ui.input("from_month", _("Giảm trừ từ tháng"), type="month", required=True, id="dep-from_month") }}
+    {{ ui.input("to_month", _("Đến tháng"), type="month", hint=_("Để trống nếu chưa kết thúc"), id="dep-to_month") }}
+    <div class="sm:col-span-2 lg:col-span-4 flex justify-end">{{ ui.button(_("Thêm người phụ thuộc"), "secondary", icon_name="plus") }}</div>
+  </form>
+  {% elif not dependents %}
+    {{ ui.empty_state(_("Chưa khai báo người phụ thuộc"), "users", compact=True) }}
+  {% endif %}
+{% endcall %}
+</div>
+{% endif %}
 {% endblock %}
