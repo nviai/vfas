@@ -55,7 +55,7 @@ jobs:
           for i in $(seq 1 30); do curl -fs http://127.0.0.1:8000/healthz && exit 0; sleep 2; done
           docker logs vfas; exit 1
 
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@v4
         with:
           username: ${{ env.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
