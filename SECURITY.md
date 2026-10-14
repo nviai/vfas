@@ -14,7 +14,8 @@ VFAS stores companies' books, payroll and tax data, so every vulnerability repor
 **Do not open a public issue, pull request or discussion.**
 
 1. Open a private report at <https://github.com/nviai/vfas/security/advisories/new> (repository **Security** tab →
-   **Report a vulnerability**). Only the maintainers can see it.
+   **Report a vulnerability**). Only the maintainers can see it. Without a GitHub account, email
+   [contact@vfas.nviai.com](mailto:contact@vfas.nviai.com) with "SECURITY" in the subject.
 2. Include: version/commit, setup (SQLite or PostgreSQL, SaaS or self-host), steps to reproduce, and impact (access to
    another company's data, privilege escalation, tampering with posted vouchers…). A minimal proof of concept helps.
 3. Test only on your own installation or a demo account; **never access real data of other businesses**.
