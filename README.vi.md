@@ -76,18 +76,20 @@ Phần mềm kế toán **miễn phí, mã nguồn mở** cho doanh nghiệp Vi�
 
 ## Dùng thử trong 2 phút
 
-Cần Docker, dùng image dựng sẵn (linux/amd64 và linux/arm64):
+**Trực tuyến:** mở <https://vfas.nviai.com> và đăng nhập `demo@example.com` / `Demo@2026` – không cần cài đặt.
+
+**Chạy trên máy** cần Docker, dùng image dựng sẵn (linux/amd64 và linux/arm64):
 
 ```bash
-docker run -d --name vfas -p 127.0.0.1:8000:8000 -v vfas-data:/data ghcr.io/nviai/vfas:latest
+docker run -d --name vfas -p 127.0.0.1:8000:8000 -v vfas-data:/data nviai/vfas:latest
 docker exec vfas python -m app.cli demo
 ```
 
-Mở <http://127.0.0.1:8000> và đăng nhập `demo@example.com` / `Demo@2026`. Công ty mẫu có khoảng một năm nghiệp vụ.
+Mở <http://127.0.0.1:8000> và đăng nhập bằng cùng tài khoản trên. Công ty mẫu có khoảng một năm nghiệp vụ.
 Dọn dẹp: `docker rm -f vfas && docker volume rm vfas-data`.
 
 Muốn tự build image: `git clone https://github.com/nviai/vfas.git && cd vfas && docker build -t vfas .` rồi chạy `vfas`
-thay cho `ghcr.io/nviai/vfas:latest`.
+thay cho `nviai/vfas:latest`.
 
 ## Cài đặt cho doanh nghiệp
 
@@ -142,7 +144,7 @@ Tài liệu chi tiết viết bằng tiếng Anh.
 - [x] Xuất hóa đơn điện tử qua nhà cung cấp (Viettel S-Invoice, MISA meInvoice, VNPT, BKAV) – xem [docs/EINVOICE.md](docs/EINVOICE.md)
 - [x] XML BCTC, 03/TNDN, 05/QTT-TNCN để nộp qua HTKK
 - [x] Chế độ kế toán TT99/2025 và TT58/2026 (`app/core/regimes.py`)
-- [x] Image Docker dựng sẵn (`ghcr.io/nviai/vfas`, amd64/arm64, có ký số)
+- [x] Image Docker dựng sẵn ([`nviai/vfas`](https://hub.docker.com/r/nviai/vfas) trên Docker Hub, amd64/arm64, có ký số)
 - [ ] Ngoại tệ, kết nối API ngân hàng, giá thành sản xuất
 
 Muốn nhận một mục? Mở issue để thảo luận trước khi làm.

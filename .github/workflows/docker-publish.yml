@@ -1,10 +1,14 @@
 name: Docker image
 
-# Publishes the prebuilt image to the GitHub Container Registry:
-#   tag vX.Y.Z  -> ghcr.io/<owner>/vfas:X.Y.Z, X.Y, X, latest
-#   push to main -> ghcr.io/<owner>/vfas:edge
+# Publishes the prebuilt image to Docker Hub (docker.io/nviai/vfas):
+#   tag vX.Y.Z  -> nviai/vfas:X.Y.Z, X.Y, X, latest
+#   push to main -> nviai/vfas:edge
 # Multi-arch (linux/amd64, linux/arm64), with SBOM and provenance
 # attestations, signed with cosign (keyless, GitHub OIDC).
+#
+# Requires the secret DOCKERHUB_TOKEN in Settings -> Secrets and variables
+# -> Actions: a Docker Hub personal access token of the account nviai with
+# Read & Write scope.
 
 on:
   push:
@@ -15,6 +19,10 @@ on:
 permissions:
   contents: read
 
+env:
+  DOCKERHUB_USERNAME: nviai
+  IMAGE: docker.io/nviai/vfas
+
 concurrency:
   group: docker-${{ github.ref }}
   cancel-in-progress: false
@@ -24,13 +32,9 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
-      packages: write
       id-token: write   # cosign keyless signing
     steps:
       - uses: actions/checkout@v4
-
-      - name: Image name (lowercase owner)
-        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
 
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
@@ -53,9 +57,8 @@ jobs:
 
       - uses: docker/login-action@v3
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - id: meta
         uses: docker/metadata-action@v5
@@ -85,7 +88,7 @@ jobs:
           sbom: true
 
       - uses: sigstore/cosign-installer@v3
-      - name: Sign the image (every tag points to this digest)
+      - name: Sign the image (all tags share this digest)
         env:
           DIGEST: ${{ steps.push.outputs.digest }}
         run: cosign sign --yes "${IMAGE}@${DIGEST}"

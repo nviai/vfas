@@ -8,7 +8,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 ### Added
 - Email over SMTP (`SMTP_*`, `MAIL_FROM`): invitation emails with a "Resend" action, password reset ("Quên mật khẩu?")
   and email verification for self sign-up (`EMAIL_VERIFICATION=auto`); `python -m app.cli send-test-email`.
-- Prebuilt Docker image `ghcr.io/nviai/vfas` (linux/amd64 + linux/arm64) published by the "Docker image" workflow on
+- Prebuilt Docker image `nviai/vfas` on Docker Hub (linux/amd64 + linux/arm64) published by the "Docker image" workflow on
   release tags (`X.Y.Z`, `X.Y`, `X`, `latest`) and on `main` (`edge`), with SBOM/provenance and a cosign signature;
   `docker-compose.yml` pulls it by default (`VFAS_VERSION`).
 - E-invoice issuing (module `einvoice`): Viettel S-Invoice, MISA meInvoice, VNPT Invoice and BKAV eHoadon adapters
@@ -32,7 +32,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - Migration `0004` adds `users.email_verified_at`; existing accounts are marked as verified. Migration `0005` adds the
   e-invoice tables.
 - `ALLOW_SIGNUP=true` without SMTP now logs a warning at startup: configure SMTP before opening public sign-up.
-- `docker-compose.yml` now uses the image `ghcr.io/nviai/vfas:${VFAS_VERSION:-latest}` instead of a local `vfas:latest`
+- `docker-compose.yml` now uses the image `nviai/vfas:${VFAS_VERSION:-latest}` instead of a local `vfas:latest`
   build; add `--build` to keep building from the source.
 
 ## [2.0.0] – Unreleased

@@ -124,9 +124,10 @@ Mandatory rules:
    new version with the date.
 2. Tag the commit on `main`: `git tag -s v2.1.0 -m "VFAS 2.1.0" && git push origin v2.1.0`.
 3. The "Docker image" workflow builds `linux/amd64` + `linux/arm64`, runs the smoke test, pushes
-   `ghcr.io/nviai/vfas:2.1.0`, `2.1`, `2` and `latest`, and signs the image with cosign. Every push to `main` also
+   `nviai/vfas:2.1.0`, `2.1`, `2` and `latest` to Docker Hub, and signs the image with cosign. Every push to `main` also
    publishes `edge`.
-4. First release only: make the `vfas` package public in the organization's GitHub Packages settings.
+4. The workflow needs the repository secret `DOCKERHUB_TOKEN` (a Docker Hub access token of the `nviai` account with
+   Read & Write scope).
 
 ## License of contributions
 
