@@ -87,7 +87,7 @@ class LLMClient:
         base_url: str,
         model: str,
         api_key: str | None = None,
-        temperature: float = 0.2,
+        temperature: float | None = None,
         transport: httpx.BaseTransport | None = None,
     ):
         self.base_url = base_url
@@ -120,8 +120,10 @@ class LLMClient:
             "model": self.model,
             "messages": messages,
             "stream": True,
-            "temperature": self.temperature,
         }
+        # Left out when None: some models reject the parameter.
+        if self.temperature is not None:
+            payload["temperature"] = self.temperature
         if tools:
             payload["tools"] = tools
             payload["tool_choice"] = "auto"

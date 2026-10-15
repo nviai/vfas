@@ -104,6 +104,24 @@ def test_daily_limit(web, db, ctxs, fake_llm):
     assert events[0][0] == "error" and "hết 1 lượt" in events[0][1]["message"]
 
 
+def test_blank_temperature_is_not_sent(web, db, ctxs, fake_llm):
+    # Some models answer 400 "`temperature` is deprecated"
+    from app.features.ai.config import get_config
+
+    company = db.get(Company, ctxs[OWNER].company_id)
+    enable_ai(db, ctxs[OWNER], temperature="")
+    db.refresh(company)
+    assert get_config(company).temperature is None
+    web.login(ROLE_EMAILS[CHIEF])
+    fake_llm.responses = [{"text": "OK"}]
+    assert _chat(web, "một")[-1][0] == "done"
+    assert "temperature" not in fake_llm.requests[-1]
+    enable_ai(db, ctxs[OWNER], temperature="0.3")
+    fake_llm.responses = [{"text": "OK"}]
+    assert _chat(web, "hai")[-1][0] == "done"
+    assert fake_llm.requests[-1]["temperature"] == 0.3
+
+
 def test_settings_page_saves_encrypted_key(web, db, ctxs, fake_llm):
     web.login(ROLE_EMAILS[OWNER])
     assert web.get("/settings/ai").status_code == 200

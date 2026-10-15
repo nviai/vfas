@@ -60,7 +60,8 @@ PRESETS: dict[str, dict] = {
 DEFAULT_PRESET = "anthropic"
 DEFAULT_MAX_ROUNDS = 8
 DEFAULT_DAILY_LIMIT = 200
-DEFAULT_TEMPERATURE = 0.2
+# None = do not send ``temperature`` (some newer models reject it).
+DEFAULT_TEMPERATURE = None
 
 
 @dataclass
@@ -70,7 +71,7 @@ class AiConfig:
     base_url: str
     model: str
     api_key: str | None
-    temperature: float
+    temperature: float | None
     max_rounds: int
     daily_limit: int
     has_key: bool = False
@@ -105,6 +106,13 @@ def _num(value, default, cast, lo, hi):
     except (TypeError, ValueError):
         return default
     return max(lo, min(hi, v))
+
+
+def _temperature(value) -> float | None:
+    """Return the temperature, or None (blank) to leave it out."""
+    if value is None or str(value).strip() == "":
+        return None
+    return _num(value, DEFAULT_TEMPERATURE, float, 0.0, 2.0)
 
 
 def raw_settings(company: Company) -> dict:
@@ -169,13 +177,7 @@ def get_config(company: Company) -> AiConfig:
         base_url=base_url,
         model=model,
         api_key=key,
-        temperature=_num(
-            raw.get("temperature", DEFAULT_TEMPERATURE),
-            DEFAULT_TEMPERATURE,
-            float,
-            0.0,
-            2.0,
-        ),
+        temperature=_temperature(raw.get("temperature")),
         max_rounds=max_rounds,
         daily_limit=daily_limit,
         has_key=bool(raw.get("api_key_enc")),
@@ -244,8 +246,8 @@ def save_config(db: Session, ctx, data: dict) -> AiConfig:
     """Validate and save the AI settings.
 
     ``data`` keys: enabled, preset, base_url, model, api_key (empty =
-    keep the current key), clear_key, temperature, max_rounds,
-    daily_limit.
+    keep the current key), clear_key, temperature (blank = not sent),
+    max_rounds, daily_limit.
     """
     company = db.get(Company, ctx.company_id)
     before = raw_settings(company)
@@ -260,9 +262,7 @@ def save_config(db: Session, ctx, data: dict) -> AiConfig:
         "preset": preset,
         "base_url": base_url,
         "model": model[:200],
-        "temperature": _num(
-            data.get("temperature"), DEFAULT_TEMPERATURE, float, 0.0, 2.0
-        ),
+        "temperature": _temperature(data.get("temperature")),
         "max_rounds": _num(
             data.get("max_rounds"), DEFAULT_MAX_ROUNDS, int, 1, 20
         ),
