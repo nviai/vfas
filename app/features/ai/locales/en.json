@@ -1,6 +1,6 @@
 {
  "0 = không giới hạn": "0 = unlimited",
- "0–2; thấp = ổn định": "0–2; lower = more stable",
+ "0–2; để trống = không gửi (cần cho một số model mới không nhận tham số này)": "0–2; leave blank to not send it (needed by some newer models that reject this parameter)",
  "API key": "API key",
  "An toàn dữ liệu": "Data safety",
  "Anthropic Claude": "Anthropic Claude",

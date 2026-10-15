@@ -33,7 +33,7 @@
     {% call ui.form_section(_("Giới hạn"), _("Kiểm soát chi phí và độ ổn định của câu trả lời.")) %}
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {{ ui.input("temperature", _("Nhiệt độ"), form.get("temperature", cfg.temperature), type="number", input_cls="tabular-nums",
-                    attrs='step="0.1" min="0" max="2"', hint=_("0–2; thấp = ổn định")) }}
+                    attrs='step="0.1" min="0" max="2"', hint=_("0–2; để trống = không gửi (cần cho một số model mới không nhận tham số này)")) }}
         {{ ui.input("max_rounds", _("Số vòng tối đa"), form.get("max_rounds", cfg.max_rounds), type="number", input_cls="tabular-nums",
                     attrs='min="1" max="20"', hint=_("Vòng gọi công cụ")) }}
         {{ ui.input("daily_limit", _("Lượt/người/ngày"), form.get("daily_limit", cfg.daily_limit), type="number", input_cls="tabular-nums",

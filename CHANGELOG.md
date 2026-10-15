@@ -41,6 +41,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 ### Fixed
 - The 01/GTGT XML now validates against the HTKK schema: version 2.8.3, the required business-line/sub-item head
   elements, and no empty signature element.
+- AI assistant: a blank "Nhiệt độ" setting leaves `temperature` out of the request, for models that answer 400
+  "`temperature` is deprecated for this model"; new configurations no longer send it by default.
 
 ### Upgrade notes
 - Migration `0004` adds `users.email_verified_at`; existing accounts are marked as verified. Migration `0005` adds the
