@@ -68,7 +68,7 @@ openpyxl==3.1.5
     # via nviai-ketoan (pyproject.toml)
 opentelemetry-api==1.45.1
     # via fastapi
-pillow==12.3.0
+pillow==13.0.0
     # via weasyprint
 psycopg==3.3.6
     # via nviai-ketoan (pyproject.toml)
