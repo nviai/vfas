@@ -34,7 +34,7 @@ Changelog = "https://github.com/nviai/vfas/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 postgres = ["psycopg[binary]>=3.2"]
-dev = ["pytest>=8.3", "pypdf>=5.1", "playwright>=1.48", "ruff==0.17.0"]
+dev = ["pytest>=8.3", "pypdf>=5.1", "playwright>=1.48", "ruff==0.17.1"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
