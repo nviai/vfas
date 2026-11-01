@@ -2,7 +2,7 @@
 
 # ---- 1. Build CSS with the Tailwind standalone CLI (no Node needed) ----
 # Base images are pinned by digest (update deliberately: docker buildx imagetools inspect <image>).
-FROM debian:bookworm-slim@sha256:7c7b2c966bc9ee8cedfeef67e0e279108992c77681fa595db4a9d65c06ccc587 AS css
+FROM debian:bookworm-slim@sha256:99c0b25c46d0214d5a2091092e7908907dcaecd6a962cde0ac700acee222b6f3 AS css
 ARG TAILWIND_VERSION=v4.3.3
 ARG TAILWIND_SHA256_X64=dc61b3ac6b8c9ca874c0cc4c57b2409791a64c5540404ca5f5367360babc313a
 ARG TAILWIND_SHA256_ARM64=55fd0b241214eff3de1e8ee4f22796662f2d2e7a49bcfca7477cfd0bac398195
