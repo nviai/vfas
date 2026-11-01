@@ -22,7 +22,7 @@ COPY app ./app
 RUN tailwindcss -i app/static/src/app.css -o app/static/css/app.css --minify
 
 # ---- 2. Runtime ----
-FROM python:3.12-slim@sha256:a6e34c598f2467ed0e9a8d349809fcd8b5c603269512df273a0bb1784edc11b1 AS runtime
+FROM python:3.12-slim@sha256:aa943ce411423c7582288f18707ff66eddcbaeb510502d747a72aeb34f30d159 AS runtime
 LABEL org.opencontainers.image.title="VFAS" \
       org.opencontainers.image.description="VietNam Free Accounting Software – free, open-source accounting for Vietnamese SMEs (TT133)" \
       org.opencontainers.image.licenses="MIT" \
